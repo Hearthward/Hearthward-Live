@@ -1864,6 +1864,20 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   html.phoneL #gearStatsSummary .stGroupName .phFxNone{ display:inline; margin-left:6px; text-transform:none; letter-spacing:0; }
   html.phoneL #gearStatsSummary .stGroupName .phFxBtn{ margin-left:8px; min-height:26px; padding:0 10px; vertical-align:middle; text-transform:none; }
 </style>
+<style id="phoneSpoilsV1">
+  html.phoneL .loadoutTab.phFind{ position:relative; }
+  html.phoneL .loadoutTab.phFind{ border-color:var(--accent-soft); }
+  html.phoneL .loadoutTab.phFind::after{ content:"🎁" attr(data-finds); display:inline-block; margin-left:6px; padding:0 5px; border-radius:999px; background:var(--accent); color:var(--bg); font:700 .55rem/15px 'Space Mono',monospace; letter-spacing:0; vertical-align:1px; }
+  html.phoneL .phBagHead #phBuyBtn .phBadge{ display:inline-block; margin-left:6px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--accent-strong); color:var(--bg); font:700 .55rem/16px 'Space Mono',monospace; }
+  html.phoneL .phBagHead #phBuyBtn.on .phBadge{ background:var(--bg); color:var(--accent-strong); }
+  .phTile .phGift{ position:absolute; left:2px; bottom:1px; font-size:.62rem; line-height:1; filter:drop-shadow(0 0 3px rgba(240,190,100,.9)); }
+  html.phoneL #phDetail .phFinds{ border:1px solid var(--accent); border-radius:8px; padding:7px; display:flex; flex-direction:column; gap:5px; background:rgba(240,190,100,.06); }
+  html.phoneL #phDetail .phFinds .phShopH{ display:flex; align-items:center; gap:6px; }
+  html.phoneL #phDetail .phFindRow{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; font-size:.72rem; }
+  html.phoneL #phDetail .phFindRow .phFindNm{ font-weight:700; }
+  html.phoneL #phDetail .phFindRow button{ margin-left:auto; min-height:36px; padding:0 10px; border-radius:7px; font-family:'Cinzel'; font-size:.62rem; border:1px solid var(--accent-soft); background:var(--bg-panel); color:var(--accent-strong); }
+  html.phoneL #phDetail .phFindRow button:disabled{ opacity:.45; }
+</style>
 <div id="appWrap">
 <div id="app">
   <div class="masthead">
@@ -25472,11 +25486,16 @@ thrall(){return gs(14)+
       const fr = forgeRank(role, slotKey);
       b.innerHTML = slotIconHTML(slotKey) + (item ? `<span class="phQ">Q${item.quality}</span>` : "") + (item && item.affix ? `<span class="phA">★</span>` : "") + (fr ? `<span class="phF">${"\u25C6".repeat(fr)}</span>` : "");
       b.title = item ? itemDisplayName(item) : SLOT_LABELS[slotKey] + " (empty)"; return b; };
+    // phoneSpoilsV1: who has finds waiting
+    const myFinds = phFinds(role), giftSlots = new Set(myFinds.filter(f=>f.v.cls==="up").map(f=>f.d.type));
+    { const tabs = document.querySelectorAll("#loadoutTabs .loadoutTab"); GEAR_ROLES.forEach((r,i)=>{ const t = tabs[i]; if(!t) return; const n = phFinds(r).filter(f=>f.v.cls==="up").length; t.classList.toggle("phFind", n>0); if(n) t.dataset.finds = n; else delete t.dataset.finds; }); }
+    { const bb = document.getElementById("phBuyBtn"); if(bb) bb.innerHTML = "Buy" + (myFinds.length ? `<span class="phBadge" title="Finds to share">🎁${myFinds.length}</span>` : ""); }
     // equipped row
     const er = document.getElementById("phEqRow"); er.innerHTML = "";
     GEAR_DISPLAY_ORDER.filter(k=>GEAR_SLOT_KEYS.includes(k)).forEach(k=>{
       const uid = eq[k], item = uid ? S.gear.inventory.find(i=>i.uid===uid) : null;
       const b = tile(k, item, (phSel && phSel.slot===k) || (phSel && phSel.shop && buyPick.slot===k) ? " on" : "");
+      if(giftSlots.has(k)) b.insertAdjacentHTML("beforeend", `<span class="phGift">🎁</span>`);
       b.addEventListener("click", ()=>{ phSel = { slot:k }; phSellArm = null; phGearRender(); }); er.appendChild(b); });
     // bag
     const equippedUids = new Set(Object.values(eq).filter(Boolean));
@@ -25500,14 +25519,19 @@ thrall(){return gs(14)+
     let item = null, cur = null, fromSlot = null;
     if(phSel && phSel.uid){ item = S.gear.inventory.find(i=>i.uid===phSel.uid); const k = item && slotForItem(item); cur = k && eq[k] ? S.gear.inventory.find(i=>i.uid===eq[k]) : null; }
     else if(phSel && phSel.slot){ fromSlot = phSel.slot; item = eq[fromSlot] ? S.gear.inventory.find(i=>i.uid===eq[fromSlot]) : null; }
-    if(!item){ d.innerHTML = fromSlot ? `<div class="phHint">${SLOT_LABELS[fromSlot]}: empty. Tap a piece in your bag to equip one.</div>` : `<div class="phHint">Tap a piece to see its stats.</div>`; return; }
+    if(!item){ d.innerHTML = fromSlot ? `<div class="phHint">${SLOT_LABELS[fromSlot]}: empty. Tap a piece in your bag to equip one.</div>` : `<div class="phHint">Tap a piece to see its stats.</div>`;
+      if(fromSlot){ const fs = myFinds.filter(f=>f.d.type===fromSlot); if(fs.length){ const box = document.createElement("div"); box.className = "phFinds"; box.innerHTML = `<div class="phShopH">🎁 Shared find for this slot</div>` + phFindRowsHTML(fs, role); d.appendChild(box); phBindFinds(box); } }
+      else if(myFinds.length){ d.insertAdjacentHTML("beforeend", `<div class="phNote" style="text-align:center">🎁 ${myFinds.length} shared find${myFinds.length>1?"s":""} on offer: tap Buy.</div>`); }
+      return; }
     const k = slotForItem(item);
     d.innerHTML = itemRowBodyHTML(item, fromSlot ? isAffixWasted(role, item, totals) : false, fromSlot ? null : cur)
       + `<div class="phSub">${SLOT_LABELS[k]}${fromSlot ? " · equipped" : ""} · sells for ${gearSellValue(item)}g</div>`
       + (!fromSlot ? `<div class="phCur">${cur ? `Replaces <b>${itemDisplayName(cur)}</b> (Q${cur.quality}). ▲▼ compare with it.` : `Your ${SLOT_LABELS[k]} slot is empty.`}</div>` : "");
     const btns = document.createElement("div"); btns.className = "phBtns"; d.appendChild(btns);
     const mk = (cls, text, fn, dis)=>{ const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = text; if(dis) b.disabled = true; b.addEventListener("click", fn); btns.appendChild(b); return b; };
-    if(fromSlot){ mk("primary", "Remove", ()=>{ phSel = { slot:fromSlot }; unequipSlot(role, fromSlot); }); return; }
+    if(fromSlot){ mk("primary", "Remove", ()=>{ phSel = { slot:fromSlot }; unequipSlot(role, fromSlot); });
+      const fs = myFinds.filter(f=>f.d.type===fromSlot); if(fs.length){ const box = document.createElement("div"); box.className = "phFinds"; box.innerHTML = `<div class="phShopH">🎁 Shared find for this slot</div>` + phFindRowsHTML(fs, role); d.insertBefore(box, btns); phBindFinds(box); }
+      return; }
     mk("primary", cur ? "Swap in" : "Equip", ()=>{ phSel = { slot:k }; equipFromInventory(item.uid); });
     const sellV = gearSellValue(item), rr = rerollGearCost(item);
     const armed = phSellArm===item.uid;
@@ -25528,6 +25552,20 @@ thrall(){return gs(14)+
     if(up && down) return { cls:"mixed", txt:"≈ Mixed" + fx };
     return { cls:"same", txt:"= Same" + fx };
   }
+  // phoneSpoilsV1: the finds on offer for a hero (same rules as commissionHTML) with each one's verdict for them
+  function phFinds(role){
+    const shopIdx0 = unlockedRarityIdx(), seen = new Set(), eq = S.gear.equipped[role];
+    return (S.recentDrops||[]).filter(d=>d.role!==role && rarityDef(d.rarity).order > shopIdx0).slice().reverse()
+      .sort((a,b)=> rarityDef(b.rarity).order-rarityDef(a.rarity).order || b.quality-a.quality)
+      .filter(d=>{ const k=d.rarity+d.type+d.quality; if(seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, COMMISSION_SHOWN)
+      .map(d=>{ const cur = eq[d.type] ? S.gear.inventory.find(i=>i.uid===eq[d.type]) : null; return { d, cur, v:phVerdict(phPreviewItem(role, d.type, d.rarity, d.quality), cur) }; });
+  }
+  function phFindRowsHTML(list, role){
+    return list.map(f=>{ const rd = rarityDef(f.d.rarity), cost = commissionQuote(f.d);
+      return `<div class="phFindRow"><span class="phFindNm" style="color:${resolveColor(rd.color)}">${rd.name} ${SLOT_LABELS[f.d.type]||f.d.type} Q${f.d.quality}</span><span class="phV ${f.v.cls}">${f.v.txt}</span><button type="button" data-find="${f.d.id}"${(S.gold||0) >= cost ? "" : " disabled"}>Buy for ${(TAB_LABELS[role]||"").replace(/^.*· /,"")} · ${cost}g</button></div>`; }).join("");
+  }
+  function phBindFinds(root){ root.querySelectorAll("[data-find]").forEach(b=>b.addEventListener("click", ()=>{ const it = commissionItem(b.getAttribute("data-find")); if(it){ phSel = { uid:it.uid }; phGearRender(); } })); }
   function phShopRender(d, role, eq){
     const maxIdx = unlockedRarityIdx();
     if(!buyPick.rarity || RARITIES.findIndex(r=>r.id===buyPick.rarity) > maxIdx) buyPick.rarity = RARITIES[maxIdx].id;
@@ -25559,8 +25597,12 @@ thrall(){return gs(14)+
     go.addEventListener("click", ()=>{ const it = buyItem(); if(it){ phSel = { uid:it.uid }; phGearRender(); } }); btns.appendChild(go);
     const next = maxIdx < RARITIES.length-1 ? ` Clear +${(maxIdx+1)*RARITY_BAND_SPAN+1} to unlock ${RARITIES[maxIdx+1].name}.` : "";
     d.querySelector("#phBuyNote").textContent = full ? `${ROLE_LABELS[role]}'s bag is full (${GEAR_INVENTORY_CAP}). Sell or equip something first.` : !afford ? `Not enough gold.${next}` : `Choosing a slot or quality costs more than random.${next}`;
-    // Share the Spoils, with each offer's verdict for this character
-    const sh = document.createElement("div"); sh.innerHTML = commissionHTML(role); d.appendChild(sh);
+    // Share the Spoils: shown first (phoneSpoilsV1)
+    const finds = phFinds(role);
+    if(finds.length){ const box = document.createElement("div"); box.className = "phFinds";
+      box.innerHTML = `<div class="phShopH">🎁 Finds to share (${finds.length})</div><div class="phNote">Gear another hero found above your shop tier. Buy a copy for ${(TAB_LABELS[role]||"").replace(/^.*· /,"")}; each find can be shared once.</div>` + phFindRowsHTML(finds, role);
+      d.insertBefore(box, d.firstChild.nextSibling); phBindFinds(box); }
+    const sh = document.createElement("div");
     sh.querySelectorAll("[data-commission]").forEach(btn=>{ const id = btn.getAttribute("data-commission"), drop = (S.recentDrops||[]).find(x=>x.id===id);
       if(drop){ const cur = eq[drop.type] ? S.gear.inventory.find(i=>i.uid===eq[drop.type]) : null, v = phVerdict(phPreviewItem(role, drop.type, drop.rarity, drop.quality), cur);
         const nm = btn.parentElement && btn.parentElement.querySelector(".commNm"); if(nm) nm.insertAdjacentHTML("afterend", `<span class="phV ${v.cls}">${v.txt}</span>`); }
@@ -31479,7 +31521,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build ee2cbeb18b) */
+<script>/* phone app: offline cache (build 6f4799f454) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
