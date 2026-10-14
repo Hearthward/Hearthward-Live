@@ -1629,14 +1629,15 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   html.phoneL .overlay .card, html.phoneL .card{ max-height:calc(100vh - 16px); overflow:auto; }
 </style>
 <div id="saveCodeDlg" hidden><div class="scCard frame"><h3>Save Code</h3>
-  <p>Your progress as one code. Copy it to back it up or move it to another copy of the game; paste a code here and press Load to bring progress in (this replaces the progress on this device).</p>
-  <textarea id="saveCodeTxt" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
-  <div class="scBtns"><button type="button" id="scCopy">Copy</button><button type="button" id="scLoad">Load pasted code</button><button type="button" id="scClose">Close</button></div>
+  <p>Move your progress to another copy of the game (or back it up). Easiest: <b>Save to file</b> here, then <b>Load from file</b> on the other device (AirDrop it, or keep it in iCloud Drive / Files). Or copy the code and paste it there. Loading replaces the progress on this device.</p>
+  <div class="scBtns"><button type="button" id="scFile">Save to file</button><button type="button" id="scOpen">Load from file</button><input type="file" id="scFileIn" accept=".txt,.hwsave,text/plain" hidden></div>
+  <textarea id="saveCodeTxt" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste a save code here"></textarea>
+  <div class="scBtns"><button type="button" id="scCopy">Copy code</button><button type="button" id="scLoad">Load pasted code</button><button type="button" id="scClose">Close</button></div>
   <p class="scMsg" id="scMsg"></p></div></div>
 <style>#saveCodeDlg{ position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding:12px; }
 #saveCodeDlg[hidden]{ display:none; } #saveCodeDlg .scCard{ width:min(520px,100%); max-height:calc(100vh - 24px); overflow:auto; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
 #saveCodeDlg h3{ margin:0; font-family:'Cinzel'; color:var(--accent-strong); } #saveCodeDlg p{ margin:0; font-size:.78rem; color:var(--text-dim); }
-#saveCodeDlg textarea{ width:100%; height:110px; font:.62rem/1.3 'Space Mono',monospace; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px; resize:vertical; -webkit-user-select:text; user-select:text; }
+#saveCodeDlg textarea{ width:100%; height:80px; font:.62rem/1.3 'Space Mono',monospace; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px; resize:vertical; -webkit-user-select:text; user-select:text; }
 #saveCodeDlg .scBtns{ display:flex; gap:8px; flex-wrap:wrap; } #saveCodeDlg button{ font-family:'Cinzel'; font-size:.72rem; letter-spacing:.05em; padding:8px 14px; border-radius:999px; border:1px solid var(--accent-soft); background:var(--bg-panel-2); color:var(--accent-strong); cursor:pointer; }
 #saveCodeDlg .scMsg{ min-height:1em; color:var(--moss); }</style>
 <div id="appWrap">
@@ -29908,18 +29909,35 @@ thrall(){return gs(14)+
     if(!d.moved && e.type==="pointerup"){ const sp = canvasPoint(e); const p = VIEW.unproject(sp.x, sp.y); if(walkable(p.x,p.y)) S.moveTo = p; }
   };
   canvas.addEventListener("pointerup", endMapDrag); canvas.addEventListener("pointercancel", endMapDrag);
-  // saveCodeV1
+  // saveCodeV1 (v2: compressed codes "HW2:", save/load as a file; old "HW1:" codes still load)
   (function(){ const dlg = document.getElementById("saveCodeDlg"), txt = document.getElementById("saveCodeTxt"), msg = document.getElementById("scMsg"); if(!dlg) return;
     const keys = ()=>{ const out = {}; try{ for(let i=0;i<localStorage.length;i++){ const k = localStorage.key(i); if(k && k.indexOf("hearthward_")===0) out[k] = localStorage.getItem(k); } }catch(e){} return out; };
-    const encode = o=>"HW1:" + btoa(unescape(encodeURIComponent(JSON.stringify(o))));
-    const decode = c=>{ c = (c||"").trim(); if(c.indexOf("HW1:")!==0) throw new Error("not a Hearthward save code"); const o = JSON.parse(decodeURIComponent(escape(atob(c.slice(4).replace(/\s+/g,""))))); if(!o || typeof o!=="object" || !Object.keys(o).some(k=>k.indexOf("hearthward_")===0)) throw new Error("no save in this code"); return o; };
-    const open = ()=>{ txt.value = encode(keys()); msg.textContent = ""; dlg.hidden = false; };
+    const b64 = u8=>{ let s = ""; for(let i=0;i<u8.length;i+=0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i+0x8000)); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); };
+    const unb64 = s=>{ s = s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length % 4) s += "="; const bin = atob(s), u8 = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i); return u8; };
+    const pipe = async (u8, stream)=>new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(stream)).arrayBuffer());
+    const canZip = typeof CompressionStream === "function" && typeof DecompressionStream === "function";
+    const encode = async o=>{ const raw = new TextEncoder().encode(JSON.stringify(o)); if(canZip){ try{ return "HW2:" + b64(await pipe(raw, new CompressionStream("deflate-raw"))); }catch(e){} } return "HW1:" + btoa(unescape(encodeURIComponent(JSON.stringify(o)))); };
+    const decode = async c=>{ c = (c||"").replace(/\s+/g,""); let o;
+      if(c.indexOf("HW2:")===0){ if(!canZip) throw new Error("this device can't open compressed codes"); o = JSON.parse(new TextDecoder().decode(await pipe(unb64(c.slice(4)), new DecompressionStream("deflate-raw")))); }
+      else if(c.indexOf("HW1:")===0) o = JSON.parse(decodeURIComponent(escape(atob(c.slice(4)))));
+      else throw new Error("not a Hearthward save code");
+      if(!o || typeof o!=="object" || !Object.keys(o).some(k=>k.indexOf("hearthward_")===0)) throw new Error("no save in this code"); return o; };
+    const apply = o=>{ try{ Object.keys(o).forEach(k=>{ if(k.indexOf("hearthward_")===0) localStorage.setItem(k, o[k]); }); }catch(e){ msg.textContent = "Could not write the save on this device."; return; } msg.textContent = "Loaded. Restarting..."; setTimeout(()=>location.reload(), 600); };
+    const loadText = async t=>{ let o; try{ o = await decode(t); }catch(e){ msg.textContent = "That doesn't look like a save (" + e.message + ")."; return; } apply(o); };
+    const open = ()=>{ txt.value = ""; msg.textContent = ""; dlg.hidden = false; };
     const b = document.getElementById("saveCodeBtn"); if(b) b.addEventListener("click", open);
     document.getElementById("scClose").addEventListener("click", ()=>{ dlg.hidden = true; });
-    document.getElementById("scCopy").addEventListener("click", async ()=>{ txt.value = encode(keys()); try{ await navigator.clipboard.writeText(txt.value); msg.textContent = "Copied."; }catch(e){ txt.focus(); txt.select(); msg.textContent = "Selected: copy it with your device's copy command."; } });
-    document.getElementById("scLoad").addEventListener("click", ()=>{ let o; try{ o = decode(txt.value); }catch(e){ msg.textContent = "That doesn't look like a save code (" + e.message + ")."; return; }
-      try{ Object.keys(o).forEach(k=>{ if(k.indexOf("hearthward_")===0) localStorage.setItem(k, o[k]); }); }catch(e){ msg.textContent = "Could not write the save on this device."; return; }
-      msg.textContent = "Loaded. Restarting..."; setTimeout(()=>location.reload(), 600); });
+    document.getElementById("scCopy").addEventListener("click", async ()=>{ txt.value = await encode(keys()); try{ await navigator.clipboard.writeText(txt.value); msg.textContent = "Copied (" + txt.value.length + " characters)."; }catch(e){ txt.focus(); txt.select(); msg.textContent = "Selected: copy it with your device's copy command."; } });
+    document.getElementById("scLoad").addEventListener("click", ()=>loadText(txt.value));
+    document.getElementById("scFile").addEventListener("click", async ()=>{ const code = await encode(keys()), d = new Date(), name = "hearthward-save-" + d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0") + ".txt";
+      const file = new File([code], name, { type:"text/plain" });
+      // inside claude.ai the viewer only hands over files through the downloads capability (a confirmation prompt)
+      try{ if(window.claude && typeof window.claude.use==="function"){ const dl = await window.claude.use("downloads"); if(dl){ try{ await dl.save({ filename:name, data:code }); msg.textContent = "Saved " + name + ". Open it with Load from file on the other device."; }catch(e){ msg.textContent = e && e.code==="declined" ? "Save cancelled." : "Could not save a file here: use Copy code instead."; } return; } } }catch(e){}
+      if(navigator.canShare && navigator.canShare({ files:[file] })){ try{ await navigator.share({ files:[file], title:"Hearthward save" }); msg.textContent = "Shared. Open it with Load from file on the other device."; return; }catch(e){ if(e && e.name==="AbortError") return; } }
+      const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000); msg.textContent = "Saved " + name + "."; });
+    const fin = document.getElementById("scFileIn");
+    document.getElementById("scOpen").addEventListener("click", ()=>{ fin.value = ""; fin.click(); });
+    fin.addEventListener("change", async ()=>{ const f = fin.files && fin.files[0]; if(!f) return; loadText(await f.text()); });
   })();
   { const mb = document.getElementById("phoneMenuBtn"); if(mb) mb.addEventListener("click", ()=>{ document.documentElement.classList.toggle("phoneMenu"); }); }
   canvas.addEventListener("wheel", e=>{
@@ -31000,7 +31018,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 938a5b0a5d) */
+<script>/* phone app: offline cache (build 8f20b89362) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
