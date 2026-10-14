@@ -1689,6 +1689,51 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   @media (prefers-reduced-motion: reduce){ #rotateNag .rnIcon{ animation:none; } }
 </style>
 <div id="rotateNag"><div class="rnIcon">▯</div><p>Turn your phone sideways</p><small>Hearthward is built for landscape on phones.</small><button type="button" id="rotateOkBtn">Play upright anyway</button></div>
+<style id="phoneMenusV1">
+  /* phoneMenusV1: full-screen menu pages on landscape phones */
+  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay){ padding:0; align-items:stretch; justify-content:stretch; }
+  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card{ max-width:none !important; width:100% !important; height:100% !important; max-height:none !important; border-radius:0; border:none; box-shadow:none;
+    padding:54px max(14px, env(safe-area-inset-right,0px)) max(10px, env(safe-area-inset-bottom,0px)) max(14px, env(safe-area-inset-left,0px)); gap:8px; }
+  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card::before{ content:""; position:fixed; left:0; right:0; top:0; height:46px; background:var(--bg-panel); border-bottom:1px solid var(--border); z-index:5; pointer-events:none; }
+  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card > h2, html.phoneL #healerGuideOverlay .hgHead h2{ position:fixed; z-index:6; top:0; left:max(16px, env(safe-area-inset-left,0px)); height:46px; display:flex; align-items:center; margin:0; font-size:1.05rem; text-align:left; white-space:nowrap; }
+  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) .overlayGold{ position:fixed; z-index:6; top:0; right:calc(max(10px, env(safe-area-inset-right,0px)) + 104px); height:46px; margin:0; display:flex; align-items:center; }
+  html.phoneL :is(#loadoutBackBtn,#talentsBackBtn,#ranksBackBtn,#anvilBackBtn,#raidMechBackBtn,#compendiumBackBtn,#skinBackBtn,#hgClose){ position:fixed; z-index:7; top:3px; right:max(10px, env(safe-area-inset-right,0px)); height:40px; min-width:88px; margin:0; padding:0 16px; font-size:.75rem; background:var(--bg-panel-2); color:var(--accent-strong); border:1px solid var(--accent-soft); box-shadow:none; }
+  /* intro text: one line, tap to read it all */
+  html.phoneL :is(#loadoutOverlay .card > p,#talentsOverlay .card > p,#ranksOverlay .card > p,#compendiumOverlay .card > p,#raidMechOverlay .card > p){ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; font-size:.74rem; line-height:1.4; text-align:left; cursor:pointer; flex:0 0 auto; padding-right:18px; position:relative; }
+  html.phoneL :is(#loadoutOverlay .card > p,#talentsOverlay .card > p,#ranksOverlay .card > p,#compendiumOverlay .card > p,#raidMechOverlay .card > p)::after{ content:"⌄"; position:absolute; right:2px; top:0; color:var(--accent); }
+  html.phoneL :is(#loadoutOverlay .card > p,#talentsOverlay .card > p,#ranksOverlay .card > p,#compendiumOverlay .card > p,#raidMechOverlay .card > p).phOpen{ -webkit-line-clamp:unset; display:block; }
+  html.phoneL :is(#loadoutOverlay .card > p,#talentsOverlay .card > p,#ranksOverlay .card > p,#compendiumOverlay .card > p,#raidMechOverlay .card > p).phOpen::after{ content:"⌃"; }
+  /* tab rows scroll sideways */
+  html.phoneL :is(.loadoutTabs,.anvTabs){ flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; align-self:stretch !important; flex:0 0 auto; gap:6px; margin:0; padding-bottom:2px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  html.phoneL :is(.loadoutTabs,.anvTabs)::-webkit-scrollbar{ display:none; }
+  html.phoneL :is(.loadoutTabs,.anvTabs) > *{ flex:0 0 auto; white-space:nowrap; min-height:36px; font-size:.68rem; padding-top:0; padding-bottom:0; }
+  /* talents: the tier list fills the page */
+  html.phoneL #talentsOverlay .card.talentsCard{ overflow:hidden; }
+  /* healer guide: body scrolls between the bar and the page dots */
+  html.phoneL #healerGuideOverlay .hgHead{ flex:0 0 auto; }
+  /* start screen */
+  html.phoneL #startOverlay .card{ overflow:hidden; }
+  html.phoneL #startOverlay .introLines{ display:none; }
+  html.phoneL #startOverlay .startGrid{ flex:1 1 auto; min-height:0; grid-template-columns:minmax(220px, 34%) minmax(0,1fr); gap:16px; align-items:stretch; }
+  html.phoneL #startOverlay .startCol{ min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0 4px 10px 0; gap:10px; -webkit-overflow-scrolling:touch; }
+  html.phoneL #startOverlay .hubRow{ grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
+  html.phoneL #startOverlay .hubRow{ grid-template-columns:1fr; } html.phoneL #startOverlay .hubBtn{ min-height:42px; padding:4px 10px; }
+  html.phoneL #startOverlay .beginDescent{ position:sticky; bottom:0; z-index:2; margin-top:6px; padding:12px 16px; box-shadow:0 -6px 12px var(--bg-panel), 0 2px 0 rgba(0,0,0,.25); }
+  html.phoneL #startOverlay .startCol .resetSaveBtn{ margin-top:8px; }
+  html.phoneL .kdHint{ font-size:0; } html.phoneL .kdHint::after{ content:"Hold for details"; font-size:.68rem; }
+  /* in-run menu: one scrolling panel beside the party column */
+  #phMenuPanel{ display:none; }
+  html.phoneL.phoneMenu #phMenuPanel{ display:flex; flex-direction:column; gap:8px; position:fixed; z-index:40; left:calc(env(safe-area-inset-left,0px) + 54px); right:calc(env(safe-area-inset-right,0px) + var(--phCol) + 14px); top:6px; bottom:6px; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:10px; background:var(--bg-panel); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow); }
+  html.phoneL.phoneMenu #phMenuPanel > *{ position:static !important; left:auto; right:auto; top:auto; bottom:auto; width:auto; margin:0; box-shadow:none; flex:0 0 auto; }
+  html.phoneL.phoneMenu #phMenuPanel > .masthead{ display:flex; padding:0; border:none; background:none; min-height:0; gap:8px; }
+  html.phoneL.phoneMenu #phMenuPanel > .masthead h1{ font-size:.95rem; margin:0; }
+  html.phoneL.phoneMenu #phMenuPanel .mchip, html.phoneL.phoneMenu #phMenuPanel .leaveBtn{ min-height:36px; }
+  html.phoneL.phoneMenu #phMenuPanel > .modbar{ display:flex; padding:6px 8px; }
+  html.phoneL.phoneMenu #phMenuPanel > #logPanel{ display:flex; min-height:44px; max-height:220px; }
+  html.phoneL #testModeBtn{ position:fixed; top:8px; left:auto; right:max(10px, env(safe-area-inset-right,0px)); z-index:7; }
+  html.phoneL #testBuildSel:not([hidden]){ position:fixed; top:8px; right:150px; z-index:7; }
+</style>
+<div id="phMenuPanel"></div>
 <div id="appWrap">
 <div id="app">
   <div class="masthead">
@@ -30026,8 +30071,18 @@ thrall(){return gs(14)+
     document.getElementById("scOpen").addEventListener("click", ()=>{ fin.value = ""; fin.click(); });
     fin.addEventListener("change", async ()=>{ const f = fin.files && fin.files[0]; if(!f) return; loadText(await f.text()); });
   })();
+  document.addEventListener("click", e=>{ if(!document.documentElement.classList.contains("phoneL")) return; const p = e.target.closest && e.target.closest("#loadoutOverlay .card > p, #talentsOverlay .card > p, #ranksOverlay .card > p, #compendiumOverlay .card > p, #raidMechOverlay .card > p"); if(p) p.classList.toggle("phOpen"); }); // phoneMenusV1
   { const rb = document.getElementById("rotateOkBtn"); if(rb) rb.addEventListener("click", ()=>document.documentElement.classList.add("rotateOk")); }
-  { const mb = document.getElementById("phoneMenuBtn"); if(mb) mb.addEventListener("click", ()=>{ document.documentElement.classList.toggle("phoneMenu"); }); }
+  const phMenu = (function(){ // phoneMenusV1
+    const ids = [".masthead", ".modbar", "#arenaPanel", "#logPanel"], marks = [];
+    function open(){ const panel = document.getElementById("phMenuPanel"); if(!panel || marks.length) return;
+      ids.forEach(sel=>{ const el = document.querySelector(sel); if(!el) return; const m = document.createComment("phMenu"); el.parentNode.insertBefore(m, el); marks.push([m, el]); panel.appendChild(el); }); }
+    function close(){ while(marks.length){ const [m, el] = marks.shift(); m.parentNode.insertBefore(el, m); m.remove(); } }
+    function set(on){ document.documentElement.classList.toggle("phoneMenu", on); if(on) open(); else close(); }
+    return { set, toggle(){ set(!document.documentElement.classList.contains("phoneMenu")); } };
+  })();
+  window.__phMenu = phMenu;
+  { const mb = document.getElementById("phoneMenuBtn"); if(mb) mb.addEventListener("click", ()=>phMenu.toggle()); }
   canvas.addEventListener("wheel", e=>{
     e.preventDefault();
     setZoom(S.camZoom + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
@@ -30133,8 +30188,10 @@ thrall(){return gs(14)+
   // phoneLayoutV1: a landscape phone gets its own layout (see the phoneLayoutV1 style block)
   function phoneLayoutSync(){
     const w = window.innerWidth, h = window.innerHeight, on = w > h && h <= 500 && w <= 1100;
-    const root = document.documentElement; if(root.classList.contains("phoneL") !== on){ root.classList.toggle("phoneL", on); if(!on) root.classList.remove("phoneMenu"); }
+    const root = document.documentElement; if(root.classList.contains("phoneL") !== on){ root.classList.toggle("phoneL", on); if(!on){ root.classList.remove("phoneMenu"); if(window.__phMenu) window.__phMenu.set(false); } }
     root.classList.toggle("phonePortrait", h > w && w <= 500); // phoneLayoutV2: offer the turn-sideways screen
+    { const rb = document.getElementById("resetSaveBtn"), rc = document.getElementById("resetConfirmRow"), col = document.querySelector("#startOverlay .startParty"), grid = document.querySelector("#startOverlay .startGrid"); // phoneMenusV1
+      if(rb && rc && col && grid){ const inCol = rb.parentElement===col; if(on && !inCol){ col.appendChild(rb); col.appendChild(rc); } else if(!on && inCol){ grid.after(rb); rb.after(rc); } } }
     return on;
   }
   let _lastFitScale = null;
@@ -31107,7 +31164,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 0d42fec01b) */
+<script>/* phone app: offline cache (build 382af09052) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
