@@ -10051,7 +10051,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         meleeSpec: S.meleeSpec, casterSpec: S.casterSpec, dungeonId: S.dungeonId, statPoints: S.statPoints, outputStepV2: true,
         highestKeystoneBeat: S.highestKeystoneBeat, recentDrops: S.recentDrops, teamXp: S.teamXp, ranks: S.ranks, kiln: S.kiln, skins: S.skins, selfTalentsV2: S.selfTalentsV2, healerTreeV3: S.healerTreeV3, tankTalentsV2: S.tankTalentsV2, tankTreeV3: S.tankTreeV3,
         dpsTalentsV2: S.dpsTalentsV2, dpsCasterTalentsV2: S.dpsCasterTalentsV2, dpsDotTalentsV2: S.dpsDotTalentsV2,
-        dpsCasterDotTalentsV2: S.dpsCasterDotTalentsV2, casterTreeV4: S.casterTreeV4, meleeTreeV2: S.meleeTreeV2, cheatGold5000: !!S.cheatGold5000,
+        dpsCasterDotTalentsV2: S.dpsCasterDotTalentsV2, casterTreeV4: S.casterTreeV4, meleeTreeV2: S.meleeTreeV2, cheatGold5000: !!S.cheatGold5000, cheatGold5000b: !!S.cheatGold5000b,
       }));
     }catch(err){ /* storage unavailable — progress just won't persist this session */ }
   }
@@ -10099,7 +10099,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       // — a save that already has it (or a brand new save with nothing to
       // migrate) skips straight through.
       if(data && typeof data.gold === "number") S.gold = data.gold;
-      S.cheatGold5000 = !!(data && data.cheatGold5000); // fixesV1 cheatGoldV1
+      S.cheatGold5000 = !!(data && data.cheatGold5000); S.cheatGold5000b = !!(data && data.cheatGold5000b); // fixesV1 cheatGoldV1
       S.teamXp = (data && typeof data.teamXp === "number") ? data.teamXp : 0;
       S.ranks = (data && data.ranks && typeof data.ranks==="object") ? data.ranks : {};
       if(!(data && data.selfTalentsV2)){
@@ -30391,9 +30391,10 @@ thrall(){return gs(14)+
     document.getElementById("scClose").addEventListener("click", ()=>{ dlg.hidden = true; });
     document.getElementById("scCopy").addEventListener("click", async ()=>{ txt.value = await encode(keys()); try{ await navigator.clipboard.writeText(txt.value); msg.textContent = "Copied (" + txt.value.length + " characters)."; }catch(e){ txt.focus(); txt.select(); msg.textContent = "Selected: copy it with your device's copy command."; } });
     document.getElementById("scLoad").addEventListener("click", ()=>{
-      if((txt.value||"").trim().toUpperCase()==="EMBERHOARD"){ // fixesV1 cheatGoldV1
-        if(S.cheatGold5000){ msg.textContent = "That code has already been used on this save."; return; }
-        S.gold = (S.gold||0) + 5000; S.cheatGold5000 = true; saveGame(); if(typeof updateGoldLabel==="function") updateGoldLabel(); if(typeof renderKeystoneStepper==="function") renderKeystoneStepper();
+      const _cc = { EMBERHOARD:"cheatGold5000", HEARTHTITHE:"cheatGold5000b" }[(txt.value||"").trim().toUpperCase()]; // fixesV1 cheatGoldV1 (+ second code)
+      if(_cc){
+        if(S[_cc]){ msg.textContent = "That code has already been used on this save."; return; }
+        S.gold = (S.gold||0) + 5000; S[_cc] = true; saveGame(); if(typeof updateGoldLabel==="function") updateGoldLabel(); if(typeof renderKeystoneStepper==="function") renderKeystoneStepper();
         txt.value = ""; msg.textContent = "+5000 gold. You now have " + S.gold + "g."; return; }
       loadText(txt.value); });
     document.getElementById("scFile").addEventListener("click", async ()=>{ const code = await encode(keys()), d = new Date(), name = "hearthward-save-" + d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0") + ".txt";
@@ -30424,6 +30425,17 @@ thrall(){return gs(14)+
     ["loadoutTabs","talentTabs","rankTabs","anvTabs"].forEach(id=>{ const w = document.getElementById(id); if(!w) return; fix(w);
       if(typeof MutationObserver==="function") new MutationObserver(()=>fix(w)).observe(w, { childList:true }); });
     window.addEventListener("resize", ()=>["loadoutTabs","talentTabs","rankTabs","anvTabs"].forEach(id=>{ const w = document.getElementById(id); if(w) fix(w); }));
+  })();
+  (function(){ // phoneCanvasRefitV1
+    const vp = document.getElementById("viewport"); if(!vp || typeof requestAnimationFrame!=="function" || typeof vp.getBoundingClientRect!=="function") return;
+    const isPh = ()=>document.documentElement.classList.contains("phoneL");
+    const off = ()=>{ const r = vp.getBoundingClientRect(); return Math.abs(Math.round(r.width) - LWd) > 2 || Math.abs(Math.round(r.height) - LHd) > 2; };
+    let q = 0; const refit = ()=>{ if(q) return; q = requestAnimationFrame(()=>{ q = 0; if(isPh() && off()) fitApp(); }); };
+    if(typeof ResizeObserver==="function") new ResizeObserver(refit).observe(vp);
+    window.addEventListener("orientationchange", ()=>[120, 400, 900].forEach(t=>setTimeout(fitApp, t)));
+    document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) [60, 350, 900].forEach(t=>setTimeout(fitApp, t)); });
+    window.addEventListener("pageshow", ()=>setTimeout(fitApp, 100));
+    setInterval(()=>{ if(isPh() && !document.hidden && off()) fitApp(); }, 800);
   })();
   { const rb = document.getElementById("rotateOkBtn"); if(rb) rb.addEventListener("click", ()=>document.documentElement.classList.add("rotateOk")); }
   const phMenu = (function(){ // phoneMenusV1
@@ -31521,7 +31533,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 6f4799f454) */
+<script>/* phone app: offline cache (build 91f5d4aa74) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
