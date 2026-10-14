@@ -30004,6 +30004,7 @@ thrall(){return gs(14)+
   function pinchDist(){ const v = [...pinchPts.values()]; return Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y) || 1; }
   function pinchDown(e){
     if(e.pointerType!=="touch" || (joy && joy.id===e.pointerId)) return false;
+    if(joy) pinchPts.delete(joy.id); // the joystick finger never counts toward a pinch
     pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY });
     if(pinchPts.size>2) pinchPts.clear(), pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY }); // a stale finger: start over
     if(pinchPts.size!==2) return false;
@@ -30012,7 +30013,7 @@ thrall(){return gs(14)+
     pinch = { d0:pinchDist(), z0:S.camZoom, m0:S.mapZoom||1 }; return true;
   }
   function pinchMove(e){
-    if(!pinchPts.has(e.pointerId)) return false; pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if((joy && joy.id===e.pointerId) || !pinchPts.has(e.pointerId)) return false; pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY });
     if(!pinch || pinchPts.size<2) return false;
     const k = pinchDist()/pinch.d0;
     if((S.mapMode||"play")==="full"){ S.mapZoom = Math.max(1, Math.min(MAP_ZOOM_MAX, pinch.m0*k)); if(S.mapZoom<1.05){ S.mapZoom = 1; S.mapFocus = null; } }
@@ -30020,14 +30021,20 @@ thrall(){return gs(14)+
     updateMapControlsUI(); pinchShow(); return true;
   }
   function pinchUp(e){
-    if(!pinchPts.has(e.pointerId)) return false; pinchPts.delete(e.pointerId);
+    if((joy && joy.id===e.pointerId) || !pinchPts.has(e.pointerId)) return false; pinchPts.delete(e.pointerId);
     if(!pinch) return false; if(pinchPts.size<2) pinch = null; if(!pinchPts.size) S.moveTo = null; return true;
   }
   const pinchForget = e=>{ if(pinchPts.has(e.pointerId)){ pinchPts.delete(e.pointerId); if(pinchPts.size<2) pinch = null; } };
   document.addEventListener("pointerup", pinchForget); document.addEventListener("pointercancel", pinchForget); // a finger lifted off the map
+  // safety net: if the joystick's finger is lifted anywhere (or every finger is off the screen, or the app is hidden), the
+  // joystick and any pinch always let go, so movement can never stay stuck
+  const touchReset = ()=>{ if(joy){ joy = null; S._joy = null; joyShow(false); } pinch = null; pinchPts.clear(); };
+  document.addEventListener("pointerup", e=>{ if(joy && e.pointerId===joy.id) joyUp(e); }); document.addEventListener("pointercancel", e=>{ if(joy && e.pointerId===joy.id) joyUp(e); });
+  document.addEventListener("touchend", e=>{ if(!e.touches || !e.touches.length) touchReset(); }, true); document.addEventListener("touchcancel", e=>{ if(!e.touches || !e.touches.length) touchReset(); }, true);
+  window.addEventListener("blur", touchReset); document.addEventListener("visibilitychange", ()=>{ if(document.hidden) touchReset(); });
   canvas.addEventListener("pointerdown", e=>{
     if(pinchDown(e)) return;
-    if(joyDown(e)) return;
+    if(joyDown(e)){ pinchPts.delete(e.pointerId); return; }
     const screenP = canvasPoint(e);
     if((S.mapMode||"play")==="full" && (S.mapZoom||1)>1.001){
       const f = S.mapFocus || (S.party && S.party.self ? {x:S.party.self.x,y:S.party.self.y} : {x:0,y:0});
@@ -30036,11 +30043,11 @@ thrall(){return gs(14)+
       return;
     }
     const p = VIEW.unproject(screenP.x, screenP.y);
-    if(walkable(p.x,p.y)) S.moveTo = p;
+    if(walkable(p.x,p.y) && !(document.documentElement.classList.contains("phoneL") && (S.mapMode||"play")==="full")) S.moveTo = p;
   });
   canvas.addEventListener("pointermove", e=>{
-    if(pinchMove(e)) return;
     if(joyMove(e)) return;
+    if(pinchMove(e)) return;
     if(!mapDrag) return;
     const sp = canvasPoint(e), sc = VIEW.scale;
     const dx = sp.x-mapDrag.sx, dy = sp.y-mapDrag.sy;
@@ -30048,10 +30055,10 @@ thrall(){return gs(14)+
     if(mapDrag.moved){ S.mapFocus = { x: mapDrag.fx - dx/sc, y: mapDrag.fy - dy/sc }; }
   });
   const endMapDrag = e=>{
-    if(pinchUp(e)) return;
     if(joyUp(e)) return;
+    if(pinchUp(e)) return;
     if(!mapDrag) return; const d = mapDrag; mapDrag = null;
-    if(!d.moved && e.type==="pointerup"){ const sp = canvasPoint(e); const p = VIEW.unproject(sp.x, sp.y); if(walkable(p.x,p.y)) S.moveTo = p; }
+    if(!d.moved && e.type==="pointerup"){ const sp = canvasPoint(e); const p = VIEW.unproject(sp.x, sp.y); if(walkable(p.x,p.y) && !(document.documentElement.classList.contains("phoneL") && (S.mapMode||"play")==="full")) S.moveTo = p; }
   };
   canvas.addEventListener("pointerup", endMapDrag); canvas.addEventListener("pointercancel", endMapDrag);
   // saveCodeV1 (v2: compressed codes "HW2:", save/load as a file; old "HW1:" codes still load)
@@ -31193,7 +31200,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 1297c7b269) */
+<script>/* phone app: offline cache (build f68655787f) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
