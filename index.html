@@ -1847,6 +1847,23 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   html.phoneL #gearStatsSummary .phFxBtn{ align-self:flex-start; min-height:30px; padding:0 12px; font-size:.62rem; font-family:'Cinzel'; letter-spacing:.05em; border-radius:999px; border:1px solid var(--accent-soft); background:var(--bg-panel); color:var(--accent-strong); }
   html.phoneL #gearStatsSummary .phDesc{ grid-column:1 / -1; column-span:none; font-size:.64rem; line-height:1.35; color:var(--text); background:var(--bg-panel); border:1px solid var(--accent-soft); border-radius:6px; padding:5px 7px; margin:2px 0 4px; break-inside:avoid; }
 </style>
+<style id="phoneStatsV2">
+  html.phoneL :is(.loadoutTabs,.anvTabs) > *{ min-height:32px; font-size:.64rem; padding-left:12px; padding-right:12px; }
+  html.phoneL #loadoutOverlay .card[data-ph="stats"]{ grid-auto-rows:max-content; }
+  html.phoneL #loadoutOverlay .card[data-ph="stats"] > .loadoutTabs{ min-height:34px; }
+  html.phoneL #phPortrait{ height:96px; }
+  html.phoneL #phPortrait img{ width:118px; }
+  html.phoneL #phStatsSide{ width:150px; }
+  html.phoneL #phStatsSide .lvBlock{ width:100%; margin:2px 0 0; }
+  html.phoneL #phStatsSide .lvTop{ font-size:.66rem; flex-wrap:wrap; gap:0 6px; } html.phoneL #phStatsSide .lvTop b{ font-size:.8rem; }
+  html.phoneL #phStatsSide .lvXp{ font-size:.58rem; }
+  html.phoneL #phStatsSide .lvBar{ height:4px; margin-top:2px; }
+  html.phoneL #phStatsSide .lvGains{ width:100%; margin:0; padding:0; border:none; font-size:.62rem; }
+  html.phoneL #phStatsSide .lvGains summary{ font-size:.56rem; min-height:28px; display:flex; align-items:center; }
+  html.phoneL #phStatsSide .lgFlat, html.phoneL #phStatsSide .lgRow{ flex-direction:column; gap:0; }
+  html.phoneL #gearStatsSummary .stGroupName .phFxNone{ display:inline; margin-left:6px; text-transform:none; letter-spacing:0; }
+  html.phoneL #gearStatsSummary .stGroupName .phFxBtn{ margin-left:8px; min-height:26px; padding:0 10px; vertical-align:middle; text-transform:none; }
+</style>
 <div id="appWrap">
 <div id="app">
   <div class="masthead">
@@ -25562,12 +25579,16 @@ thrall(){return gs(14)+
     const el = document.getElementById("gearStatsSummary"); if(!el) return;
     el.classList.toggle("phFxAll", phFxAll);
     const grid = el.querySelector(".fxGrid");
+    { const side = document.getElementById("phStatsSide"); // phoneStatsV2: level block under the picture
+      const lb = el.querySelector(".lvBlock"), lg = el.querySelector(".lvGains");
+      if(side && (lb || lg)){ side.querySelectorAll(".lvBlock, .lvGains").forEach(x=>x.remove()); if(lb) side.appendChild(lb); if(lg) side.appendChild(lg); } }
     if(grid && !el.querySelector(".phFxBtn")){
       const total = grid.querySelectorAll(".fxItem").length, on = grid.querySelectorAll(".fxItem.on").length;
-      if(!on) grid.insertAdjacentHTML("beforebegin", `<div class="phFxNone">No gear effects active.</div>`);
+      const gName = grid.parentElement && grid.parentElement.querySelector(".stGroupName");
+      if(!on) (gName || grid).insertAdjacentHTML(gName ? "beforeend" : "beforebegin", `<span class="phFxNone">None active.</span>`);
       const b = document.createElement("button"); b.type = "button"; b.className = "phFxBtn"; b.textContent = phFxAll ? "Show active only" : `Show all ${total}`;
       b.addEventListener("click", ()=>{ phFxAll = !phFxAll; el.classList.toggle("phFxAll", phFxAll); b.textContent = phFxAll ? "Show active only" : `Show all ${total}`; });
-      grid.after(b);
+      const gN = grid.parentElement && grid.parentElement.querySelector(".stGroupName"); if(gN) gN.appendChild(b); else grid.after(b);
     }
     if(!el.dataset.phTap){ el.dataset.phTap = "1"; // tap a stat or effect to read what it does
       el.addEventListener("click", e=>{ if(!document.documentElement.classList.contains("phoneL")) return; const row = e.target.closest && e.target.closest(".stRow, .fxItem"); if(!row) return;
@@ -30354,6 +30375,14 @@ thrall(){return gs(14)+
     if(typeof MutationObserver==="function") new MutationObserver(later).observe(body, { childList:true, subtree:true });
     window.addEventListener("resize", later);
   })();
+  (function(){ // phoneStatsV2: character tabs show just the name on a phone
+    const short = full=>{ const i = full.indexOf("·"); return i>=0 ? full.slice(i+1).trim() : full; };
+    const fix = wrap=>{ const ph = document.documentElement.classList.contains("phoneL");
+      wrap.querySelectorAll("button").forEach(b=>{ if(!b.dataset.full) b.dataset.full = b.textContent; const want = ph ? short(b.dataset.full) : b.dataset.full; if(b.textContent!==want) b.textContent = want; }); };
+    ["loadoutTabs","talentTabs","rankTabs","anvTabs"].forEach(id=>{ const w = document.getElementById(id); if(!w) return; fix(w);
+      if(typeof MutationObserver==="function") new MutationObserver(()=>fix(w)).observe(w, { childList:true }); });
+    window.addEventListener("resize", ()=>["loadoutTabs","talentTabs","rankTabs","anvTabs"].forEach(id=>{ const w = document.getElementById(id); if(w) fix(w); }));
+  })();
   { const rb = document.getElementById("rotateOkBtn"); if(rb) rb.addEventListener("click", ()=>document.documentElement.classList.add("rotateOk")); }
   const phMenu = (function(){ // phoneMenusV1
     const ids = [".masthead", ".modbar", "#arenaPanel", "#logPanel"], marks = [];
@@ -31450,7 +31479,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 7f9c189d78) */
+<script>/* phone app: offline cache (build ee2cbeb18b) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
