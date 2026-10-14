@@ -1691,13 +1691,13 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 <div id="rotateNag"><div class="rnIcon">▯</div><p>Turn your phone sideways</p><small>Hearthward is built for landscape on phones.</small><button type="button" id="rotateOkBtn">Play upright anyway</button></div>
 <style id="phoneMenusV1">
   /* phoneMenusV1: full-screen menu pages on landscape phones */
-  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay){ padding:0; align-items:stretch; justify-content:stretch; }
-  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card{ max-width:none !important; width:100% !important; height:100% !important; max-height:none !important; border-radius:0; border:none; box-shadow:none;
+  html.phoneL :is(#treasureOverlay,#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay){ padding:0; align-items:stretch; justify-content:stretch; }
+  html.phoneL :is(#treasureOverlay,#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card{ max-width:none !important; width:100% !important; height:100% !important; max-height:none !important; border-radius:0; border:none; box-shadow:none;
     padding:54px max(14px, env(safe-area-inset-right,0px)) max(10px, env(safe-area-inset-bottom,0px)) max(14px, env(safe-area-inset-left,0px)); gap:8px; }
-  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card::before{ content:""; position:fixed; left:0; right:0; top:0; height:46px; background:var(--bg-panel); border-bottom:1px solid var(--border); z-index:5; pointer-events:none; }
-  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card > h2, html.phoneL #healerGuideOverlay .hgHead h2{ position:fixed; z-index:6; top:0; left:max(16px, env(safe-area-inset-left,0px)); height:46px; display:flex; align-items:center; margin:0; font-size:1.05rem; text-align:left; white-space:nowrap; }
-  html.phoneL :is(#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) .overlayGold{ position:fixed; z-index:6; top:0; right:calc(max(10px, env(safe-area-inset-right,0px)) + 104px); height:46px; margin:0; display:flex; align-items:center; }
-  html.phoneL :is(#loadoutBackBtn,#talentsBackBtn,#ranksBackBtn,#anvilBackBtn,#raidMechBackBtn,#compendiumBackBtn,#skinBackBtn,#hgClose){ position:fixed; z-index:7; top:3px; right:max(10px, env(safe-area-inset-right,0px)); height:40px; min-width:88px; margin:0; padding:0 16px; font-size:.75rem; background:var(--bg-panel-2); color:var(--accent-strong); border:1px solid var(--accent-soft); box-shadow:none; }
+  html.phoneL :is(#treasureOverlay,#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card::before{ content:""; position:fixed; left:0; right:0; top:0; height:46px; background:var(--bg-panel); border-bottom:1px solid var(--border); z-index:5; pointer-events:none; }
+  html.phoneL :is(#treasureOverlay,#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) > .card > h2, html.phoneL #healerGuideOverlay .hgHead h2{ position:fixed; z-index:6; top:0; left:max(16px, env(safe-area-inset-left,0px)); height:46px; display:flex; align-items:center; margin:0; font-size:1.05rem; text-align:left; white-space:nowrap; }
+  html.phoneL :is(#treasureOverlay,#startOverlay,#loadoutOverlay,#talentsOverlay,#ranksOverlay,#anvilOverlay,#raidMechOverlay,#compendiumOverlay,#skinOverlay,#healerGuideOverlay) .overlayGold{ position:fixed; z-index:6; top:0; right:calc(max(10px, env(safe-area-inset-right,0px)) + 104px); height:46px; margin:0; display:flex; align-items:center; }
+  html.phoneL :is(#treasureBackBtn,#loadoutBackBtn,#talentsBackBtn,#ranksBackBtn,#anvilBackBtn,#raidMechBackBtn,#compendiumBackBtn,#skinBackBtn,#hgClose){ position:fixed; z-index:7; top:3px; right:max(10px, env(safe-area-inset-right,0px)); height:40px; min-width:88px; margin:0; padding:0 16px; font-size:.75rem; background:var(--bg-panel-2); color:var(--accent-strong); border:1px solid var(--accent-soft); box-shadow:none; }
   /* intro text: one line, tap to read it all */
   html.phoneL :is(#loadoutOverlay .card > p,#talentsOverlay .card > p,#ranksOverlay .card > p,#compendiumOverlay .card > p,#raidMechOverlay .card > p){ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; font-size:.74rem; line-height:1.4; text-align:left; cursor:pointer; flex:0 0 auto; padding-right:18px; position:relative; }
   html.phoneL :is(#loadoutOverlay .card > p,#talentsOverlay .card > p,#ranksOverlay .card > p,#compendiumOverlay .card > p,#raidMechOverlay .card > p)::after{ content:"⌄"; position:absolute; right:2px; top:0; color:var(--accent); }
@@ -1730,6 +1730,18 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   html.phoneL.phoneMenu #phMenuPanel .mchip, html.phoneL.phoneMenu #phMenuPanel .leaveBtn{ min-height:36px; }
   html.phoneL.phoneMenu #phMenuPanel > .modbar{ display:flex; padding:6px 8px; }
   html.phoneL.phoneMenu #phMenuPanel > #logPanel{ display:flex; min-height:44px; max-height:220px; }
+  /* chest puzzles: lock info on the left, the puzzle fills the right */
+  html.phoneL #treasureOverlay .card > p{ display:none; }
+  html.phoneL #treasurePuzzleBody{ flex:1 1 auto; min-height:0; display:grid; grid-template-columns:minmax(190px, 30%) minmax(0,1fr); grid-template-rows:repeat(6, min-content) 1fr; column-gap:14px; row-gap:4px; align-content:stretch; }
+  html.phoneL #treasurePuzzleBody > *{ grid-column:1; margin:0; text-align:left; }
+  html.phoneL #treasurePuzzleBody > .czHost{ grid-column:2; grid-row:1 / -1; align-self:stretch; justify-content:center; min-height:0; overflow:hidden; }
+  html.phoneL #treasurePuzzleBody .czHead{ gap:8px; }
+  html.phoneL #treasurePuzzleBody .czHead svg{ width:54px; height:auto; flex:0 0 auto; }
+  html.phoneL #treasurePuzzleBody .czTitle{ font-size:.85rem; text-align:left; }
+  html.phoneL #treasurePuzzleBody .czClue{ font-size:.74rem; }
+  html.phoneL #treasurePuzzleBody .czRule{ font-size:.66rem; }
+  html.phoneL #treasurePuzzleBody .puzzleStatus{ min-height:1.2em; }
+  html.phoneL #treasurePuzzleBody .czHost button{ min-height:40px; min-width:44px; }
   html.phoneL #testModeBtn{ position:fixed; top:8px; left:auto; right:max(10px, env(safe-area-inset-right,0px)); z-index:7; }
   html.phoneL #testBuildSel:not([hidden]){ position:fixed; top:8px; right:150px; z-index:7; }
 </style>
@@ -9904,7 +9916,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         meleeSpec: S.meleeSpec, casterSpec: S.casterSpec, dungeonId: S.dungeonId, statPoints: S.statPoints, outputStepV2: true,
         highestKeystoneBeat: S.highestKeystoneBeat, recentDrops: S.recentDrops, teamXp: S.teamXp, ranks: S.ranks, kiln: S.kiln, skins: S.skins, selfTalentsV2: S.selfTalentsV2, healerTreeV3: S.healerTreeV3, tankTalentsV2: S.tankTalentsV2, tankTreeV3: S.tankTreeV3,
         dpsTalentsV2: S.dpsTalentsV2, dpsCasterTalentsV2: S.dpsCasterTalentsV2, dpsDotTalentsV2: S.dpsDotTalentsV2,
-        dpsCasterDotTalentsV2: S.dpsCasterDotTalentsV2, casterTreeV4: S.casterTreeV4, meleeTreeV2: S.meleeTreeV2,
+        dpsCasterDotTalentsV2: S.dpsCasterDotTalentsV2, casterTreeV4: S.casterTreeV4, meleeTreeV2: S.meleeTreeV2, cheatGold5000: !!S.cheatGold5000,
       }));
     }catch(err){ /* storage unavailable — progress just won't persist this session */ }
   }
@@ -9952,6 +9964,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       // — a save that already has it (or a brand new save with nothing to
       // migrate) skips straight through.
       if(data && typeof data.gold === "number") S.gold = data.gold;
+      S.cheatGold5000 = !!(data && data.cheatGold5000); // fixesV1 cheatGoldV1
       S.teamXp = (data && typeof data.teamXp === "number") ? data.teamXp : 0;
       S.ranks = (data && data.ranks && typeof data.ranks==="object") ? data.ranks : {};
       if(!(data && data.selfTalentsV2)){
@@ -12292,7 +12305,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     const rule = P.penalty
       ? `Mistakes cost ${Math.round(CHEST_MISTAKE_DECAY*100)}% of the payout (down to half).` + (t.mod==="trapped" ? ` <b>Trapped:</b> each one also zaps the healer for ${Math.round(CHEST_ZAP_PCT*100)}% max HP.` : "")
       : "No penalty. Take your time.";
-    body.appendChild(czEl("div","czClue", P.clue));
+    body.appendChild(czEl("div","czClue", document.documentElement.classList.contains("phoneL") ? P.clue.replace(/ ?\(or [^)]*\)/g,"").replace(/\bClick\b/g,"Tap").replace(/\bclick\b/g,"tap") : P.clue));
     const host = czEl("div","czHost"+(t.mod==="trapped" ? " trapped" : "")); body.appendChild(host);
     const status = czEl("div","puzzleStatus"); body.appendChild(status);
     body.appendChild(czEl("div","czRule", rule));
@@ -20592,7 +20605,7 @@ thrall(){return gs(14)+
       // via the +0 practice tier's free dungeon picker, can't lower it).
       if(S.level > S.highestKeystoneBeat){
         S.highestKeystoneBeat = S.level;
-        saveGame();
+        saveGame(); renderKeystoneStepper(); // fixesV1 keystoneRefreshV1: the new entry limit applies at once
         const capNow = maxSelectableKeystoneLevel(), idxNow = unlockedRarityIdx();
         const idxPrev = rarityBandIndex(prevBest);
         S._endLines.push(`<b>New best clear: +${S.level}.</b> ` + (capNow>=KEYSTONE_UNCAPPED_MAX ? "Entry limit lifted." : `You can now enter up to +${capNow}.`) + (idxNow>idxPrev ? ` The shop now stocks <b style="color:${resolveColor(RARITIES[idxNow].color)}">${RARITIES[idxNow].name}</b>.` : ""));
@@ -30060,7 +30073,12 @@ thrall(){return gs(14)+
     const b = document.getElementById("saveCodeBtn"); if(b) b.addEventListener("click", open);
     document.getElementById("scClose").addEventListener("click", ()=>{ dlg.hidden = true; });
     document.getElementById("scCopy").addEventListener("click", async ()=>{ txt.value = await encode(keys()); try{ await navigator.clipboard.writeText(txt.value); msg.textContent = "Copied (" + txt.value.length + " characters)."; }catch(e){ txt.focus(); txt.select(); msg.textContent = "Selected: copy it with your device's copy command."; } });
-    document.getElementById("scLoad").addEventListener("click", ()=>loadText(txt.value));
+    document.getElementById("scLoad").addEventListener("click", ()=>{
+      if((txt.value||"").trim().toUpperCase()==="EMBERHOARD"){ // fixesV1 cheatGoldV1
+        if(S.cheatGold5000){ msg.textContent = "That code has already been used on this save."; return; }
+        S.gold = (S.gold||0) + 5000; S.cheatGold5000 = true; saveGame(); if(typeof updateGoldLabel==="function") updateGoldLabel(); if(typeof renderKeystoneStepper==="function") renderKeystoneStepper();
+        txt.value = ""; msg.textContent = "+5000 gold. You now have " + S.gold + "g."; return; }
+      loadText(txt.value); });
     document.getElementById("scFile").addEventListener("click", async ()=>{ const code = await encode(keys()), d = new Date(), name = "hearthward-save-" + d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0") + ".txt";
       const file = new File([code], name, { type:"text/plain" });
       // inside claude.ai the viewer only hands over files through the downloads capability (a confirmation prompt)
@@ -30072,6 +30090,16 @@ thrall(){return gs(14)+
     fin.addEventListener("change", async ()=>{ const f = fin.files && fin.files[0]; if(!f) return; loadText(await f.text()); });
   })();
   document.addEventListener("click", e=>{ if(!document.documentElement.classList.contains("phoneL")) return; const p = e.target.closest && e.target.closest("#loadoutOverlay .card > p, #talentsOverlay .card > p, #ranksOverlay .card > p, #compendiumOverlay .card > p, #raidMechOverlay .card > p"); if(p) p.classList.toggle("phOpen"); }); // phoneMenusV1
+  (function(){ // phoneMenusV1: chest puzzle fit
+    const body = document.getElementById("treasurePuzzleBody"); if(!body || typeof requestAnimationFrame!=="function") return; let q = 0;
+    const fit = ()=>{ q = 0; const host = body.querySelector(".czHost"); if(!host) return; const kids = [...host.children]; kids.forEach(k=>{ k.style.zoom = ""; });
+      if(!document.documentElement.classList.contains("phoneL")) return;
+      const sc = Math.min(1, host.clientHeight / Math.max(1, host.scrollHeight), host.clientWidth / Math.max(1, host.scrollWidth));
+      if(sc < 0.995) kids.forEach(k=>{ k.style.zoom = String(Math.max(0.5, sc*0.97)); }); };
+    const later = ()=>{ if(!q) q = requestAnimationFrame(fit); };
+    if(typeof MutationObserver==="function") new MutationObserver(later).observe(body, { childList:true, subtree:true });
+    window.addEventListener("resize", later);
+  })();
   { const rb = document.getElementById("rotateOkBtn"); if(rb) rb.addEventListener("click", ()=>document.documentElement.classList.add("rotateOk")); }
   const phMenu = (function(){ // phoneMenusV1
     const ids = [".masthead", ".modbar", "#arenaPanel", "#logPanel"], marks = [];
@@ -30482,6 +30510,7 @@ thrall(){return gs(14)+
       document.getElementById("startOverlay").style.display="flex";
       document.getElementById("endOverlay").style.display="none";
       S.started=false;
+      renderKeystoneStepper(); // fixesV1 keystoneRefreshV1
       renderMods();
       fitApp(); requestAnimationFrame(fitApp);
     });
@@ -31164,7 +31193,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 382af09052) */
+<script>/* phone app: offline cache (build 1297c7b269) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
