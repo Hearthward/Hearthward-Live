@@ -1746,6 +1746,54 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   html.phoneL #testBuildSel:not([hidden]){ position:fixed; top:8px; right:150px; z-index:7; }
 </style>
 <div id="phMenuPanel"></div>
+<style id="phoneGearV1">
+  .phOnly{ display:none; }
+  html.phoneL #phGearTabs{ display:flex; gap:4px; position:fixed; z-index:7; top:3px; height:40px; left:calc(max(16px, env(safe-area-inset-left,0px)) + 92px); right:calc(max(10px, env(safe-area-inset-right,0px)) + 190px); max-width:330px; }
+  html.phoneL #loadoutOverlay .card[data-ph] > h2{ font-size:0; } html.phoneL #loadoutOverlay .card[data-ph] > h2::after{ content:"Gear"; font-size:1.05rem; }
+  html.phoneL #loadoutOverlay .card[data-ph] > p{ display:none; }
+  html.phoneL #phGearTabs button{ flex:1 1 0; min-height:40px; font-family:'Cinzel'; font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; border-radius:8px; border:1px solid var(--border); background:var(--bg-panel-2); color:var(--text-dim); }
+  html.phoneL #phGearTabs button.on{ border-color:var(--accent); color:var(--accent-strong); box-shadow:inset 0 -2px 0 var(--accent); }
+  /* which sections each sub-tab shows */
+  html.phoneL #loadoutOverlay .card[data-ph] > .loadoutGrid, html.phoneL #loadoutOverlay .card[data-ph] > section.loadoutCol, html.phoneL #loadoutOverlay .card[data-ph] > #buyItemWrap, html.phoneL #loadoutOverlay .card[data-ph] > #wardrobe{ display:none; }
+  html.phoneL #loadoutOverlay .card[data-ph="stats"] > #wardrobe{ display:flex; }
+  html.phoneL #loadoutOverlay .card[data-ph="gear"]{ overflow:hidden; }
+  html.phoneL #loadoutOverlay .card[data-ph="gear"] > #phGear{ display:grid; }
+  html.phoneL #loadoutOverlay .card[data-ph="stats"] > .loadoutGrid{ display:block; }
+  html.phoneL #loadoutOverlay .card[data-ph="stats"] > .loadoutGrid > .loadoutCol:first-child{ display:none; }
+  html.phoneL #loadoutOverlay .card[data-ph="shop"] > #buyItemWrap{ display:block; }
+  /* the Gear sub-tab */
+  html.phoneL #phGear{ flex:1 1 auto; min-height:0; grid-template-columns:minmax(0,1fr) minmax(230px, 40%); gap:12px; }
+  html.phoneL #phGear .phGL{ min-height:0; display:flex; flex-direction:column; gap:8px; }
+  html.phoneL #phEqRow{ display:flex; gap:6px; flex:0 0 auto; }
+  .phTile{ position:relative; width:52px; height:52px; flex:0 0 52px; border-radius:9px; border:2px solid var(--rc, var(--border)); background:var(--bg-panel-2); color:var(--rc, var(--text-dim)); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+  .phTile .slotIcon{ width:28px; height:28px; }
+  .phTile.empty{ border-style:dashed; border-color:var(--border); color:var(--text-dim); opacity:.55; }
+  .phTile .phQ{ position:absolute; right:2px; bottom:1px; font:700 .55rem 'Space Mono',monospace; color:var(--text); }
+  .phTile .phF{ position:absolute; left:3px; top:1px; font-size:.45rem; color:var(--accent); letter-spacing:-1px; }
+  .phTile .phA{ position:absolute; right:3px; top:1px; font-size:.55rem; color:var(--accent-strong); }
+  .phTile.on{ box-shadow:0 0 0 2px var(--accent-strong), 0 0 10px rgba(240,190,100,.45); }
+  .phTile.picked::after{ content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.55); color:var(--accent-strong); font-size:1.3rem; border-radius:7px; }
+  html.phoneL .phBagHead{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+  html.phoneL .phBagHead .loadoutH{ margin:0; font-size:.8rem; }
+  html.phoneL .phBagHead button{ margin-left:auto; min-height:36px; padding:0 14px; font-family:'Cinzel'; font-size:.68rem; letter-spacing:.05em; border-radius:999px; border:1px solid var(--accent-soft); background:var(--bg-panel-2); color:var(--accent-strong); }
+  html.phoneL .phBagHead button.on{ background:var(--accent); color:var(--bg); }
+  html.phoneL #phGear #invTools{ display:none; gap:6px; flex-wrap:wrap; flex:0 0 auto; }
+  html.phoneL #phGear.selecting #invTools{ display:flex; }
+  html.phoneL #phGear #invTools .invToolBtn{ min-height:36px; }
+  html.phoneL #phGear #invConfirm:not([hidden]){ display:flex; gap:6px; align-items:center; flex-wrap:wrap; flex:0 0 auto; font-size:.74rem; }
+  html.phoneL #phBag{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; display:grid; grid-template-columns:repeat(auto-fill, 52px); gap:8px; align-content:start; padding:2px 2px 8px; }
+  html.phoneL #phBag .phEmptyMsg{ grid-column:1 / -1; font-size:.74rem; color:var(--text-dim); font-style:italic; }
+  html.phoneL #phDetail{ min-height:0; overflow-y:auto; overscroll-behavior:contain; border:1px solid var(--border); border-radius:10px; background:var(--bg-panel-2); padding:10px; display:flex; flex-direction:column; gap:8px; font-size:.78rem; }
+  html.phoneL #phDetail .phHint{ color:var(--text-dim); font-style:italic; margin:auto 0; text-align:center; }
+  html.phoneL #phDetail .phSub{ color:var(--text-dim); font-size:.7rem; }
+  html.phoneL #phDetail .phCur{ font-size:.68rem; color:var(--text-dim); border-top:1px solid var(--border); padding-top:6px; }
+  html.phoneL #phDetail .phBtns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:auto; position:sticky; bottom:-10px; background:var(--bg-panel-2); padding:6px 0 0; }
+  html.phoneL #phDetail .phBtns button{ flex:1 1 auto; min-height:42px; border-radius:8px; font-family:'Cinzel'; font-size:.7rem; letter-spacing:.04em; border:1px solid var(--accent-soft); background:var(--bg-panel); color:var(--accent-strong); }
+  html.phoneL #phDetail .phBtns button.primary{ flex:1 1 100%; background:var(--accent); color:var(--bg); border:none; }
+  html.phoneL #phDetail .phBtns button.danger{ border-color:var(--blood); color:var(--blood); }
+  html.phoneL #phDetail .phBtns button.danger.arm{ background:var(--blood); color:#fff; }
+  html.phoneL #phDetail .phBtns button:disabled{ opacity:.45; }
+</style>
 <div id="appWrap">
 <div id="app">
   <div class="masthead">
@@ -1981,7 +2029,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     <div class="overlayGold" id="loadoutGoldLabel"></div>
     <p>Equip a piece, or tick pieces to sell or reroll them. Q1–Q5 scales stats from 70% to 130%. Green and red numbers compare with what you are wearing.</p>
     <div class="loadoutTabs" id="loadoutTabs"></div>
+    <div id="phGearTabs" class="phOnly"><button type="button" data-t="gear">Gear</button><button type="button" data-t="stats">Stats</button><button type="button" data-t="shop">Shop</button></div>
     <div class="wardrobe" id="wardrobe"></div>
+    <div id="phGear" class="phOnly"><div class="phGL"><div id="phEqRow"></div><div class="phBagHead"><span class="loadoutH">Bag <span class="invCount" id="phBagCount"></span></span><button type="button" id="phSelBtn">Select</button></div><div id="phTools"></div><div id="phBag"></div></div><div id="phDetail"></div></div>
     <div class="loadoutGrid">
       <section class="loadoutCol">
         <h3 class="loadoutH">Equipped</h3>
@@ -25329,7 +25379,70 @@ thrall(){return gs(14)+
       } else { conf.hidden = true; conf.innerHTML = ""; invPending = null; }
     }
   }
-  function renderGearInventory(){
+  // phoneGearV1: the phone gear view (sub-tabs, equipped icon row, bag tile grid, detail panel)
+  let phGearTab = "gear", phSel = null, phSelecting = false, phSellArm = null;
+  function phGearRender(){
+    const card = document.querySelector("#loadoutOverlay .loadoutCard"); if(!card) return;
+    const tools = document.getElementById("invTools"), conf = document.getElementById("invConfirm"), ph = document.getElementById("phGear");
+    const head = document.querySelector("#loadoutOverlay .invHead");
+    if(!document.documentElement.classList.contains("phoneL")){ // put the shared tools back on desktop
+      delete card.dataset.ph; if(tools && head && tools.parentElement!==head) head.appendChild(tools); if(conf && head && conf.previousElementSibling!==head) head.after(conf); return; }
+    card.dataset.ph = phGearTab;
+    document.querySelectorAll("#phGearTabs button").forEach(b=>b.classList.toggle("on", b.dataset.t===phGearTab));
+    const pt = document.getElementById("phTools"); if(tools && pt && tools.parentElement!==pt){ pt.appendChild(tools); if(conf) pt.appendChild(conf); }
+    ph.classList.toggle("selecting", phSelecting);
+    const sb = document.getElementById("phSelBtn"); sb.classList.toggle("on", phSelecting); sb.textContent = phSelecting ? "Done" : "Select";
+    const role = S.loadoutTab, eq = S.gear.equipped[role], totals = computeGearTotals(role);
+    const tile = (slotKey, item, extra)=>{ const b = document.createElement("button"); b.type = "button"; b.className = "phTile" + (item ? "" : " empty") + (extra||"");
+      if(item) b.style.setProperty("--rc", resolveColor(rarityDef(item.rarity).color));
+      const fr = forgeRank(role, slotKey);
+      b.innerHTML = slotIconHTML(slotKey) + (item ? `<span class="phQ">Q${item.quality}</span>` : "") + (item && item.affix ? `<span class="phA">★</span>` : "") + (fr ? `<span class="phF">${"\u25C6".repeat(fr)}</span>` : "");
+      b.title = item ? itemDisplayName(item) : SLOT_LABELS[slotKey] + " (empty)"; return b; };
+    // equipped row
+    const er = document.getElementById("phEqRow"); er.innerHTML = "";
+    GEAR_DISPLAY_ORDER.filter(k=>GEAR_SLOT_KEYS.includes(k)).forEach(k=>{
+      const uid = eq[k], item = uid ? S.gear.inventory.find(i=>i.uid===uid) : null;
+      const b = tile(k, item, phSel && phSel.slot===k ? " on" : "");
+      b.addEventListener("click", ()=>{ phSel = { slot:k }; phSellArm = null; phGearRender(); }); er.appendChild(b); });
+    // bag
+    const equippedUids = new Set(Object.values(eq).filter(Boolean));
+    const items = S.gear.inventory.filter(i=>i.role===role && !equippedUids.has(i.uid)).sort((a,b)=>(RARITY_ORDER[b.rarity]-RARITY_ORDER[a.rarity]) || (b.quality-a.quality));
+    document.getElementById("phBagCount").textContent = `(${items.length}/${GEAR_INVENTORY_CAP})`;
+    if(phSel && phSel.uid){ const it = S.gear.inventory.find(i=>i.uid===phSel.uid);
+      if(!it || it.role!==role) phSel = null; else if(equippedUids.has(it.uid)) phSel = { slot:slotForItem(it) }; }
+    if(phSel && phSel.slot && !GEAR_SLOT_KEYS.includes(phSel.slot)) phSel = null;
+    const bag = document.getElementById("phBag"); const keep = bag.scrollTop; bag.innerHTML = "";
+    if(!items.length) bag.innerHTML = `<div class="phEmptyMsg">No unequipped ${ROLE_LABELS[role]} gear. Clear a descent to find more.</div>`;
+    items.forEach(item=>{ const k = slotForItem(item);
+      const b = tile(k, item, (phSelecting && invSel.has(item.uid) ? " picked" : "") + (!phSelecting && phSel && phSel.uid===item.uid ? " on" : ""));
+      b.addEventListener("click", ()=>{ phSellArm = null;
+        if(phSelecting){ if(invSel.has(item.uid)) invSel.delete(item.uid); else invSel.add(item.uid); invPending = null; renderGearInventory(); return; }
+        phSel = { uid:item.uid }; phGearRender(); });
+      bag.appendChild(b); });
+    bag.scrollTop = keep;
+    // detail
+    const d = document.getElementById("phDetail"); d.innerHTML = "";
+    let item = null, cur = null, fromSlot = null;
+    if(phSel && phSel.uid){ item = S.gear.inventory.find(i=>i.uid===phSel.uid); const k = item && slotForItem(item); cur = k && eq[k] ? S.gear.inventory.find(i=>i.uid===eq[k]) : null; }
+    else if(phSel && phSel.slot){ fromSlot = phSel.slot; item = eq[fromSlot] ? S.gear.inventory.find(i=>i.uid===eq[fromSlot]) : null; }
+    if(!item){ d.innerHTML = fromSlot ? `<div class="phHint">${SLOT_LABELS[fromSlot]}: empty. Tap a piece in your bag to equip one.</div>` : `<div class="phHint">Tap a piece to see its stats.</div>`; return; }
+    const k = slotForItem(item);
+    d.innerHTML = itemRowBodyHTML(item, fromSlot ? isAffixWasted(role, item, totals) : false, fromSlot ? null : cur)
+      + `<div class="phSub">${SLOT_LABELS[k]}${fromSlot ? " · equipped" : ""} · sells for ${gearSellValue(item)}g</div>`
+      + (!fromSlot ? `<div class="phCur">${cur ? `Replaces <b>${itemDisplayName(cur)}</b> (Q${cur.quality}). ▲▼ compare with it.` : `Your ${SLOT_LABELS[k]} slot is empty.`}</div>` : "");
+    const btns = document.createElement("div"); btns.className = "phBtns"; d.appendChild(btns);
+    const mk = (cls, text, fn, dis)=>{ const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = text; if(dis) b.disabled = true; b.addEventListener("click", fn); btns.appendChild(b); return b; };
+    if(fromSlot){ mk("primary", "Remove", ()=>{ phSel = { slot:fromSlot }; unequipSlot(role, fromSlot); }); return; }
+    mk("primary", cur ? "Swap in" : "Equip", ()=>{ phSel = { slot:k }; equipFromInventory(item.uid); });
+    const sellV = gearSellValue(item), rr = rerollGearCost(item);
+    const armed = phSellArm===item.uid;
+    mk("danger" + (armed ? " arm" : ""), armed ? `Tap again to sell · ${sellV}g` : `Sell · ${sellV}g`, ()=>{
+      if(phSellArm!==item.uid){ phSellArm = item.uid; phGearRender(); setTimeout(()=>{ if(phSellArm===item.uid){ phSellArm = null; phGearRender(); } }, 3000); return; }
+      phSellArm = null; phSel = null; invSel.clear(); invSel.add(item.uid); invDo("sell"); });
+    mk("", `Reroll · ${rr}g`, ()=>{ invSel.clear(); invSel.add(item.uid); invDo("reroll"); }, (S.gold||0) < rr);
+  }
+  function renderGearInventory(){ _renderGearInventory(); try{ phGearRender(); }catch(e){ if(typeof console!=="undefined") console.warn("phGearRender", e); } }
+  function _renderGearInventory(){
     const role = S.loadoutTab;
     const wrap = document.getElementById("gearInventory");
     const roleCount = unequippedGearCount(role);
@@ -30527,6 +30640,8 @@ thrall(){return gs(14)+
       renderLoadout();
       fitApp(); requestAnimationFrame(fitApp);
     });
+    document.querySelectorAll("#phGearTabs button").forEach(b=>b.addEventListener("click", ()=>{ phGearTab = b.dataset.t; phGearRender(); })); // phoneGearV1
+    { const sb = document.getElementById("phSelBtn"); if(sb) sb.addEventListener("click", ()=>{ phSelecting = !phSelecting; invSel.clear(); invPending = null; renderGearInventory(); }); }
     document.getElementById("loadoutBackBtn").addEventListener("click", ()=>{
       document.getElementById("loadoutOverlay").style.display="none";
       document.getElementById("startOverlay").style.display="flex";
@@ -31200,7 +31315,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build f68655787f) */
+<script>/* phone app: offline cache (build 1cf80ab70a) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
