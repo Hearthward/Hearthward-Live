@@ -1640,6 +1640,55 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 #saveCodeDlg textarea{ width:100%; height:80px; font:.62rem/1.3 'Space Mono',monospace; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px; resize:vertical; -webkit-user-select:text; user-select:text; }
 #saveCodeDlg .scBtns{ display:flex; gap:8px; flex-wrap:wrap; } #saveCodeDlg button{ font-family:'Cinzel'; font-size:.72rem; letter-spacing:.05em; padding:8px 14px; border-radius:999px; border:1px solid var(--accent-soft); background:var(--bg-panel-2); color:var(--accent-strong); cursor:pointer; }
 #saveCodeDlg .scMsg{ min-height:1em; color:var(--moss); }</style>
+<style id="phoneLayoutV2">
+  /* phoneLayoutV2: tighter landscape phone layout (overrides phoneLayoutV1) */
+  html.phoneL{ --phCol:216px; --phBot:max(4px, env(safe-area-inset-bottom,0px)); }
+  html.phoneL .stage{ right:calc(env(safe-area-inset-right,0px) + var(--phCol) + 10px); }
+  html.phoneL .sidebar{ width:var(--phCol); bottom:calc(var(--phBot) + 168px); display:flex; flex-direction:column; }
+  html.phoneL .party{ padding:3px; gap:3px; flex:1 1 auto; display:flex; flex-direction:column; overflow:hidden; }
+  html.phoneL .party > .unitframe{ flex:1 1 auto; }
+  html.phoneL .unitframe{ grid-template-columns:18px 1fr; min-height:44px; padding:4px 6px; gap:2px 6px; align-content:center; }
+  html.phoneL .unitframe .glyph{ width:18px; height:18px; grid-row:span 2; align-self:center; }
+  html.phoneL .unitframe .name{ font-size:.66rem; }
+  html.phoneL .unitframe .bar{ height:15px; }
+  html.phoneL .unitframe .bar .num{ font-size:.58rem; }
+  html.phoneL .unitframe .buffrow:empty{ display:none; }
+  html.phoneL .hud-dock{ width:var(--phCol); bottom:var(--phBot); }
+  html.phoneL .actionbar{ padding:5px; gap:5px; }
+  html.phoneL .managauge{ position:relative; }
+  html.phoneL .managauge .bar.mana{ height:13px; }
+  html.phoneL .managauge .lbl{ position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:flex-end; padding:0 6px; pointer-events:none; }
+  html.phoneL .managauge .lbl span:first-child{ display:none; }
+  html.phoneL .managauge .lbl #manaNum{ font-size:.56rem; color:#fff; text-shadow:0 0 3px #000, 0 0 2px #000; }
+  html.phoneL .ability{ height:54px; }
+  html.phoneL .ability .key{ display:none; }
+  html.phoneL .ability .cdnum{ font-size:.95rem; text-shadow:0 0 4px #000; }
+  html.phoneL #castBar{ position:relative; left:auto; bottom:auto; transform:none; width:auto; height:16px; border-radius:6px; }
+  html.phoneL .castbar-label{ font-size:.58rem; }
+  /* boss banner: one slim row */
+  html.phoneL .bossBanner{ display:flex; align-items:center; gap:6px; width:min(440px, calc(100% - 120px)); top:5px; padding:3px 8px; }
+  html.phoneL .bossBanner .bbName{ flex:0 1 auto; max-width:38%; font-size:.6rem; }
+  html.phoneL .bossBanner .bbBar{ flex:1 1 auto; height:7px; margin:0; }
+  html.phoneL .bossBanner .bbNext{ flex:0 0 auto; min-height:0; gap:4px; }
+  html.phoneL .bossBanner .bbChip{ font-size:.54rem; }
+  /* zoom: pinch instead of buttons; Map is a small round button */
+  html.phoneL .zoomControls{ top:5px; right:5px; padding:0; gap:0; background:none; border:none; box-shadow:none; }
+  html.phoneL .zoomControls #zoomOutBtn, html.phoneL .zoomControls #zoomInBtn, html.phoneL .zoomControls #zoomLabel{ display:none; }
+  html.phoneL .zoomControls button#mapToggleBtn{ width:44px; height:44px; padding:0; border-radius:50%; font-size:.6rem; background:var(--scrim); backdrop-filter:blur(2px); }
+  #pinchLbl{ display:none; }
+  html.phoneL #pinchLbl{ display:block; position:absolute; z-index:6; left:50%; top:40px; transform:translateX(-50%); padding:3px 10px; border-radius:999px; background:var(--scrim); color:var(--accent-strong); font:700 .7rem 'Space Mono',monospace; opacity:0; transition:opacity .25s; pointer-events:none; }
+  html.phoneL #pinchLbl.on{ opacity:1; transition:none; }
+  /* a phone held upright */
+  #rotateNag{ display:none; }
+  html.phonePortrait:not(.rotateOk) #rotateNag{ display:flex; position:fixed; inset:0; z-index:300; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:#17131b; color:#e9dcc3; }
+  #rotateNag .rnIcon{ font-size:3rem; color:#f0cf85; animation:rnTurn 2.2s ease-in-out infinite; }
+  #rotateNag p{ margin:0; font-family:'Cinzel'; font-size:1.15rem; color:#f0cf85; }
+  #rotateNag small{ color:#a99c86; font-size:.78rem; max-width:300px; }
+  #rotateNag button{ font-family:'Cinzel'; font-size:.75rem; padding:10px 18px; border-radius:999px; border:1px solid #8a7246; background:#2a2230; color:#f0cf85; }
+  @keyframes rnTurn{ 0%,30%{ transform:rotate(0deg); } 60%,100%{ transform:rotate(90deg); } }
+  @media (prefers-reduced-motion: reduce){ #rotateNag .rnIcon{ animation:none; } }
+</style>
+<div id="rotateNag"><div class="rnIcon">▯</div><p>Turn your phone sideways</p><small>Hearthward is built for landscape on phones.</small><button type="button" id="rotateOkBtn">Play upright anyway</button></div>
 <div id="appWrap">
 <div id="app">
   <div class="masthead">
@@ -1668,7 +1717,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       <div class="prompts" id="prompts"></div>
       <div class="bossBanner" id="bossBanner"></div>
       <button type="button" id="phoneMenuBtn" title="Menu: header, run info, arena controls and the log">☰</button>
-      <div id="joyBase"></div><div id="joyKnob"></div>
+      <div id="joyBase"></div><div id="joyKnob"></div><div id="pinchLbl"></div>
       <div class="zoomControls" id="zoomControls">
         <button type="button" id="zoomOutBtn" title="Zoom out (or scroll down / press -)">−</button>
         <span id="zoomLabel">1.0×</span>
@@ -25762,6 +25811,12 @@ thrall(){return gs(14)+
         <div class="buffrow"></div>
         <div class="ccdrow"></div>`;
       div.addEventListener("click", ()=>{ S.target = key; updatePartyFrames(); });
+      div.addEventListener("mouseenter", ()=>{ // phoneLayoutV2: a long-press on a phone shows the exact numbers
+        if(!document.documentElement.classList.contains("phoneL")) return; const m = S.party[key]; if(!m) return;
+        const sh = Math.max(0, Math.round(m.shield||0));
+        showTooltip(`<b>${m.label==="you" ? "You" : m.label}</b><br>${Math.max(0,Math.round(m.hp))} / ${m.maxHp} HP` + (sh>0 ? `<br>Shield ${sh}` : ""), div.getBoundingClientRect());
+      });
+      div.addEventListener("mouseleave", ()=>{ if(document.documentElement.classList.contains("phoneL")) hideTooltip(); });
       wrap.appendChild(div);
       const debuffRow = div.querySelector(".debuffrow");
       const aggroIcon = div.querySelector(".aggroIcon");
@@ -25926,7 +25981,8 @@ thrall(){return gs(14)+
       els.root.classList.toggle("aggroWarn", hasAggroWarn);
       if(els.aggroIcon) els.aggroIcon.hidden = !hasAggroWarn;
       if(els.bwIcon) els.bwIcon.hidden = !(key==="tank" && m.alive && (m.ccds.bulwark||0)<=0 && !((m.mitigateT||0)>0));
-      els.nameB.textContent = m.label==="you" ? "You" : m.label;
+      const _ph = document.documentElement.classList.contains("phoneL"); // phoneLayoutV2
+      els.nameB.textContent = m.label==="you" ? "You" : (_ph ? String(m.label||"").split(" ")[0] : m.label);
       els.hpBar.classList.toggle("low", hpPct<.4);
       els.hpFill.style.transform = `scaleX(${hpPct})`;
       if(els.shieldFill){
@@ -25939,7 +25995,7 @@ thrall(){return gs(14)+
         els.healFill.style.left = (hpPct*100)+"%";
         els.healFill.style.width = (pendingPct*100)+"%";
       }
-      els.hpNum.textContent = `${Math.max(0,Math.round(m.hp))}/${m.maxHp}` + (shieldAmt>0 ? ` (+${shieldAmt})` : "");
+      els.hpNum.textContent = _ph ? `${Math.round(Math.max(0,m.hp)/m.maxHp*100)}%` + (shieldAmt>0 ? ` +${shieldAmt}` : "") : `${Math.max(0,Math.round(m.hp))}/${m.maxHp}` + (shieldAmt>0 ? ` (+${shieldAmt})` : "");
       if(m.downed){
         // Checked first (and applies to any of the 4 roles, self included —
         // unlike the ordinary revive text below, which only ever applied to
@@ -29883,7 +29939,36 @@ thrall(){return gs(14)+
     S._joy = m > JOY_DEAD ? { x:dx/JOY_R, y:dy/JOY_R } : null; joyShow(true, joy.ox, joy.oy, joy.ox + dx, joy.oy + dy); }
   function joyMove(e){ if(!joy || e.pointerId!==joy.id) return false; const r = canvas.getBoundingClientRect(); joyMoveTo(e.clientX - r.left, e.clientY - r.top); return true; }
   function joyUp(e){ if(!joy || e.pointerId!==joy.id) return false; joy = null; S._joy = null; joyShow(false); return true; }
+  // phoneLayoutV2: pinch to zoom
+  const pinchPts = new Map(); let pinch = null, pinchLblT = null;
+  function pinchShow(){ const el = document.getElementById("pinchLbl"); if(!el) return; const full = (S.mapMode||"play")==="full";
+    el.textContent = full ? `Map ${(S.mapZoom||1).toFixed(1)}×` : `${S.camZoom.toFixed(1)}×`; el.classList.add("on"); clearTimeout(pinchLblT); pinchLblT = setTimeout(()=>el.classList.remove("on"), 700); }
+  function pinchDist(){ const v = [...pinchPts.values()]; return Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y) || 1; }
+  function pinchDown(e){
+    if(e.pointerType!=="touch" || (joy && joy.id===e.pointerId)) return false;
+    pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if(pinchPts.size>2) pinchPts.clear(), pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY }); // a stale finger: start over
+    if(pinchPts.size!==2) return false;
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+    S.moveTo = null; mapDrag = null;
+    pinch = { d0:pinchDist(), z0:S.camZoom, m0:S.mapZoom||1 }; return true;
+  }
+  function pinchMove(e){
+    if(!pinchPts.has(e.pointerId)) return false; pinchPts.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if(!pinch || pinchPts.size<2) return false;
+    const k = pinchDist()/pinch.d0;
+    if((S.mapMode||"play")==="full"){ S.mapZoom = Math.max(1, Math.min(MAP_ZOOM_MAX, pinch.m0*k)); if(S.mapZoom<1.05){ S.mapZoom = 1; S.mapFocus = null; } }
+    else S.camZoom = Math.max(zoomMin(), Math.min(ZOOM_MAX, pinch.z0*k));
+    updateMapControlsUI(); pinchShow(); return true;
+  }
+  function pinchUp(e){
+    if(!pinchPts.has(e.pointerId)) return false; pinchPts.delete(e.pointerId);
+    if(!pinch) return false; if(pinchPts.size<2) pinch = null; if(!pinchPts.size) S.moveTo = null; return true;
+  }
+  const pinchForget = e=>{ if(pinchPts.has(e.pointerId)){ pinchPts.delete(e.pointerId); if(pinchPts.size<2) pinch = null; } };
+  document.addEventListener("pointerup", pinchForget); document.addEventListener("pointercancel", pinchForget); // a finger lifted off the map
   canvas.addEventListener("pointerdown", e=>{
+    if(pinchDown(e)) return;
     if(joyDown(e)) return;
     const screenP = canvasPoint(e);
     if((S.mapMode||"play")==="full" && (S.mapZoom||1)>1.001){
@@ -29896,6 +29981,7 @@ thrall(){return gs(14)+
     if(walkable(p.x,p.y)) S.moveTo = p;
   });
   canvas.addEventListener("pointermove", e=>{
+    if(pinchMove(e)) return;
     if(joyMove(e)) return;
     if(!mapDrag) return;
     const sp = canvasPoint(e), sc = VIEW.scale;
@@ -29904,6 +29990,7 @@ thrall(){return gs(14)+
     if(mapDrag.moved){ S.mapFocus = { x: mapDrag.fx - dx/sc, y: mapDrag.fy - dy/sc }; }
   });
   const endMapDrag = e=>{
+    if(pinchUp(e)) return;
     if(joyUp(e)) return;
     if(!mapDrag) return; const d = mapDrag; mapDrag = null;
     if(!d.moved && e.type==="pointerup"){ const sp = canvasPoint(e); const p = VIEW.unproject(sp.x, sp.y); if(walkable(p.x,p.y)) S.moveTo = p; }
@@ -29939,6 +30026,7 @@ thrall(){return gs(14)+
     document.getElementById("scOpen").addEventListener("click", ()=>{ fin.value = ""; fin.click(); });
     fin.addEventListener("change", async ()=>{ const f = fin.files && fin.files[0]; if(!f) return; loadText(await f.text()); });
   })();
+  { const rb = document.getElementById("rotateOkBtn"); if(rb) rb.addEventListener("click", ()=>document.documentElement.classList.add("rotateOk")); }
   { const mb = document.getElementById("phoneMenuBtn"); if(mb) mb.addEventListener("click", ()=>{ document.documentElement.classList.toggle("phoneMenu"); }); }
   canvas.addEventListener("wheel", e=>{
     e.preventDefault();
@@ -30046,6 +30134,7 @@ thrall(){return gs(14)+
   function phoneLayoutSync(){
     const w = window.innerWidth, h = window.innerHeight, on = w > h && h <= 500 && w <= 1100;
     const root = document.documentElement; if(root.classList.contains("phoneL") !== on){ root.classList.toggle("phoneL", on); if(!on) root.classList.remove("phoneMenu"); }
+    root.classList.toggle("phonePortrait", h > w && w <= 500); // phoneLayoutV2: offer the turn-sideways screen
     return on;
   }
   let _lastFitScale = null;
@@ -31018,7 +31107,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 8f20b89362) */
+<script>/* phone app: offline cache (build 0d42fec01b) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
