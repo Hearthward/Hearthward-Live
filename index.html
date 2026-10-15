@@ -28321,7 +28321,7 @@ thrall(){return gs(14)+
         </div>
         <div class="buffrow"></div>
         <div class="ccdrow"></div>`;
-      div.addEventListener("click", ()=>{ S.target = key; updatePartyFrames(); });
+      phTap(div, ()=>{ S.target = key; updatePartyFrames(); }); // phoneMultiTouchV1
       div.addEventListener("mouseenter", ()=>{ // phoneLayoutV2: a long-press on a phone shows the exact numbers
         if(!document.documentElement.classList.contains("phoneL")) return; const m = S.party[key]; if(!m) return;
         const sh = Math.max(0, Math.round(m.shield||0));
@@ -28607,6 +28607,21 @@ thrall(){return gs(14)+
   const tipUp = e=>{ if(e.pointerType!=="touch") return; tipTouch.down = false; clearTimeout(tipTouch.timer); if(tipTouch.long){ tipTouch.long = false; hideTooltip(); setTimeout(hideTooltip, 60); } };
   document.addEventListener("pointerup", tipUp, true); document.addEventListener("pointercancel", tipUp, true);
   document.addEventListener("click", e=>{ if(tipTouch.eatClick){ tipTouch.eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true); // a long press read the tooltip: do not also press the button
+  // phoneMultiTouchV1: tap = finger lifted on the same element without sliding off; works while another finger holds the joystick
+  function phTap(el, fn){
+    el.style.touchAction = "none";
+    const downs = new Map();
+    el.addEventListener("pointerdown", e=>{ if(e.pointerType==="touch") downs.set(e.pointerId, { x:e.clientX, y:e.clientY, t:performance.now() }); });
+    el.addEventListener("pointercancel", e=>{ downs.delete(e.pointerId); });
+    el.addEventListener("pointerup", e=>{
+      if(e.pointerType!=="touch") return; const d = downs.get(e.pointerId); downs.delete(e.pointerId); if(!d) return;
+      el._phTapAt = performance.now();
+      if(tipTouch.eatClick || performance.now() - d.t > TIP_HOLD*1000){ tipTouch.eatClick = false; return; } // long press: tooltip only
+      if(Math.hypot(e.clientX - d.x, e.clientY - d.y) > 24) return; // slid off: not a tap
+      fn(e);
+    });
+    el.addEventListener("click", e=>{ if(el._phTapAt && performance.now() - el._phTapAt < 800) return; fn(e); });
+  }
   function showTooltip(html, rect){
     if(tipTouch.type==="touch" && !tipTouch.long) return; // a tap (or the browser's fake hover after it) never opens a tooltip
     const tip = document.getElementById("abilityTip");
@@ -28627,7 +28642,7 @@ thrall(){return gs(14)+
       const btn = document.createElement("div");
       btn.className = "ability";
       btn.innerHTML = `<span class="key">${a.key}</span>${a.glyph}<div class="cd"></div><div class="cdnum"></div>`;
-      btn.addEventListener("click", ()=>tryCast(a));
+      phTap(btn, ()=>tryCast(a)); // phoneMultiTouchV1
       btn.addEventListener("mouseenter", ()=>{
         const mods = activeAbilityModifiers(a);
         const effects = [...rankEffects("self",a.id), ...mods.map(m=>({ n:m.name, d:m.desc }))];
@@ -33676,7 +33691,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build f8b7ab9933) */
+<script>/* phone app: offline cache (build f5d657983d) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
