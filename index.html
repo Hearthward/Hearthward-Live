@@ -3271,6 +3271,967 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 
   // Round 143: mini-bosses carry their mechanic list in `miniMechanics` (so every 'boss = has .mechanics' roster/generator
   // filter ignores them) — engine code that ticks/draws an enemy's mechanics reads it through this.
+  // ===== emberReworkV1: Ember family boss reworks (The Ashguard, Thane Brogar, Karrick, Kestin) =====
+  // Design: "Hearthward dungeon boss review" doc, Ember family. Fire leaves marks: burns linger, ground stays
+  // scorched, cover gets used up. New mechanics run as kind:"script" mechanics (EMBER_MECH[fn].tick/draw/hazards),
+  // sharing the engine's timer / casting / castT / windup shape so the banner chips, wind-up floats, phase holds
+  // and hazard budget all treat them like any other mechanic.
+  var EMBER_MECH = {};
+  function emNow(){ return (S.tPrev||0)/1000; }
+  function emOf(e){ return e._em || (e._em = { ramp:{}, seen:{} }); }
+  function emRamp(e, id){ return emOf(e).ramp[id]||0; }
+  function emRampMul(e, id, pct){ return 1 + (pct||0.12)*emRamp(e, id); }
+  // Failure ramp: +1 on a miss, -1 on a clean answer, capped (default 3).
+  function emRampAdd(e, id, n, label, color, cap){
+    const em = emOf(e), before = em.ramp[id]||0, v = Math.max(0, Math.min(cap||3, before+n));
+    em.ramp[id] = v;
+    if(v>before){ spawnFloatingText(e.x, e.y-58, label+" ×"+v, color||"var(--blood)"); pushLog("event", `${e.name}'s ${label} builds (×${v}).`); }
+    else if(v<before) spawnFloatingText(e.x, e.y-58, v ? label+" ×"+v : label+" fades", "var(--moss)");
+  }
+  function emAliveKeys(f){ return Object.keys(S.party).filter(k=>S.party[k] && S.party[k].alive && (!f || f(k))); }
+  function emPick(a){ return a && a.length ? a[Math.floor(Math.random()*a.length)] : null; }
+  // The first time each mechanic appears, name it over the boss (lesson 5: make a big deal of it).
+  function emFirst(e, mech){ const em = emOf(e); if(em.seen[mech.id]) return; em.seen[mech.id] = true; const v = mechVerb(mech); spawnFloatingText(e.x, e.y-76, mech.name.toUpperCase()+" · "+v.verb, v.color); }
+  function emHasWax(m){ return !!(m && (m.shields||[]).some(s=>s.source==="waxward" && s.amount>0)); }
+  function emIsEncased(m){ return !!(m && m.debuffs && m.debuffs.length && m.debuffs.some(d=>d.id==="encased" || d.id==="caged")); }
+  // rooted: can't move (Encased, Catalogued, Pinned); the pin tick also holds them against AI code that moves them directly
+  const EM_ROOT_IDS = { encased:1, caged:1, pinned:1 };
+  function emIsRooted(m){ return !!(m && m.debuffs && m.debuffs.length && m.debuffs.some(d=>EM_ROOT_IDS[d.id])); }
+  function emPinTick(){
+    Object.values(S.party).forEach(m=>{
+      if(!m.alive || !emIsRooted(m)){ m._pin = null; return; }
+      if(!m._pin) m._pin = { x:m.x, y:m.y }; else { m.x = m._pin.x; m.y = m._pin.y; }
+    });
+  }
+  function emCoverPillars(){ return PILLAR_DEFS.filter(p=>!p.shattered && !p.prop && !p.lava); }
+  function emSparks(x, y){ try{ if(typeof showSparks==="function") showSparks(x, y, "255,140,60", 14, 200, 0.7, 30); }catch(_){} }
+  // Shared wind-up: "start" on the frame a cast begins, "fire" when it lands, "cast" in between, null when idle.
+  // onStart may return false to skip this cast (no valid target) and retry in a second.
+  function emCast(e, mech, st, dt, onStart){
+    if(!st.casting){
+      st.timer -= dt; if(st.timer>0) return null;
+      st.casting = true; st.castT = 0;
+      if(onStart && onStart()===false){ st.casting = false; st.timer = 1; return null; }
+      pushLog("event", `${e.name} begins ${mech.name}!`); emFirst(e, mech);
+      return "start";
+    }
+    st.castT += dt;
+    if(st.castT >= (mech.windup||0)){ st.casting = false; st.timer = mechEvery(e, mech); return "fire"; }
+    return "cast";
+  }
+
+  // ---------- The Ashguard: the teaching boss (cover, Cleansing Rite, Misdirection) ----------
+  EMBER_MECH.cinderburst = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      // Phase 2, Smoldering Pillar: 3s before the cast begins one pillar catches fire and won't block it.
+      if((e._phase||0)>0 && !st.casting && st.timer<=3 && !em.lit) emLightPillar(e);
+      const r = emCast(e, mech, st, dt);
+      if(r==="fire"){
+        const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]) * emRampMul(e, "smolder", mech.ramp));
+        let caught = 0, ducked = false;
+        Object.entries(S.party).forEach(([key,m])=>{
+          if(!m.alive) return;
+          if(mech.range && dist(m.x,m.y,e.x,e.y) > mech.range) return;
+          if(!hasLineOfSight(e.x,e.y,m.x,m.y)){ if(key==="self") ducked = true; return; }
+          damageMember(key, d, mech.name, e);
+          if(key!=="tank") caught++; // Kessa holds melee and always takes it (that's what Bulwark is for)
+        });
+        if(ducked) pushLog("event", `A pillar shields you from ${mech.name}!`);
+        emRampAdd(e, "smolder", caught ? 1 : -1, "Smolder");
+        emUnlight(e);
+      }
+      return !!st.casting || r==="fire";
+    },
+  };
+  function emLightPillar(e){
+    const em = emOf(e), ps = emCoverPillars();
+    if(ps.length<2) return;
+    const i = (em.litIdx==null ? Math.floor(Math.random()*ps.length) : em.litIdx+1) % ps.length;
+    em.litIdx = i; const p = ps[i]; em.lit = p;
+    p._lit = true; p._blos0 = p.blocksLOS; p.blocksLOS = false;
+    spawnFloatingText(p.x, p.y-p.r-18, "PILLAR LIT · NO COVER", "var(--blood)");
+    pushLog("event", "A pillar catches fire. It won't block the next Cinderburst!");
+  }
+  function emUnlight(e){
+    const em = emOf(e), p = em.lit;
+    if(p){ p._lit = false; if(p._blos0===undefined) delete p.blocksLOS; else p.blocksLOS = p._blos0; }
+    em.lit = null;
+  }
+  EMBER_MECH.fixate = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.fix){
+        const f = em.fix, md = S._lastMD, m = S.party[f.key];
+        f.t -= dt;
+        const snapped = !!(md && md.key===f.key && md.at >= f.armedAt - 0.05);
+        if(snapped || f.t<=0 || !m || !m.alive) emEndFixate(e, snapped);
+        return false; // it lumbers after its target and keeps swinging
+      }
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys(k=>k==="dps" || k==="dpsCaster"));
+        if(!key) return false;
+        em.fixPending = { key, armedAt: emNow() };
+        const m = S.party[key];
+        spawnFloatingText(m.x, m.y-32, "FIXATE · MISDIRECT " + displayName(m).toUpperCase(), "var(--arcane)");
+        pushLog("event", `${e.name} turns its gaze on ${displayName(m)}. Misdirection on ${displayName(m)} turns it back to Kessa.`);
+      });
+      if(r==="fire" && em.fixPending){
+        const p = em.fixPending; em.fixPending = null;
+        const md = S._lastMD;
+        if(md && md.key===p.key && md.at >= p.armedAt - 0.05){
+          spawnFloatingText(e.x, e.y-52, "MISDIRECTED", "var(--moss)");
+          pushLog("event", `Misdirection turns ${e.name} back before the fixation takes hold.`);
+        } else if(S.party[p.key] && S.party[p.key].alive){
+          em.fix = { key:p.key, t:mech.dur||6, armedAt:p.armedAt };
+          e._forcedTargetKey = p.key;
+          e.buffs = (e.buffs||[]).filter(b=>b.id!=="ashenFixate");
+          e.buffs.push({ id:"ashenFixate", label:"Ashen Fixate", purgeable:false, dmgMul:mech.dmgMul||1.35, remaining:mech.dur||6 });
+        }
+      }
+      return !!st.casting;
+    },
+    draw(e, mech, st, progress){
+      const p = emOf(e).fixPending, m = p && S.party[p.key];
+      if(m && m.alive) drawLineTelegraph(e.x, e.y, m.x, m.y, 8, progress, "var(--arcane)");
+    },
+  };
+  function emEndFixate(e, snapped){
+    const em = emOf(e); if(!em.fix) return;
+    if(e._forcedTargetKey===em.fix.key) e._forcedTargetKey = null;
+    e.buffs = (e.buffs||[]).filter(b=>b.id!=="ashenFixate");
+    if(snapped){ spawnFloatingText(e.x, e.y-52, "SNAPPED BACK", "var(--moss)"); pushLog("event", `Misdirection snaps ${e.name} back to Kessa.`); }
+    em.fix = null;
+  }
+  function emCoalDrop(key, m){
+    S.groundPools.push({ x:m.x, y:m.y, radius:40, tickDmg:Math.round(8*(S.keystoneDmgMul||1)), tickInterval:0.5, tickT:0,
+      remaining:12, srcName:"Falling Coal", color:"var(--blood)", icon:"🔥" });
+    spawnFloatingText(m.x, m.y-14, "COAL FALLS", "var(--blood)"); emSparks(m.x, m.y);
+    pushLog("event", `A coal falls from ${displayName(m)} and sets the floor alight.`);
+  }
+
+  // ---------- Thane Brogar: the healing check (cooldown timing, Cleansing Rite, Wax Ward) ----------
+  EMBER_MECH.roar = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      const r = emCast(e, mech, st, dt);
+      if(r==="fire"){
+        const grow = 1 + (mech.p2Grow||0.08)*(em.roars2||0);
+        const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]) * emRampMul(e, "heat", 0.10) * grow);
+        Object.keys(S.party).forEach(k=>{ if(S.party[k].alive) damageMember(k, d, mech.name, e); });
+        if((e._phase||0)>0) em.roars2 = (em.roars2||0) + 1;
+        spawnFloatingText(e.x, e.y-62, "ROAR!", "var(--ember)"); emSparks(e.x, e.y);
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){ drawGroundTelegraph(e.x, e.y, 46, progress, "var(--ember)"); },
+    top(e, mech, st){ // the countdown: "3, 2, 1, ROAR" in a badge over his head
+      if(!st.casting && st.timer>3) return;
+      const p = VIEW.project(e.x, e.y), R = 34*VIEW.scale*(BOSS_ART_SCALE[e.kind]||1);
+      const cx = p.x, cy = p.y - R*2.1, rr = Math.max(17, 22*VIEW.scale);
+      const frac = st.casting ? 1 : 1 - st.timer/3, txt = st.casting ? "!" : String(Math.max(1, Math.ceil(st.timer)));
+      ctx.save();
+      ctx.fillStyle = "rgba(20,8,4,.82)"; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = resolveColor("var(--ember)"); ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(cx, cy, rr-2, -Math.PI/2, -Math.PI/2 + Math.PI*2*frac); ctx.stroke();
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = resolveColor("var(--ember)");
+      ctx.font = `700 ${Math.round(rr*1.15)}px Cinzel, serif`; ctx.fillText(txt, cx, cy+1);
+      ctx.font = `700 ${Math.round(Math.max(9, rr*0.42))}px 'Space Mono', monospace`; ctx.fillText("ROAR", cx, cy+rr+9);
+      ctx.restore();
+    },
+  };
+  EMBER_MECH.anvil = {
+    tick(e, mech, st, dt){
+      const tank = S.party.tank;
+      const r = emCast(e, mech, st, dt, ()=>{
+        if(!tank.alive) return false;
+        spawnFloatingText(tank.x, tank.y-34, "WAX WARD KESSA", "var(--shield)");
+      });
+      if(r==="fire" && tank.alive){
+        const warded = emHasWax(tank);
+        let d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+        if(warded){ d = Math.round(d*(mech.wardMul||0.4)); spawnFloatingText(tank.x, tank.y-30, "WARDED", "var(--shield)"); }
+        damageMember("tank", d, mech.name, e);
+        if(warded) emRampAdd(e, "heat", -1, "Heat", "var(--ember)");
+        else if(tank.alive){
+          applyDebuff("tank", "dented"); spawnFloatingText(tank.x, tank.y-30, "DENTED", "var(--blood)");
+          emRampAdd(e, "heat", 1, "Heat", "var(--ember)");
+        }
+        emSparks(tank.x, tank.y);
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){ const t = S.party.tank; if(t && t.alive) drawGroundTelegraph(t.x, t.y, 24, progress, "var(--shield)"); },
+  };
+  function emBrogarTick(e, kind, dt){
+    // Molten: three Ember stacks erupt on the bearer and everyone near them.
+    Object.entries(S.party).forEach(([key,m])=>{
+      if(!m.alive || !m.debuffs) return;
+      if(m.debuffs.filter(d=>d.id==="moltenEmber").length < 3) return;
+      m.debuffs = m.debuffs.filter(d=>d.id!=="moltenEmber");
+      const dmg = Math.round(scaledEnemyDmg(28, 36));
+      damageMember(key, dmg, "Molten eruption", e);
+      Object.entries(S.party).forEach(([k2,o])=>{ if(k2!==key && o.alive && dist(o.x,o.y,m.x,m.y)<=80) damageMember(k2, dmg, "Molten eruption", e); });
+      spawnFloatingText(m.x, m.y-16, "MOLTEN!", "var(--ember)"); emSparks(m.x, m.y);
+      pushLog("event", `The embers on ${displayName(m)} erupt!`);
+      emRampAdd(e, "heat", 1, "Heat", "var(--ember)");
+    });
+    // the lash's slag lasts the whole fight; keep the newest six so the arena carves up without closing off
+    const slags = S.groundPools.filter(p=>p._emSlag);
+    if(slags.length>6){ const drop = new Set(slags.slice(0, slags.length-6)); S.groundPools = S.groundPools.filter(p=>!drop.has(p)); }
+  }
+
+  // ---------- Karrick the Hollowed Smith: the pit (Wax Ward brace, heal-to-full, valves) ----------
+  function emPitMech(e){ return (kindMechs(ENEMY_KINDS[e.kind])||[]).find(m=>m.kind==="tankShove"); }
+  function emSetPit(e, pm){
+    const em = emOf(e), r = pm._base.danger + 18*(em.pitGrow||0);
+    pm.dangerRadius = r;
+    const lp = PILLAR_DEFS.find(q=>q.lava); if(lp) lp.dangerRadius = r;
+  }
+  function emShoveResult(e, mech, res){
+    const em = emOf(e), tank = S.party.tank;
+    if(res==="braced"){ spawnFloatingText(tank.x, tank.y-32, "BRACED", "var(--shield)"); pushLog("event", "Wax Ward braces Kessa. The shove doesn't move her."); }
+    if(mech.brace){
+      if(res==="lava"){ emRampAdd(e, "fury", 1, "Forge Fury", "var(--ember)", 2); pushLog("event", "Kessa lands in the lava. The next shove will come faster."); }
+      else if(res==="braced" || res==="caught") emRampAdd(e, "fury", -1, "Forge Fury", "var(--ember)", 2);
+      mech.windup = Math.round(mech._base.windup * [1, 0.8, 0.65][emRamp(e, "fury")] * 100)/100;
+      if((e._phase||0)>0){ em.pitGrow = Math.min(4, (em.pitGrow||0)+1); emSetPit(e, mech); spawnFloatingText(pitPos(mech).x, pitPos(mech).y-80, "THE PIT GROWS", "var(--ember)"); }
+    }
+  }
+  function emValveSpots(pm){
+    const c = pitPos(pm), out = [];
+    [45, 135, 225, 315].forEach(a0=>{
+      for(const da of [0, 15, -15, 30, -30, 45, -45]){
+        let ok = null;
+        for(const R of [200, 180, 220, 160]){
+          const a = (a0+da)*Math.PI/180, x = c.x + Math.cos(a)*R, y = c.y + Math.sin(a)*R;
+          if(walkable(x, y) && walkable(x+14, y) && walkable(x-14, y) && walkable(x, y+14) && walkable(x, y-14)){ ok = { x, y }; break; }
+        }
+        if(ok){ out.push({ x:ok.x, y:ok.y, r:20, cd:0 }); break; }
+      }
+    });
+    return out;
+  }
+  function emKarrickTick(e, kind, dt){
+    const em = emOf(e), pm = emPitMech(e);
+    if(!pm || !pm._base) return;
+    if(!em.init){ em.init = true; em.pitGrow = 0; emSetPit(e, pm); }
+    const p2 = (e._phase||0)>0;
+    pm.pushDistance = Math.round(pm._base.push * (p2 ? 1.3 : 1));
+    if(p2 && !em.valves){
+      em.valves = emValveSpots(pm);
+      spawnFloatingText(e.x, e.y-76, "THE PIT GROWS · STEP ON A VALVE", "var(--ember)");
+      pushLog("event", "The forge overloads: every shove now spreads the lava. Step on a valve to cool it back a step.");
+    }
+    (em.valves||[]).forEach(v=>{
+      if(v.cd>0){ v.cd -= dt; return; }
+      const me = S.party.self;
+      if(!(em.pitGrow>0) || !me.alive || dist(me.x,me.y,v.x,v.y) > v.r) return;
+      em.pitGrow--; v.cd = 20; emSetPit(e, pm);
+      spawnFloatingText(v.x, v.y-20, "VALVE · PIT COOLS", "var(--shield)");
+      pushLog("event", "You open a valve. The lava pulls back.");
+    });
+  }
+  EMBER_MECH.hollowing = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.hollow){
+        const h = em.hollow, m = S.party[h.key];
+        h.t -= dt;
+        const clear = ()=>{ m.debuffs = (m.debuffs||[]).filter(d=>d.id!=="hollowing"); em.hollow = null; };
+        if(!m || !m.alive){ em.hollow = null; }
+        else if(m.hp >= m.maxHp*0.95){ clear(); spawnFloatingText(m.x, m.y-22, "RESTORED", "var(--moss)"); }
+        else if(h.t<=0){
+          clear(); applyDebuff(h.key, "encased");
+          if(h.key==="self" && m.casting) m.casting = null;
+          spawnFloatingText(m.x, m.y-22, "ENCASED!", "var(--slag)");
+          pushLog("event", `${displayName(m)==="you" ? "You harden" : displayName(m)+" hardens"} into cinder!`);
+        }
+        return false;
+      }
+      st.timer -= dt;
+      if(st.timer>0) return false;
+      st.timer = mechEvery(e, mech);
+      const key = emPick(emAliveKeys(k=>!emIsEncased(S.party[k])));
+      if(!key) return false;
+      const m = S.party[key];
+      emFirst(e, mech);
+      damageMember(key, Math.round(m.maxHp*(mech.hpPct||0.2)), mech.name, e);
+      if(!m.alive) return false;
+      applyDebuff(key, "hollowing");
+      em.hollow = { key, t: mech.dur||6 };
+      spawnFloatingText(m.x, m.y-32, "HEAL TO FULL", "var(--shield)");
+      return false;
+    },
+  };
+  EMBER_MECH.bellows = {
+    tick(e, mech, st, dt){
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys(k=>k!=="tank"));
+        if(!key) return false;
+        const pit = pitPos(emPitMech(e)||mech), m = S.party[key];
+        const dx = m.x-pit.x, dy = m.y-pit.y, dd = Math.hypot(dx,dy)||1, L = mech.len||420;
+        st.ox = pit.x; st.oy = pit.y; st.ex = pit.x + dx/dd*L; st.ey = pit.y + dy/dd*L;
+      });
+      if(r==="fire"){
+        const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+        const pm = emPitMech(e), core = pm ? pm.pillarRadius : 70;
+        Object.entries(S.party).forEach(([key,m])=>{
+          if(!m.alive || key==="tank") return;
+          if(segmentDistance(m.x, m.y, st.ox, st.oy, st.ex, st.ey) > mech.width) return;
+          damageMember(key, d, mech.name, e);
+          if(key==="self" && m.casting){ m.casting = null; pushLog("event", `The ${mech.name} interrupts your cast!`); }
+          const dd = dist(m.x, m.y, st.ox, st.oy) || 1, move = Math.min(mech.pullDist, Math.max(0, dd-(core+14)));
+          if(move>0){
+            for(const f of [1, 0.6, 0.3]){
+              const nx = m.x+(st.ox-m.x)/dd*move*f, ny = m.y+(st.oy-m.y)/dd*move*f;
+              if(walkable(nx, ny)){ pushEntity(m, nx, ny, { dur:0.45, arc:0 }); break; }
+            }
+          }
+          spawnFloatingText(m.x, m.y-10, "DRAGGED", "var(--ember)");
+        });
+        st.ox = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){ if(st.ox!=null) drawLineTelegraph(st.ox, st.oy, st.ex, st.ey, mech.width, progress, "var(--ember)"); },
+    hazards(e, mech, st){ return (st.casting && st.ox!=null) ? [{ line:true, x1:st.ox, y1:st.oy, x2:st.ex, y2:st.ey, radius:mech.width+HAZARD_SAFE_MARGIN }] : []; },
+  };
+
+  // ---------- Kestin Emberhollow: cover as a resource (Purge, then stand together) ----------
+  function emBannerUp(e){ return !!(e.buffs||[]).some(b=>b.id==="pyreBanner"); }
+  function emRubble(p){
+    S.groundPools.push({ x:p.x, y:p.y, radius:p.r+18, tickDmg:Math.round(7*(S.keystoneDmgMul||1)), tickInterval:0.5, tickT:0,
+      remaining:1e9, permanent:true, srcName:"Ember rubble", color:"var(--slag)", icon:"🔥" });
+    emSparks(p.x, p.y);
+  }
+  EMBER_MECH.emberfall = {
+    tick(e, mech, st, dt){
+      const p2 = (e._phase||0)>0;
+      mech.verb = p2 ? "GET IN" : "HIDE"; mech.color = p2 ? "var(--moss)" : "var(--shield)"; // the banner chip names the phase-2 answer
+      const r = emCast(e, mech, st, dt, ()=>{
+        st.mul = emRampMul(e, "cinder", mech.ramp) * (emBannerUp(e) ? (mech.bannerMul||1.25) : 1);
+        st.zone = null;
+        if(p2){ // No Retreat: a soak circle replaces cover
+          const me = S.party.self, ang = Math.atan2(me.y-e.y, me.x-e.x);
+          let zx = e.x + Math.cos(ang)*70, zy = e.y + Math.sin(ang)*70;
+          if(!walkable(zx, zy)){ zx = e.x; zy = e.y; }
+          const base = scaledEnemyDmg(mech.dmg[0], mech.dmg[1]) * st.mul;
+          st.zone = { x:zx, y:zy, radius:mech.soakR||60, windupT:mech.windup, windupTotal:mech.windup,
+            dmg:Math.round(base*3.2), missedDmg:Math.round(base*1.3), srcName:mech.name, color:"var(--accent)" };
+          S.soakZones = S.soakZones || []; S.soakZones.push(st.zone);
+          spawnFloatingText(zx, zy-mech.soakR-10, "STAND TOGETHER", "var(--accent)");
+        }
+      });
+      if(r==="fire"){
+        if(st.zone){ // resolved by tickSoakZones; whoever stayed out feeds Cinder
+          const z = st.zone; st.zone = null;
+          const missed = emAliveKeys(k=>dist(S.party[k].x, S.party[k].y, z.x, z.y) > z.radius).length;
+          emRampAdd(e, "cinder", missed ? 1 : -1, "Cinder", "var(--accent)");
+        } else {
+          const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]) * (st.mul||1));
+          let ducked = false, caught = 0; const used = new Set();
+          Object.entries(S.party).forEach(([key,m])=>{
+            if(!m.alive) return;
+            if(mech.range && dist(m.x,m.y,e.x,e.y) > mech.range) return;
+            const blocker = blockingPillar(e.x, e.y, m.x, m.y);
+            if(blocker){ if(key==="self") ducked = true; used.add(blocker); return; }
+            damageMember(key, d, mech.name, e);
+            if(key!=="tank") caught++;
+          });
+          if(ducked) pushLog("event", `A pillar shields you from ${mech.name}!`);
+          used.forEach(p=>{
+            p.cracks = (p.cracks||0) + 1;
+            if(p.cracks >= (p.maxCracks||2) && !p.shattered){ p.shattered = true; emRubble(p); pushLog("event", "A weakened pillar crumbles into burning rubble!"); }
+          });
+          emRampAdd(e, "cinder", caught ? 1 : -1, "Cinder", "var(--accent)");
+        }
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress, kind){ if(!st.zone) drawGroundTelegraph(e.x, e.y, mech.range, progress, kind.color); },
+  };
+  EMBER_MECH.banner = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.bannerUp && !emBannerUp(e)){
+        em.bannerUp = false; st.timer = mechEvery(e, mech);
+        spawnFloatingText(e.x, e.y-62, "BANNER SHATTERED", "var(--moss)"); emSparks(e.x+26, e.y-10);
+        pushLog("event", "Purge shatters the Pyre Banner.");
+      }
+      if(em.bannerUp){ st.timer = Math.max(st.timer, mechEvery(e, mech)); return false; }
+      const r = emCast(e, mech, st, dt);
+      if(r==="fire"){
+        e.buffs = (e.buffs||[]).filter(b=>b.id!=="pyreBanner");
+        e.buffs.push({ id:"pyreBanner", label:"Pyre Banner", purgeable:true, dmgMul:mech.dmgMul||1.2, remaining:1e9 });
+        em.bannerUp = true;
+        spawnFloatingText(e.x, e.y-62, "PYRE BANNER · PURGE IT", "var(--shield)");
+        pushLog("event", `${e.name} plants a Pyre Banner: his attacks and the next Emberfall hit harder until you Purge it.`);
+      }
+      return !!st.casting;
+    },
+  };
+
+  // ---------- engine glue ----------
+  function emberOnSpawn(e, k){
+    (kindMechs(k)||[]).forEach(m=>{
+      if(m.fn==="emberfall"){ m.verb = "HIDE"; m.color = "var(--shield)"; }
+      if(m.kind==="tankShove" && m.brace){
+        m._base = m._base || { windup:m.windup, danger:m.dangerRadius, push:m.pushDistance };
+        m.windup = m._base.windup; m.dangerRadius = m._base.danger; m.pushDistance = m._base.push;
+      }
+    });
+  }
+  function emberBossTick(e, kind, dt){
+    emPinTick();
+    if(kind.arcane && typeof arcBossTick==="function") arcBossTick(e, kind, dt);
+    if(kind.emberTick==="brogar") emBrogarTick(e, kind, dt);
+    else if(kind.emberTick==="karrick") emKarrickTick(e, kind, dt);
+  }
+  function emBosses(){
+    const out = [];
+    (S.engagedGroups||[]).forEach(g=>livingEnemiesOf(g).forEach(e=>{ const k = ENEMY_KINDS[e.kind]; if(k && k.ember && e.mech) out.push([e, k]); }));
+    return out;
+  }
+  function emberHazards(hz){
+    emBosses().forEach(([e,k])=>{
+      (kindMechs(k)||[]).forEach(m=>{ const f = m.kind==="script" && EMBER_MECH[m.fn]; if(f && f.hazards) f.hazards(e, m, e.mech[m.id]).forEach(h=>hz.push(h)); });
+      if(k.emberTick==="karrick"){ const pm = emPitMech(e); if(pm){ const c = pitPos(pm); hz.push({ x:c.x, y:c.y, radius:pm.dangerRadius + HAZARD_SAFE_MARGIN }); } }
+    });
+  }
+  function emberDrawWorld(){
+    emBosses().forEach(([e,k])=>{
+      const em = emOf(e), now = (S.tPrev||0)/1000, pulse = 0.5+0.5*Math.sin(now*6);
+      if(k.arcane && typeof arcDrawWorld==="function") arcDrawWorld(e, k, em, now, pulse);
+      if(em.lit){ // Smoldering Pillar
+        const p = VIEW.project(em.lit.x, em.lit.y), r = (em.lit.r+8)*VIEW.scale;
+        ctx.save(); ctx.fillStyle = resolveColor("var(--blood)"); ctx.globalAlpha = 0.18+0.2*pulse;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r+6*VIEW.scale, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = resolveColor("var(--ember)"); ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+      }
+      if(em.fix){ // Ashen Fixate tether
+        const m = S.party[em.fix.key];
+        if(m && m.alive){
+          const a = VIEW.project(e.x, e.y), b = VIEW.project(m.x, m.y);
+          ctx.save(); ctx.strokeStyle = resolveColor("var(--arcane)"); ctx.lineWidth = 3; ctx.globalAlpha = 0.55+0.35*pulse; ctx.setLineDash([8,6]);
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(b.x, b.y, 18*VIEW.scale, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+        }
+      }
+      (em.valves||[]).forEach(v=>{ // Karrick's valves
+        const p = VIEW.project(v.x, v.y), r = v.r*VIEW.scale, ready = !(v.cd>0) && em.pitGrow>0;
+        ctx.save(); ctx.globalAlpha = ready ? 0.55+0.35*pulse : 0.3;
+        ctx.strokeStyle = resolveColor(ready ? "var(--shield)" : "var(--wall)"); ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); for(let i=0;i<4;i++){ const a = i*Math.PI/2 + now*(ready?1.5:0); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x+Math.cos(a)*r*0.75, p.y+Math.sin(a)*r*0.75); } ctx.stroke();
+        ctx.restore();
+      });
+    });
+  }
+  function emberDrawTop(){
+    emBosses().forEach(([e,k])=>{
+      const em = emOf(e), now = (S.tPrev||0)/1000, pulse = 0.5+0.5*Math.sin(now*6);
+      if(em.bannerUp){ // Pyre Banner beside Kestin
+        const p = VIEW.project(e.x+38, e.y+4), s = Math.max(1, VIEW.scale)*1.3;
+        ctx.save(); ctx.strokeStyle = "#3a2410"; ctx.lineWidth = Math.max(2, 3*s);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y-46*s); ctx.stroke();
+        ctx.fillStyle = resolveColor("var(--accent)"); ctx.globalAlpha = 0.85+0.15*pulse;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y-46*s); ctx.lineTo(p.x+22*s, p.y-40*s+3*s*Math.sin(now*5)); ctx.lineTo(p.x, p.y-30*s); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.25+0.2*pulse; ctx.strokeStyle = resolveColor("var(--shield)"); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y-20*s, 26*s, 0, Math.PI*2); ctx.stroke(); ctx.restore();
+      }
+      (kindMechs(k)||[]).forEach(m=>{ const f = m.kind==="script" && EMBER_MECH[m.fn]; if(f && f.top) f.top(e, m, e.mech[m.id]); });
+    });
+  }
+
+  // ---------- new marks ----------
+  DEBUFFS.fallingCoal = { name:"Falling Coal", tickDmg:6, interval:1, ticks:5, maxStacks:1, markRing:{ radius:40 }, onExpire:emCoalDrop,
+    desc:"A coal smoulders on you. When it runs out it drops a burning patch where you stand. Cleanse it first and nothing falls." };
+  DEBUFFS.moltenEmber = { name:"Molten Ember", tickDmg:5, interval:1, ticks:15, maxStacks:3,
+    desc:"Stacks up to three times. At three it erupts on you and everyone near you. Cleanse a stack before then." };
+  DEBUFFS.dented = { name:"Dented", bane:true, interval:1, ticks:12, maxStacks:1, dmgTakenMul:1.10,
+    desc:"Damage taken +10%. Can't be cleansed. Wax Ward Kessa before Anvil Strike lands to avoid it." };
+  DEBUFFS.hollowing = { name:"Hollowing", bane:true, noCleanse:true, interval:1, ticks:6, maxStacks:1,
+    desc:"Hardening into cinder. Heal to full within 6s or be encased. Can't be cleansed." };
+  DEBUFFS.encased = { name:"Encased", bane:true, noCleanse:true, interval:1, ticks:3, maxStacks:1,
+    desc:"Encased in cinder: can't move, attack or cast for 3s." };
+
+  // ---------- the bosses ----------
+  (function(){
+    const A = ENEMY_KINDS.ashguard, B = ENEMY_KINDS.brogar, K = ENEMY_KINDS.karrick, KE = ENEMY_KINDS.kestin;
+    A.ember = true;
+    A.pillarLayout = [[0.26,0.27],[0.74,0.27],[0.5,0.8]];
+    A.phases = [ { at:0.5, tint:"#ff8a3d", everyMul:{}, note:"<b>Smoldering Pillar.</b> Three seconds before each Cinderburst, one pillar catches fire and won't block it. The lit pillar moves round each time, so read which one is safe." } ];
+    A.mechanics = [
+      { id:"cinderburst", name:"Cinderburst", kind:"script", fn:"cinderburst", sky:true, shelter:true, bulwark:true, verb:"HIDE", color:"var(--shield)",
+        every:13, first:8, windup:2.6, dmg:[42,55], range:150, ramp:0.12,
+        trigger:"Every ~13s, a 2.6s wind-up, then a blast that hits anyone within 150 of The Ashguard. Each time it catches someone besides Kessa it gains a Smolder stack: +12% on the next one, up to 3.",
+        counter:"Get behind one of the three pillars before it lands; breaking line of sight blocks it. A cast that catches nobody burns off a Smolder stack. Kessa stays in melee and takes it." },
+      { id:"fallingcoal", name:"Falling Coal", kind:"debuffApply", every:11, first:5, debuff:"fallingCoal", verb:"CLEANSE", color:"var(--arcane)",
+        trigger:"Every ~11s, a coal lands on a random party member. When it burns out (5s) it drops a burning patch where they stand.",
+        counter:"Cleanse it (Cleansing Rite) and no patch falls. Let it run and the patch can land behind a pillar and cost you that cover." },
+      { id:"scorchedearth", name:"Scorched Earth", kind:"groundPool", every:16, first:11, windup:1.5, radius:45, tickDmg:9, tickInterval:0.5, duration:6,
+        trigger:"Every ~16s, a burning patch begins forming under the healer, with a 1.5s telegraph before it ignites.",
+        counter:"Step out of the marked circle before it ignites, and don't drag it onto the party. It stops you camping behind one pillar." },
+      { id:"ashenfixate", name:"Ashen Fixate", kind:"script", fn:"fixate", every:20, first:15, windup:1.5, dur:6, dmgMul:1.15, verb:"MISDIRECT", color:"var(--arcane)",
+        trigger:"Every ~20s, The Ashguard fixes its gaze on Rook/Vex or Mira/Wren and lumbers after them for 6s, hitting 15% harder. Rook/Vex and Mira/Wren wear far less armour than Kessa, so it hurts.",
+        counter:"Cast Misdirection on the fixated companion, during the 1.5s wind-up or once it's chasing, and it snaps back to Kessa." },
+    ];
+    B.ember = true; B.emberTick = "brogar";
+    B.pillarLayout = []; // no cover: the Roar always lands
+    B.phases = [ { at:0.5, tint:"#ffb347", everyMul:{}, note:"<b>Overheat.</b> Molten Lash now aims at a random party member (you included), so dodge it yourself, and each Forge Roar hits 8% harder than the last until he falls." } ];
+    B.mechanics = [
+      { id:"forgeroar", name:"Forge Roar", kind:"script", fn:"roar", bulwark:true, verb:"TOP OFF", color:"var(--shield)",
+        every:12, first:9, windup:2.2, dmg:[30,40], p2Grow:0.08,
+        trigger:"Every ~12s, with a countdown over his head, a roar that hits the whole party. Nothing blocks it. Each stack of Heat makes it 10% stronger (up to 3).",
+        counter:"Time it: top everyone off before the count runs out, and save Second Wind or Wax Ward for the Roars that would hurt most." },
+      { id:"moltenembers", name:"Molten Embers", kind:"debuffApply", every:6, first:4, debuff:"moltenEmber", stackOnSame:0.75, verb:"CLEANSE", color:"var(--arcane)",
+        trigger:"Every ~6s, molten embers land on a party member, usually one already burning. Three stacks erupt on them and everyone within 80, and add a stack of Heat.",
+        counter:"Cleanse anyone at two stacks before the third lands. Choose who: the melee pair standing together suffer most from an eruption." },
+      { id:"anvilstrike", name:"Anvil Strike", kind:"script", fn:"anvil", every:18, first:13, windup:2.0, dmg:[70,90], wardMul:0.4, verb:"WAX WARD", color:"var(--shield)",
+        trigger:"Every ~18s, Brogar raises his hammer over Kessa for 2s, then brings it down. Unwarded, it leaves her Dented (+10% damage taken for 12s) and adds a stack of Heat.",
+        counter:"Wax Ward Kessa before it lands: it absorbs most of the blow and burns off a stack of Heat." },
+      { id:"moltenlash", name:"Molten Lash", kind:"lineCast", every:14, first:7, windup:1.8, dmg:[26,36], width:30, randomP2:true,
+        slag:{ radius:22, tickDmg:7, tickInterval:0.5, duration:1e9, permanent:true },
+        trigger:"Every ~14s, a lash of molten chain along a line toward whoever he's fighting, with a 1.8s wind-up. Its slag stays for the rest of the fight (the newest six pools).",
+        counter:"Companions step off the line on their own. In phase 2 it can aim at you, so move. Fight away from the slag so the arena doesn't close in." },
+    ];
+    K.ember = true; K.emberTick = "karrick";
+    K.phases = [ { at:0.5, tint:"#ff7a3a", everyMul:{}, note:"<b>The pit grows.</b> Every Forge Shove now spreads the lava's burning edge outward and shoves land 30% farther. Four valves appear around the pit: step on one to cool the pit back a step (each valve then needs 20s)." } ];
+    K.mechanics = [
+      { id:"hollowing", name:"Hollowing", kind:"script", fn:"hollowing", every:16, first:9, dur:6, hpPct:0.2, verb:"HEAL FULL", color:"var(--shield)",
+        trigger:"Every ~16s, Karrick's grasp burns a random party member for 20% of their health and starts to harden them.",
+        counter:"Heal them back to full (95% or more) within 6s or they're Encased: unable to move, attack or cast for 3s. A Wax Ward already on them soaks the burn." },
+      { id:"bellows", name:"Bellows Draft", kind:"script", fn:"bellows", hazard:true, every:15, first:6, windup:2.2, width:34, len:420, pullDist:90, dmg:[10,14], verb:"SIDESTEP", color:"var(--blood)",
+        trigger:"Every ~15s, a draft roars out of the pit toward a random party member (never Kessa), with a 2.2s wind-up along the band.",
+        counter:"Step sideways out of the band before it lands. Anyone still in it is dragged up to 90 toward the lava and has their cast interrupted." },
+      { id:"pitshove", name:"Forge Shove", kind:"tankShove", every:18, first:12, windup:2, brace:true,
+        pitX:1050, pitY:250, pillarRadius:70, dangerRadius:100,
+        pushDistance:130, catchRadius:55, catchRingOffset:35,
+        pitTickDmg:24, pitTickInterval:0.5, catchDmg:[18,26], verb:"WAX WARD", color:"var(--shield)",
+        trigger:"Every ~18s, Karrick winds up to shove Kessa straight toward the pit, with a 2s warning. Each time she lands in the lava, the next shove's wind-up gets shorter (2s, 1.6s, 1.3s).",
+        counter:"Wax Ward Kessa during the wind-up and she's braced: not moved at all. Otherwise Rook/Vex or Mira/Wren try to catch her. A brace or a catch slows the shoves back down." },
+    ];
+    KE.ember = true;
+    KE.pillarLayout = [[0.25,0.27,22,{crackable:true,maxCracks:2}],[0.75,0.27,22,{crackable:true,maxCracks:2}],[0.25,0.73,22,{crackable:true,maxCracks:2}],[0.75,0.73,22,{crackable:true,maxCracks:2}]];
+    KE.phases = [ { at:0.5, tint:"#ffc94d", everyMul:{}, note:"<b>No Retreat.</b> Emberfall can no longer be blocked. A glowing circle marks where to stand: everyone inside splits the hit, and anyone outside takes a heavy share alone." } ];
+    KE.mechanics = [
+      { id:"emberfall", name:"Emberfall", kind:"script", fn:"emberfall", sky:true, shelter:true, shelterUntilPhase:1, bulwark:true, verb:"HIDE", color:"var(--shield)",
+        every:13, first:8, windup:2.5, dmg:[40,53], range:260, ramp:0.12, bannerMul:1.25, soakR:60,
+        trigger:"Every ~13s, a 2.5s wind-up, then Emberfall hits everyone in the chamber without line of sight broken. Anyone besides Kessa it catches adds Cinder: +12% on the next one, up to 3.",
+        counter:"Stand behind one of the four pillars. Each one cracks when it shelters someone and crumbles after two, leaving burning rubble. Phase 2: stand together in the circle instead." },
+      { id:"pyrebanner", name:"Pyre Banner", kind:"script", fn:"banner", every:18, first:12, windup:1.0, dmgMul:1.2, verb:"PURGE", color:"var(--shield)",
+        trigger:"Every ~18s (unless one is already up), Kestin plants a banner: his attacks hit 20% harder and the next Emberfall 25% harder while it stands.",
+        counter:"Cast Purge within range of Kestin and the banner shatters." },
+    ];
+  })();
+  // test hook (harness only reads it)
+  if(typeof window!=="undefined") window.__ember = { EMBER_MECH, emOf, emRamp, emSetPit, emPitMech, emBannerUp, emIsEncased, emCoverPillars,
+    get PILLAR_DEFS(){ return PILLAR_DEFS; }, hasLineOfSight:(a,b,c,d)=>hasLineOfSight(a,b,c,d), tryCast:(a)=>tryCast(a), tryMove:(m,x,y)=>tryMove(m,x,y),
+    activeHazardsList:()=>activeHazardsList(), nearestShelterPillar:(e)=>nearestShelterPillar(e), activeEmberfallWindup:()=>activeEmberfallWindup(),
+    bossRoomPillarsFor:(k,x,y,w,h)=>bossRoomPillarsFor(k,x,y,w,h), wtDt:(m,dt)=>wtDt(m,dt) };
+  // The healer's on-screen cue for whatever Ember answer is due right now (null when nothing is).
+  function emberHint(){
+    const me = S.party.self, tank = S.party.tank;
+    for(const [e,k] of emBosses()){
+      if(k.arcane && typeof arcHint==="function"){ const ah = arcHint(e, k); if(ah) return ah; continue; }
+      const em = emOf(e), M = id=>(kindMechs(k)||[]).find(m=>m.id===id), ST = id=>e.mech[id];
+      const fixKey = (em.fix && em.fix.key) || (em.fixPending && em.fixPending.key);
+      if(fixKey && S.party[fixKey]) return `🎯 Misdirect ${displayName(S.party[fixKey])}: ${e.name} is fixated on them!`;
+      if(em.hollow && S.party[em.hollow.key]) return `❤ Heal ${displayName(S.party[em.hollow.key])==="you" ? "yourself" : displayName(S.party[em.hollow.key])} to full before the cinder sets!`;
+      const zone = ST("emberfall") && ST("emberfall").zone;
+      if(zone && dist(me.x, me.y, zone.x, zone.y) > zone.radius) return "🔥 Stand in the glowing circle with the party!";
+      const bl = M("bellows"), bst = ST("bellows");
+      if(bl && bst && bst.casting && bst.ox!=null && segmentDistance(me.x, me.y, bst.ox, bst.oy, bst.ex, bst.ey) <= bl.width) return "💨 Step out of the draft!";
+      if(ST("anvilstrike") && ST("anvilstrike").casting && tank.alive && !emHasWax(tank)) return "🛡 Wax Ward Kessa before the hammer lands!";
+      if(ST("pitshove") && ST("pitshove").casting && tank.alive && !emHasWax(tank)) return "🛡 Wax Ward Kessa to brace her against the shove!";
+      const two = emAliveKeys(kk=>(S.party[kk].debuffs||[]).filter(d=>d.id==="moltenEmber").length===2);
+      if(two.length) return `🔥 Cleanse ${displayName(S.party[two[0]])==="you" ? "yourself" : displayName(S.party[two[0]])} before a third ember lands!`;
+      const r = ST("forgeroar"); if(r && !r.casting && r.timer<=3) return `🔥 Roar in ${Math.max(1, Math.ceil(r.timer))}: top everyone off!`;
+      if(em.lit) return "🔥 The burning pillar won't shield you. Pick another!";
+      if(em.bannerUp) return "✨ Purge near Kestin to shatter the Pyre Banner!";
+      if(em.valves && em.pitGrow>0 && em.valves.some(v=>!(v.cd>0))) return "🔧 Step on a glowing valve to cool the pit!";
+    }
+    return null;
+  }
+
+  // ===== arcaneReworkV1: Arcane family boss reworks (Riftbound Custodian, Ysolt, Hollow Cartographer) =====
+  // Design: "Hearthward dungeon boss review" doc, Arcane section. Arcane rewrites the rules of the room: the Custodian
+  // controls WHO may act (cells, silence), Ysolt WHEN (foresight), the Cartographer WHERE (walls, a living map).
+  // Built on the Ember module's script-mechanic engine (EMBER_MECH, emCast, emRamp*, emOf...).
+
+  function arcName(m){ return displayName(m)==="you" ? "yourself" : displayName(m); }
+  function arcBossTick(e, kind, dt){
+    const em = emOf(e), me = S.party.self;
+    // Seal of Silence: a sealed companion can't start a special ability (they all wait on the global cooldown)
+    ["tank","dps","dpsCaster"].forEach(k=>{ const m = S.party[k]; if(m.alive && partyHasDebuff(m, "silenced")) m.gcd = Math.max(m.gcd||0, 0.25); });
+    if(kind.arcane==="custodian"){
+      if(em.cage){
+        const m = S.party[em.cage.key];
+        if(!m || !m.alive || !partyHasDebuff(m, "caged")){ em.cage = null; }
+        else if(me.alive && dist(me.x, me.y, em.cage.gx, em.cage.gy) <= 24){
+          m.debuffs = m.debuffs.filter(d=>d.id!=="caged"); m._pin = null; em.cage = null;
+          spawnFloatingText(m.x, m.y-26, "FREED", "var(--moss)"); emSparks(m.x, m.y);
+          pushLog("event", `You break the seal. ${displayName(m)} is free.`);
+        }
+      }
+    } else if(kind.arcane==="ysolt"){
+      // Fates Exchanged: if one end was cleansed, the other goes too
+      Object.entries(S.party).forEach(([k,m])=>{
+        (m.debuffs||[]).forEach(d=>{ if(d.id!=="fateswap") return; const pm = S.party[d.partner];
+          if(!pm || !pm.alive || !(pm.debuffs||[]).some(x=>x.id==="fateswap" && x.partner===k)) d._orphan = true; });
+        if(m.debuffs && m.debuffs.some(d=>d._orphan)) m.debuffs = m.debuffs.filter(d=>!d._orphan);
+      });
+    } else if(kind.arcane==="cartographer"){
+      // Ink Walls fade
+      for(let i=PILLAR_DEFS.length-1;i>=0;i--){ const p = PILLAR_DEFS[i]; if(p.inkWall){ p.t -= dt; if(p.t<=0) PILLAR_DEFS.splice(i,1); } }
+      // Living Map (phase 2): fissures crawl toward the nearest party member
+      if((e._phase||0)>0) S.groundPools.forEach(p=>{
+        if(!p._arcRedraw) return;
+        let best = null, bd = Infinity;
+        emAliveKeys().forEach(k=>{ const m = S.party[k]; const dd = dist(m.x,m.y,p.x,p.y); if(dd<bd){ bd = dd; best = m; } });
+        p.vx = 0; p.vy = 0;
+        if(best && bd>4){ const sp = 16, nx = p.x+(best.x-p.x)/bd*sp*dt, ny = p.y+(best.y-p.y)/bd*sp*dt; if(walkable(nx, ny)){ p.x = nx; p.y = ny; } }
+      });
+    }
+  }
+
+  // ---------- The Riftbound Custodian: who may act ----------
+  function arcCells(e){
+    const em = emOf(e); if(em.cells) return em.cells;
+    const br = roomById("bossroom"); em.cells = [];
+    if(!br) return em.cells;
+    const cx = br.x+br.w/2, cy = br.y+br.h/2;
+    [[0.12,0.86],[0.88,0.86]].forEach(([fx,fy])=>{
+      for(let f=0; f<=0.5; f+=0.05){
+        const x = br.x+br.w*(fx+(0.5-fx)*f), y = br.y+br.h*(fy+(0.5-fy)*f);
+        if([[0,0],[16,0],[-16,0],[0,16],[0,-16]].every(([dx,dy])=>walkable(x+dx, y+dy))){
+          const dd = Math.hypot(cx-x, cy-y)||1; let gx = x+(cx-x)/dd*42, gy = y+(cy-y)/dd*42;
+          if(!walkable(gx, gy)){ gx = x; gy = y-42; }
+          em.cells.push({ x, y, gx, gy }); break;
+        }
+      }
+    });
+    return em.cells;
+  }
+  EMBER_MECH.catalogue = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.cage && !st.casting){ st.timer = Math.max(st.timer, 3); return false; } // one cell at a time
+      { const td = e.mech.corrosivetide; // never right before a Tide: always leave time to free them
+        if(!st.casting && st.timer<=dt && td && (td.casting || S.zoneFlood || td.timer < 10)) st.timer = Math.max(st.timer, 2); }
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys(k=>(k==="dps" || k==="dpsCaster") && !emIsEncased(S.party[k])));
+        const cells = arcCells(e);
+        if(!key || !cells.length) return false;
+        st.key = key; st.cell = emPick(cells);
+        spawnFloatingText(S.party[key].x, S.party[key].y-30, "CATALOGUED", "var(--corrosion)");
+      });
+      if(r==="fire" && st.key){
+        const m = S.party[st.key], c = st.cell;
+        if(m && m.alive){
+          for(let i=0;i<6;i++) try{ addPuff(m.x+(Math.random()-0.5)*12, m.y+(Math.random()-0.5)*8, 5, 0.45, 0, -10); }catch(_){}
+          m.x = c.x; m.y = c.y; m._pin = { x:c.x, y:c.y }; if(m.casting) m.casting = null;
+          applyDebuff(st.key, "caged");
+          em.cage = { key:st.key, x:c.x, y:c.y, gx:c.gx, gy:c.gy };
+          emSparks(c.x, c.y);
+          pushLog("event", `${e.name} files ${displayName(m)} away in a rune cell. Step on the glyph beside it to free them.`);
+        }
+        st.key = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){
+      const m = st.key && S.party[st.key];
+      if(m && m.alive){ drawGroundTelegraph(m.x, m.y, 22, progress, "var(--corrosion)"); if(st.cell) drawLineTelegraph(m.x, m.y, st.cell.x, st.cell.y, 6, progress, "var(--corrosion)"); }
+    },
+  };
+
+  // ---------- Ysolt: when ----------
+  function arcFateSwap(key, m, d){
+    const pm = S.party[d.partner];
+    if(!pm || !pm.alive || !m.alive) return;
+    pm.debuffs = (pm.debuffs||[]).filter(x=>!(x.id==="fateswap" && x.partner===key));
+    const fa = m.hp/m.maxHp, fb = pm.hp/pm.maxHp;
+    m.hp = Math.max(1, Math.round(fb*m.maxHp)); pm.hp = Math.max(1, Math.round(fa*pm.maxHp));
+    spawnFloatingText(m.x, m.y-24, "FATES SWAP", "var(--veil)"); spawnFloatingText(pm.x, pm.y-24, "FATES SWAP", "var(--veil)");
+    pushLog("event", `${displayName(m)==="you"?"Your":displayName(m)+"'s"} fate and ${displayName(pm)==="you"?"yours":displayName(pm)+"'s"} trade places (${Math.round(fa*100)}% ⇄ ${Math.round(fb*100)}%).`);
+  }
+  EMBER_MECH.fates = {
+    tick(e, mech, st, dt){
+      st.timer -= dt; if(st.timer>0) return false;
+      const pair = pickTetherPair();
+      if(!pair){ st.timer = 1; return false; }
+      if(pair.some(k=>partyHasDebuff(S.party[k], "fateswap"))){ st.timer = 1; return false; }
+      st.timer = mechEvery(e, mech); emFirst(e, mech);
+      applyDebuff(pair[0], "fateswap", { partner:pair[1] }); applyDebuff(pair[1], "fateswap", { partner:pair[0] });
+      return false;
+    },
+  };
+  function arcGazeBusy(e){ const g = e.mech && e.mech.fourfoldgaze; return !!(g && (g.casting || g.active || g.timer < 5)); }
+  EMBER_MECH.lances = {
+    tick(e, mech, st, dt){
+      if(!st.casting && st.timer<=dt && arcGazeBusy(e)) st.timer = Math.max(st.timer, 2); // never during a Gaze
+      const r = emCast(e, mech, st, dt, ()=>{
+        const keys = emAliveKeys().sort(()=>Math.random()-0.5);
+        if(!keys.length) return false;
+        st.lines = [];
+        for(let i=0;i<3;i++){
+          const m = S.party[keys[i%keys.length]], a = Math.random()*Math.PI, L = mech.len||520, c = Math.cos(a), s = Math.sin(a);
+          st.lines.push({ x1:m.x-c*L/2, y1:m.y-s*L/2, x2:m.x+c*L/2, y2:m.y+s*L/2, at:mech.firstAt+i*mech.gap, fired:false, n:i+1 });
+        }
+      });
+      if((r==="cast" || r==="fire") && st.lines){
+        st.lines.forEach(L=>{
+          if(L.fired || st.castT < L.at - 1e-6) return;
+          L.fired = true;
+          const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+          Object.entries(S.party).forEach(([key,m])=>{ if(m.alive && segmentDistance(m.x, m.y, L.x1, L.y1, L.x2, L.y2) <= mech.width) damageMember(key, d, mech.name, e); });
+          spawnFloatingText((L.x1+L.x2)/2, (L.y1+L.y2)/2-10, String(L.n), "var(--veil)");
+        });
+        if(r==="fire") st.lines = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st){
+      (st.lines||[]).forEach(L=>{
+        if(L.fired) return;
+        const prog = Math.min(1, st.castT/L.at);
+        drawLineTelegraph(L.x1, L.y1, L.x2, L.y2, mech.width, prog, "var(--veil)");
+        const mx = (L.x1+L.x2)/2, my = (L.y1+L.y2)/2, p = VIEW.project(mx, my), rr = Math.max(11, 13*VIEW.scale);
+        ctx.save(); ctx.fillStyle = "rgba(20,8,30,.85)"; ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = resolveColor("var(--veil)"); ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = resolveColor("var(--veil)"); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.font = `700 ${Math.round(rr*1.3)}px Cinzel, serif`; ctx.fillText(String(L.n), p.x, p.y+1); ctx.restore();
+      });
+    },
+    hazards(e, mech, st){ return st.casting && st.lines ? st.lines.filter(L=>!L.fired).map(L=>({ line:true, x1:L.x1, y1:L.y1, x2:L.x2, y2:L.y2, radius:mech.width+HAZARD_SAFE_MARGIN })) : []; },
+  };
+  // Unspooled Sight (phase 2): the next safe wedge is chosen ahead of time (any of the other three) and shown as a ghost
+  function arcNextQ(st){ const o = [0,1,2,3].filter(q=>q!==st.safeQuadrant); return o[Math.floor(Math.random()*o.length)]; }
+
+  // ---------- The Hollow Cartographer: where ----------
+  EMBER_MECH.redraw = {
+    tick(e, mech, st, dt, kind){
+      const r = emCast(e, mech, st, dt, ()=>{
+        const room = roomBoundsContaining(e.x, e.y), pts = [];
+        const n = mech.poolCount + emRamp(e, "smudge"), margin = mech.radius+20, minGap = mech.radius*2+10;
+        if(room){
+          const xMin = room.x+margin, xMax = room.x+room.w-margin, yMin = room.y+margin, yMax = room.y+room.h-margin;
+          for(let i=0;i<n;i++){
+            let px, py, tries = 0;
+            do { px = xMin+Math.random()*Math.max(0,xMax-xMin); py = yMin+Math.random()*Math.max(0,yMax-yMin); tries++; }
+            while(tries<30 && (pts.some(p=>dist(px,py,p.x,p.y) < minGap) || !walkable(px,py)));
+            pts.push({ x:px, y:py });
+          }
+        }
+        st.pending = pts;
+      });
+      if(r==="fire"){
+        let caught = 0;
+        (st.pending||[]).forEach(p=>{
+          S.groundPools.push({ x:p.x, y:p.y, radius:mech.radius, tickDmg:Math.round(mech.tickDmg*(S.keystoneDmgMul||1)), tickInterval:mech.tickInterval, tickT:0,
+            remaining:mech.duration, srcName:mech.name, color:kind.color, icon:kind.groundIcon||"📜", _arcRedraw:true });
+          emAliveKeys().forEach(k=>{ const m = S.party[k]; if(dist(m.x,m.y,p.x,p.y) <= mech.radius) caught++; });
+        });
+        st.pending = [];
+        emRampAdd(e, "smudge", caught ? caught : -1, "Smudge", "var(--ink)");
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress, kind){ (st.pending||[]).forEach(p=>drawGroundTelegraph(p.x, p.y, mech.radius, progress, kind.color)); },
+    hazards(e, mech, st){ return st.casting ? (st.pending||[]).map(p=>({ x:p.x, y:p.y, radius:mech.radius+HAZARD_SAFE_MARGIN })) : []; },
+  };
+  function arcWallPlan(e){
+    const br = roomById("bossroom") || roomBoundsContaining(e.x, e.y); if(!br) return null;
+    const alive = emAliveKeys().map(k=>S.party[k]); if(!alive.length) return null;
+    const movers = alive.concat(livingEnemiesOf(e._group||{enemies:[e]})), me = S.party.self;
+    const ok = [], split = [];
+    [true,false].forEach(vert=>{
+      for(let f=0.2; f<=0.801; f+=0.05){
+        [true,false].forEach(fromStart=>{
+          let w;
+          if(vert){ const len = br.h*0.68, x = br.x+br.w*f; w = { x, y: fromStart ? br.y+len/2 : br.y+br.h-len/2, w:len, h:14, rot:Math.PI/2, vert, at:x }; }
+          else { const len = br.w*0.68, y = br.y+br.h*f; w = { x: fromStart ? br.x+len/2 : br.x+br.w-len/2, y, w:len, h:14, rot:0, vert, at:y }; }
+          const probe = { x:w.x, y:w.y, shape:"rect", w:w.w+36, h:w.h+36, rot:w.rot };
+          if(movers.some(m=>m.alive && propContains(probe, m.x, m.y))) return;
+          if(!walkable(w.x, w.y)) return;
+          ok.push(w);
+          // does it stand between you and someone? (opposite sides, and within the wall's span)
+          const side = m=> (vert ? m.x : m.y) < w.at;
+          const inSpan = m=> vert ? Math.abs(m.y-w.y) < w.w/2 : Math.abs(m.x-w.x) < w.w/2;
+          if(me.alive && alive.some(m=>m!==me && side(m)!==side(me) && (inSpan(m) || inSpan(me)))) split.push(w);
+        });
+      }
+    });
+    const pool = split.length ? split : ok;
+    return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+  }
+  EMBER_MECH.inkwall = {
+    tick(e, mech, st, dt){
+      const r = emCast(e, mech, st, dt, ()=>{ st.plan = arcWallPlan(e); if(!st.plan) return false; });
+      if(r==="fire" && st.plan){
+        const pl = st.plan;
+        // re-check nobody walked into it during the wind-up
+        const probe = { x:pl.x, y:pl.y, shape:"rect", w:pl.w+20, h:pl.h+20, rot:pl.rot };
+        const blocked = Object.values(S.party).some(m=>m.alive && propContains(probe, m.x, m.y)) || livingEnemiesOf(e._group||{enemies:[e]}).some(x=>propContains(probe, x.x, x.y));
+        if(!blocked){
+          const wall = { id:"inkWall", x:pl.x, y:pl.y, shape:"rect", w:pl.w, h:pl.h, rot:pl.rot, prop:true, inkWall:true, t:mech.dur||10, tTotal:mech.dur||10 };
+          propPts(wall); PILLAR_DEFS.push(wall);
+          pushLog("event", `${e.name} draws a wall of ink across the chamber.`);
+        }
+        st.plan = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){
+      const pl = st.plan; if(!pl) return;
+      const c = Math.cos(pl.rot), s = Math.sin(pl.rot);
+      drawLineTelegraph(pl.x-c*pl.w/2, pl.y-s*pl.w/2, pl.x+c*pl.w/2, pl.y+s*pl.w/2, 10, progress, "var(--ink)");
+    },
+    hazards(e, mech, st){ const pl = st.plan; if(!st.casting || !pl) return []; const c = Math.cos(pl.rot), s = Math.sin(pl.rot);
+      return [{ line:true, x1:pl.x-c*pl.w/2, y1:pl.y-s*pl.w/2, x2:pl.x+c*pl.w/2, y2:pl.y+s*pl.w/2, radius:18 }]; },
+  };
+  function arcDrawInkWall(pl){
+    const pts = propPts(pl).map(q=>VIEW.project(q[0], q[1]));
+    const fade = Math.min(1, (pl.t||0)/1.2, ((pl.tTotal||10)-(pl.t||0))/0.4+0.2);
+    ctx.save(); ctx.globalAlpha = Math.max(0.2, fade);
+    ctx.beginPath(); pts.forEach((p,i)=> i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y)); ctx.closePath();
+    ctx.fillStyle = "#120c1c"; ctx.fill();
+    ctx.strokeStyle = resolveColor("var(--ink)"); ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.restore();
+  }
+  EMBER_MECH.pin = {
+    tick(e, mech, st, dt, kind){
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys(k=>k!=="tank" && !emIsRooted(S.party[k])));
+        if(!key) return false;
+        const m = S.party[key]; st.key = key; st.px = m.x; st.py = m.y;
+        applyDebuff(key, "pinned"); m._pin = { x:m.x, y:m.y };
+        spawnFloatingText(m.x, m.y-30, key==="self" ? "PINNED · WARD YOURSELF" : "PINNED · WAX WARD", "var(--shield)");
+      });
+      if(r==="fire" && st.px!=null){
+        S.groundPools.push({ x:st.px, y:st.py, radius:mech.radius, tickDmg:Math.round(mech.tickDmg*(S.keystoneDmgMul||1)), tickInterval:mech.tickInterval, tickT:0,
+          remaining:mech.duration, srcName:mech.name, color:kind.color, icon:kind.groundIcon||"📜" });
+        st.key = null; st.px = null;
+      }
+      return false; // he keeps fighting while the quill holds
+    },
+    draw(e, mech, st, progress, kind){ if(st.px!=null) drawGroundTelegraph(st.px, st.py, mech.radius, progress, "var(--ink)"); },
+    hazards(e, mech, st){ return (st.casting && st.px!=null) ? [{ x:st.px, y:st.py, radius:mech.radius+HAZARD_SAFE_MARGIN }] : []; },
+  };
+
+  // ---------- drawing + hints ----------
+  function arcDrawWorld(e, k, em, now, pulse){
+    if(k.arcane==="custodian"){
+      arcCells(e).forEach(c=>{
+        const caged = em.cage && Math.abs(em.cage.x-c.x)<1 && Math.abs(em.cage.y-c.y)<1;
+        const p = VIEW.project(c.x, c.y), g = VIEW.project(c.gx, c.gy), s = VIEW.scale;
+        ctx.save(); ctx.strokeStyle = resolveColor("var(--corrosion)");
+        ctx.globalAlpha = caged ? 0.9 : 0.25; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 20*s, 0, Math.PI*2); ctx.stroke();
+        if(caged){ for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(p.x+i*7*s, p.y-26*s); ctx.lineTo(p.x+i*7*s, p.y+8*s); ctx.stroke(); } }
+        ctx.globalAlpha = caged ? 0.55+0.4*pulse : 0.22; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(g.x, g.y, 18*s, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); for(let i=0;i<5;i++){ const a = -Math.PI/2 + i*Math.PI*4/5 + (caged?now:0); const x = g.x+Math.cos(a)*12*s, y = g.y+Math.sin(a)*12*s; i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); } ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      });
+    }
+    if(k.arcane==="ysolt"){ // the ghost of the next safe wedge (phase 2)
+      const mech = (kindMechs(k)||[]).find(m=>m.kind==="rotatingQuadrants"), st = mech && e.mech[mech.id];
+      if(st && st.active && st.nextQ!=null && mech.previewP2 && (e._phase||0)>0){
+        const p = VIEW.project(e.x, e.y), rPx = mech.radius*VIEW.scale, a0 = (st.offsetDeg + st.nextQ*90)*Math.PI/180;
+        ctx.save(); ctx.setLineDash([8,6]); ctx.strokeStyle = resolveColor("var(--moss)"); ctx.lineWidth = 3; ctx.globalAlpha = 0.5+0.35*pulse;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, rPx, a0, a0+Math.PI/2); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+        const mid = a0+Math.PI/4; ctx.fillStyle = resolveColor("var(--moss)"); ctx.textAlign = "center"; ctx.font = `700 ${Math.round(Math.max(10, 12*VIEW.scale))}px 'Space Mono', monospace`;
+        ctx.fillText("NEXT", p.x+Math.cos(mid)*rPx*0.8, p.y+Math.sin(mid)*rPx*0.8); ctx.restore();
+      }
+    }
+  }
+  function arcHint(e, k){
+    const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
+    if(k.arcane==="custodian"){
+      if(em.cage && S.party[em.cage.key]) return `🔓 Step on the glyph to free ${displayName(S.party[em.cage.key])} before the next Tide!`;
+      const sil = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "silenced"));
+      if(sil.length) return `🔇 Cleanse ${arcName(S.party[sil[0]])}: their powers are sealed.`;
+    } else if(k.arcane==="ysolt"){
+      if((e.buffs||[]).some(b=>b.id==="secondsight")) return "✨ Purge near Ysolt to strip her Second Sight!";
+      const fk = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "fateswap"));
+      if(fk.length>=2) return `⚖ ${displayName(S.party[fk[0]])} and ${displayName(S.party[fk[1]])} swap health soon: cleanse one to stop it.`;
+      if(ST("lances") && ST("lances").casting) return "🔮 The lances fire in order: 1, then 2, then 3.";
+    } else if(k.arcane==="cartographer"){
+      const pin = ST("pin");
+      if(pin && pin.casting && pin.key && S.party[pin.key]) return `🛡 Wax Ward ${arcName(S.party[pin.key])}: pinned over a fissure!`;
+      if(PILLAR_DEFS.some(p=>p.inkWall) && emAliveKeys(kk=>kk!=="self" && !hasLineOfSight(me.x, me.y, S.party[kk].x, S.party[kk].y)).length) return "🖋 The ink wall blocks your heals. Walk around it!";
+      if((e._phase||0)>0 && S.groundPools.some(p=>p._arcRedraw && dist(p.x,p.y,me.x,me.y) < p.radius+40)) return "📜 The fissures are crawling toward you. Keep moving!";
+    }
+    return null;
+  }
+
+  // ---------- new marks ----------
+  DEBUFFS.silenced = { name:"Seal of Silence", interval:1, ticks:10, maxStacks:1,
+    desc:"Powers sealed: a companion can't use special abilities; on you, Second Wind and Ember Surge are locked. Cleanse it." };
+  DEBUFFS.caged = { name:"Catalogued", bane:true, noCleanse:true, interval:1, ticks:30, maxStacks:1,
+    desc:"Sealed in a rune cell: can't move, attack or cast. The healer frees them by stepping on the glyph beside the cell." };
+  DEBUFFS.fateswap = { name:"Fates Exchanged", interval:1, ticks:6, maxStacks:1, link:true, onExpire:arcFateSwap,
+    desc:"Bound to another. When it runs out, your health percentages swap. Cleanse either end to cancel it, or let it run if the swap helps." };
+  DEBUFFS.pinned = { name:"Pinned", bane:true, noCleanse:true, interval:1, ticks:4, maxStacks:1,
+    desc:"Pinned to the map: can't move for 4s. A fissure is about to open underneath. Wax Ward soaks it." };
+  const ARC_SEALED_ABILITIES = { wind:1, flicker:1 };
+  function arcSealedCast(ability){ return !!(ability && ARC_SEALED_ABILITIES[ability.id] && partyHasDebuff(S.party.self, "silenced")); }
+
+  // ---------- the bosses ----------
+  (function(){
+    const C = ENEMY_KINDS.riftboundcustodian, Y = ENEMY_KINDS.ysolt, M = ENEMY_KINDS.cartographer;
+    C.ember = true; C.emberTick = "arcane"; C.arcane = "custodian";
+    C.phases = [ { at:0.5, tint:"#57e0a8", everyMul:{}, note:"<b>Archive Inverted.</b> The Tides now alternate: one floods the floor (climb to the gallery), the next pours down from above and floods the gallery (get back down to the floor). The beacon arrow and the hint say which." } ];
+    C.mechanics = [
+      { id:"corrosivetide", name:"Corrosive Tide", kind:"zoneFlood", every:25, first:14, windup:3, tickDmg:16, tickInterval:0.75, duration:8, safeRoomId:"platform", safeRoomStyle:"platform",
+        safeW:240, safeH:100, ramp:0.12, invertP2:true,
+        invertHint:"The light pours from above. Get down to the floor!", invertMsg:"The gallery floods from above. Get down to the floor!",
+        trigger:"Every ~25s, the Custodian floods the boss floor with corrosive light, with a 3s warning. Each person it catches adds Corrosion: +12% on the next Tide, up to 3.",
+        counter:"Get up onto the raised gallery before the light rises; companions head up on their own. A Tide that catches nobody clears a Corrosion stack. In phase 2 every other Tide floods the gallery instead: follow the beacon." },
+      { id:"sealofsilence", name:"Seal of Silence", kind:"debuffApply", every:14, first:6, debuff:"silenced", verb:"CLEANSE", color:"var(--arcane)",
+        trigger:"Every ~14s, the Custodian seals a party member's powers for 10s: a companion can't use special abilities (Kessa loses Bulwark and her taunts); on you, Second Wind and Ember Surge are locked.",
+        counter:"Cleanse it. Choose who first: Kessa before a big hit, a damage dealer when the boss needs to fall." },
+      { id:"catalogue", name:"Catalogue", kind:"script", fn:"catalogue", every:22, first:10, windup:1.5, verb:"FREE", color:"var(--corrosion)",
+        trigger:"Every ~22s, the Custodian files Rook/Vex or Mira/Wren away in a rune cell at the edge of the chamber. Caged, they can't fight, and the cell is on the floor, so a Tide floods it. It never happens in the 10s before a Tide.",
+        counter:"Walk to the glowing glyph beside the cell and step on it to free them, ideally before the next Tide." },
+    ];
+    Y.ember = true; Y.emberTick = "arcane"; Y.arcane = "ysolt";
+    Y.phases = [ { at:0.5, tint:"#e28cff", everyMul:{}, mods:{ fourfoldgaze:{ rotateInterval:2.5 } }, note:"<b>Unspooled Sight.</b> The safe wedge now jumps every 2.5s and can jump to any other wedge, but a dashed green ghost marked NEXT shows where it will go. Move to the future, not the present." } ];
+    Y.mechanics = [
+      { id:"fourfoldgaze", name:"Fourfold Gaze", kind:"rotatingQuadrants", every:22, first:12, windup:2.5,
+        duration:12, rotateInterval:4, tickDmg:14, tickInterval:1, radius:220, ramp:0.10, previewP2:true, grace:0.8,
+        trigger:"Every ~22s, after a 2.5s warning, four wedges of the room around Ysolt ignite, three red and one green. For ~12s the green wedge jumps every 4s. Each tick anyone takes adds Unspooling: +10% on the next Gaze, up to 3.",
+        counter:"Stay in the green SAFE wedge and jump the moment it moves (you get a moment of grace after each jump); companions reposition on their own. A Gaze nobody gets hurt in clears an Unspooling stack." },
+      { id:"fates", name:"Fates Exchanged", kind:"script", fn:"fates", every:14, first:6, verb:"DECIDE", color:"var(--veil)",
+        trigger:"Every ~14s, two of you are bound (your two damage dealers, or you and an ally). After 6s their health percentages swap.",
+        counter:"Cleanse either end to cancel it, or let it run when the swap helps (a full-health ally trading with a dying one)." },
+      { id:"lances", name:"Foretold Lances", kind:"script", fn:"lances", hazard:true, every:16, first:9, windup:4, firstAt:2, gap:1, width:22, len:520, dmg:[24,32], verb:"1 · 2 · 3", color:"var(--veil)",
+        trigger:"Every ~16s (never during a Gaze), Ysolt draws three numbered lances across the floor. They fire in order, a second apart.",
+        counter:"Read the numbers and step clear of each lance before it fires; you can cross a lance once it has fired. Companions dodge on their own." },
+      { id:"secondsight", name:"Second Sight", kind:"selfBuff", every:20, first:16, duration:8, mitMul:0.5,
+        trigger:"Every ~20s, Ysolt foresees your blows and takes half damage for 8s.",
+        counter:"Cast Purge near her to strip it." },
+    ];
+    M.ember = true; M.emberTick = "arcane"; M.arcane = "cartographer";
+    M.phases = [ { at:0.5, tint:"#f0d9a0", everyMul:{}, note:"<b>Living Map.</b> Redraw's fissures no longer stay put: they crawl slowly toward the nearest party member. Keep moving, and don't lead them into the group." } ];
+    M.mechanics = [
+      { id:"redraw", name:"Redraw", kind:"script", fn:"redraw", hazard:true, every:14, first:7, windup:2.2, radius:45, tickDmg:9, tickInterval:0.5, duration:6, poolCount:3, verb:"MOVE", color:"var(--blood)",
+        trigger:"Every ~14s, after a 2.2s wind-up, fissures open across the floor in new spots. Each person caught as they open adds one more fissure to the next Redraw (Smudge, up to +3).",
+        counter:"Step clear of the wind-up circles before they open. A Redraw that catches nobody removes a Smudge." },
+      { id:"inkwall", name:"Ink Wall", kind:"script", fn:"inkwall", every:18, first:11, windup:1.5, dur:10, verb:"GO AROUND", color:"var(--ink)",
+        trigger:"Every ~18s, he draws a wall of ink across most of the chamber. For 10s it blocks movement and line of sight.",
+        counter:"If it cuts you off from someone you can't heal them: walk round the open end. The dashed line during the wind-up shows where it will stand." },
+      { id:"pin", name:"Pinned", kind:"script", fn:"pin", hazard:true, every:17, first:14, windup:2.0, radius:40, tickDmg:12, tickInterval:0.5, duration:5, verb:"WAX WARD", color:"var(--shield)",
+        trigger:"Every ~17s, he pins a party member (never Kessa) to the floor for 4s and draws a fissure under them, which opens 2s later.",
+        counter:"Wax Ward the pinned one before the fissure opens, then heal them through it. It can't be cleansed." },
+    ];
+  })();
+  if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { arcCells, arcWallPlan, arcSealedCast, arcFateSwap });
+
   function kindMechs(k){ return k ? (k.mechanics || k.miniMechanics) : undefined; }
   const MINI_POOL = { ember:["slagmaw","cinderoracle","broodkiln"], tide:["undertoad","drownedcantor","brinematron"], thicket:["bramblehulk","sporecap","seedpod"], gloom:["barrowknight","dirgekeeper","gravecaller"], iron:["forgeguard","gearwarden","gearhive"], arcane:["runegolem","glyphweaver","riftmother"] }; // other families get theirs in later rounds
   function mkMini(kind, x, y){ const k = ENEMY_KINDS[kind]; return mkEnemy(kind, k.label, x, y); }
@@ -3337,7 +4298,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     };
     if(kindMechs(k)){
       e.mech = {};
-      kindMechs(k).forEach(m=>{ e.mech[m.id] = { timer: m.every*0.5, casting:false, castT:0 }; });
+      kindMechs(k).forEach(m=>{ e.mech[m.id] = { timer: (m.first!=null ? m.first : m.every*0.5), casting:false, castT:0 }; }); if(k.ember) emberOnSpawn(e, k);
     }
     return e;
   }
@@ -4056,9 +5017,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // room grows up/down about its centre and to the right, attached bays
   // (safe rooms, alcoves) move with the walls, and everything inside is
   // remapped proportionally. Keyed by boss kind so procedural runs reuse it.
-  const BOSS_ARENA_SIZE = { ashguard:[240,220], murk:[250,230], brogar:[240,340], thornmother:[280,260], ironsentinel:[250,280],
-    hollowchoir:[250,210], riftboundcustodian:[260,220], wickfadedwidow:[240,220], ossric:[400,350], gravewellchoir:[360,360],
-    karrick:[500,440], verdantmaw:[310,260], ysolt:[340,300], brinecolossus:[320,280], kestin:[400,350], cartographer:[380,360] };
+  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[250,230], brogar:[340,380], thornmother:[280,260], ironsentinel:[250,280],
+    hollowchoir:[250,210], riftboundcustodian:[380,300], wickfadedwidow:[240,220], ossric:[400,350], gravewellchoir:[360,360],
+    karrick:[500,440], verdantmaw:[310,260], ysolt:[340,300], brinecolossus:[320,280], kestin:[440,380], cartographer:[440,400] };
   // Round 123: every boss arena is 20% larger (each side) than its Round 110 size.
   // One knob; hand-authored (growBossArena) and procedural (generateDungeon) both read it.
   const BOSS_ARENA_SCALE = 1.2;
@@ -5920,6 +6881,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // Cartographer, ...) gets none, matching that same precedent.
   function bossRoomPillarsFor(bossKind, x, y, w, h){
     const k = ENEMY_KINDS[bossKind];
+    if(k.pillarLayout) return k.pillarLayout.map((q,i)=>Object.assign({ id:"bossPillar"+i, x:x+w*q[0], y:y+h*q[1], r:q[2]||22 }, q[3]||{})); // emberReworkV1
     const wantsPillars = (k.mechanics||[]).some(m=>m.kind==="raidCast" || m.kind==="crackingRaidCast");
     if(!wantsPillars) return [];
     return [
@@ -6475,7 +7437,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       // path a party member needs to actually walk during a live
       // evacuation, not just visually adjacent.
       const style = zoneFloodMech.safeRoomStyle || "platform";
-      const safeW=160, safeH=85, neckW=80, neckH=70, ov=ROOM_CHAIN_OVERLAP;
+      const safeW=zoneFloodMech.safeW||160, safeH=zoneFloodMech.safeH||85, neckW=80, neckH=70, ov=ROOM_CHAIN_OVERLAP;
       const neckX = bcx-neckW/2, safeX = bcx-safeW/2;
       const neckY = style==="hollow" ? bossPos.y+bossH-ov : bossPos.y-neckH+ov;
       const safeY = style==="hollow" ? neckY+neckH-ov : neckY-safeH+ov;
@@ -8966,7 +9928,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     // each run, so a "Descend Again" on the same dungeon would otherwise
     // start with whatever cracks/shattered state the PREVIOUS attempt left
     // them in. Reset explicitly here, every fresh run.
-    PILLAR_DEFS.forEach(p=>{ if(p.crackable){ p.cracks = 0; p.shattered = false; } });
+    for(let _i=PILLAR_DEFS.length-1;_i>=0;_i--) if(PILLAR_DEFS[_i].inkWall) PILLAR_DEFS.splice(_i,1); // arcaneReworkV1
+    PILLAR_DEFS.forEach(p=>{ if(p.crackable){ p.cracks = 0; p.shattered = false; } if(p._lit){ p._lit = false; if(p._blos0===undefined) delete p.blocksLOS; else p.blocksLOS = p._blos0; } });
     S.losWarnT = 0;
     S.volcanicTimer = VOLCANIC_INTERVAL*0.5; // first eruption comes a bit sooner than a full interval
     S.volcanicCast = null;
@@ -10658,7 +11621,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function partyHasDebuff(m, id){ return !!(m && m.debuffs && m.debuffs.some(d=>d.id===id)); }
   function debuffIsBane(d){ const df = DEBUFFS[d.id]; return !!(df && df.bane); }
   function memberHasWeight(m){ return !!(m && m.debuffs && m.debuffs.some(d=>DEBUFFS[d.id] && DEBUFFS[d.id].weight)); }
-  function wtDt(m, dt){ return (memberHasWeight(m) ? dt/1.25 : dt) * ((S._simAS && (m.role==="dps"||m.role==="dpsCaster")) ? S._simAS : (m.role==="heal" ? 1 : (m.speedMul||1))); } // Weight slows attacks 25%; Attack Speed stat (sims may override via S._simAS)
+  function wtDt(m, dt){ if(emIsEncased(m)) return 0; return (memberHasWeight(m) ? dt/1.25 : dt) * ((S._simAS && (m.role==="dps"||m.role==="dpsCaster")) ? S._simAS : (m.role==="heal" ? 1 : (m.speedMul||1))); } // Weight slows attacks 25%; Attack Speed stat (sims may override via S._simAS)
   function sapMulFor(key){ const m = S.party[key]; return partyHasDebuff(m,"sap") ? DEBUFFS.sap.healMul : 1; }
   function anyBaneActive(){ return Object.values(S.party).some(m=>m.alive && (m.debuffs||[]).some(debuffIsBane)); }
   // The boss-mark guard: no cleansable mark on two different people within
@@ -10886,6 +11849,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(!self.alive || S.over) return;
     if(self.casting) return;
     if(S._tutBlock) return; // tutorialV1: a tutorial callout is open
+    if(emIsEncased(self)){ spawnFloatingText(self.x, self.y-24, "ENCASED", "var(--slag)"); return; } // emberReworkV1
+    if(arcSealedCast(ability)){ spawnFloatingText(self.x, self.y-24, "SEALED", "var(--arcane)"); return; } // arcaneReworkV1
     if(self.gcd > 0) return;
     if(self.cds[ability.id] > 0) return;
     if(self.mana < effectiveCost(ability, S.target)) return;
@@ -10950,6 +11915,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(isDot && srcName==="Afflicted") dmg = Math.min(dmg, m.maxHp*AFFLICTED_TICK_CAP_PCT);
     if(S._simStat && isDot){ const sd=S._simStat[key]||(S._simStat[key]={hits:0,crits:0,max:0,over50:0,oneshot:0,dmg:0}); sd.dotDmg=(sd.dotDmg||0)+dmg; sd.dotHits=(sd.dotHits||0)+1; }
     if(partyHasDebuff(m,"fragile")) dmg = dmg*DEBUFFS.fragile.dmgTakenMul; // Round 107 — Fragile (Bane)
+    if(partyHasDebuff(m,"dented")) dmg = dmg*DEBUFFS.dented.dmgTakenMul; // emberReworkV1
     dmg = dmg*fountainDamageTakenMul(); // Reckless Font — applies to every role, healer included
     if(hasPositiveModifier("resolute")) dmg = dmg*RESOLUTE_DMG_TAKEN_MUL; // Round 52
     if(key==="self" && S.motehiveBuff) dmg = dmg*S.motehiveBuff.dmgTakenMul; // carrying the Widow's motehive charge
@@ -13175,6 +14141,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     return p ? { x:p.x, y:p.y } : { x:mech.pitX, y:mech.pitY };
   }
   function tryMove(m, nx, ny){
+    if(m.debuffs && m.debuffs.length && emIsRooted(m)) return; // emberReworkV1: Encased / Catalogued / Pinned
     if(walkable(nx,ny)){ m.x=nx; m.y=ny; return; }
     if(walkable(nx,m.y)){ m.x=nx; return; }
     if(walkable(m.x,ny)){ m.y=ny; return; }
@@ -13356,6 +14323,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     { const _kz = S.arena && S.arena.raid && S.arena.raid.k; if(_kz && _kz.self && _kz.self.st!=="brittle"){ const be = S.boss && S.boss.enemies && S.boss.enemies[0]; if(be && be.alive) hazards.push({ x:be.x, y:be.y, radius:SW_AURA_R+HAZARD_SAFE_MARGIN }); } }
     { const _kl = S.arena && S.arena.raid && S.arena.raid.k; if(_kl && _kl.lunge && _kl.lunge.st==="aim" && _kl.lunge.x2!=null && _kl.lunge.t>=0){ const L = _kl.lunge; hazards.push({ line:true, x1:L.x1, y1:L.y1, x2:L.x2, y2:L.y2, radius:LUNGE_W+HAZARD_SAFE_MARGIN }); } }
     { const _rk = S.arena && S.arena.raid && S.arena.raid.k; if(_rk && _rk.C) hazards.push({ inv:true, x:_rk.C.x, y:_rk.C.y, radius:_rk.R-HAZARD_SAFE_MARGIN }); } // raid: outside the shrinking hall
+    emberHazards(hazards); // emberReworkV1
     return hazards;
   }
   // Sums an escape vector out of every hazard m is currently standing inside
@@ -13396,7 +14364,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         const nx = hz.x1+t*dx, ny = hz.y1+t*dy;
         vx = m.x-nx; vy = m.y-ny;
         d = Math.hypot(vx,vy);
-        if(d<0.001){ vx=-dy; vy=dx; d=Math.hypot(vx,vy)||1; } // standing exactly on the line — pick a perpendicular
+        if(d<0.001){ const _pl = Math.hypot(dx,dy)||1; vx=-dy/_pl*0.001; vy=dx/_pl*0.001; d=0.001; } // standing exactly on the line — pick a perpendicular (emberReworkV1 fix)
       } else {
         vx = m.x-hz.x; vy = m.y-hz.y;
         d = Math.hypot(vx,vy);
@@ -16491,7 +17459,7 @@ thrall(){return gs(14)+
         const kind = ENEMY_KINDS[e.kind];
         if(!kindMechs(kind)) continue;
         for(const mech of kindMechs(kind)){
-          if(mech.kind!=="crackingRaidCast") continue;
+          if(mech.kind!=="crackingRaidCast" && !(mech.kind==="script" && mech.shelter && !(mech.shelterUntilPhase!=null && (e._phase||0)>=mech.shelterUntilPhase))) continue;
           const st = e.mech[mech.id];
           if(st && st.casting) return { e, mech, st };
         }
@@ -16509,7 +17477,10 @@ thrall(){return gs(14)+
     let best = null, bestD = Infinity;
     PILLAR_DEFS.forEach(p=>{
       if(p.shattered || p.prop) return; // Round 129: scenery props are not raid shelters
-      const d = dist(e.x, e.y, p.x, p.y);
+      if(p.lava || p.blocksLOS===false) return; // emberReworkV1: the lit (Smoldering) pillar gives no cover
+      let d = dist(e.x, e.y, p.x, p.y);
+      { const dd = d || 1, sx = p.x + (p.x-e.x)/dd*(p.r+18), sy = p.y + (p.y-e.y)/dd*(p.r+18);
+        if(S.groundPools.some(q=>dist(sx, sy, q.x, q.y) <= q.radius + 8)) d += 400; } // its shelter spot is burning
       if(d < bestD){ bestD = d; best = p; }
     });
     return best;
@@ -16548,7 +17519,7 @@ thrall(){return gs(14)+
           if(st && st.casting){
             const room = roomById(st.safeId || mech.safeRoomId);
             if(room) return { room,
-              hintIcon: mech.hintIcon||ZONE_EVAC_DEFAULTS.hintIcon, hintText: mech.hintText||ZONE_EVAC_DEFAULTS.hintText,
+              hintIcon: mech.hintIcon||ZONE_EVAC_DEFAULTS.hintIcon, hintText: (st.hintText||mech.hintText||ZONE_EVAC_DEFAULTS.hintText),
               beaconGlyph: st.glyph||mech.beaconGlyph||ZONE_EVAC_DEFAULTS.beaconGlyph, beaconColor: mech.beaconColor||ZONE_EVAC_DEFAULTS.beaconColor };
           }
         }
@@ -17758,6 +18729,7 @@ thrall(){return gs(14)+
         tickEnemyBuffs(e, dt); // dummies too: their debuffs and stacks must expire like anyone else's
         if(kind.dummy) return; // Testing arena: dummies never act
         tickBossPhase(e, kind, dt); // Round 103
+        if(kind.emberTick) emberBossTick(e, kind, dt); // emberReworkV1
         if(kind.raid) tickRaidBoss(e, kind, dt);
         if(e.kind==="mimicboss") tickMimicBoss(e, dt);
         let isCastingMechanic = false;
@@ -17765,7 +18737,8 @@ thrall(){return gs(14)+
           kindMechs(kind).forEach(mech=>{
             const st = e.mech[mech.id];
             mechPreTick(e, mech, st, dt); // Round 103: beat hold + hazard budget
-            if(mech.kind==="raidCast"){
+            if(mech.kind==="script"){ const _sf = EMBER_MECH[mech.fn]; if(_sf && _sf.tick(e, mech, st, dt, kind)) isCastingMechanic = true; } // emberReworkV1
+            else if(mech.kind==="raidCast"){
               st.timer -= dt;
               if(!st.casting && st.timer<=0){
                 st.casting=true; st.castT=0;
@@ -17999,7 +18972,7 @@ thrall(){return gs(14)+
               // moving off the line before it resolves.
               st.timer -= dt;
               if(!st.casting && st.timer<=0){
-                const lockKey = currentTargetFor(e) || "self";
+                const lockKey = (mech.randomP2 && (e._phase||0)>0) ? (emPick(emAliveKeys()) || "self") : (currentTargetFor(e) || "self");
                 const lockMember = S.party[lockKey];
                 if(lockMember && lockMember.alive){
                   st.casting = true; st.castT = 0;
@@ -18027,7 +19000,7 @@ thrall(){return gs(14)+
                   if(mech.slag){ // Round 108: the lash leaves molten slag where it lands
                     S.groundPools.push({ x:st.targetX, y:st.targetY, radius:mech.slag.radius,
                       tickDmg: Math.round(mech.slag.tickDmg*(S.keystoneDmgMul||1)), tickInterval:mech.slag.tickInterval, tickT:0,
-                      remaining:mech.slag.duration, srcName:mech.name+" slag", color:kind.color, icon:"🔥" });
+                      remaining:mech.slag.duration, permanent:!!mech.slag.permanent, _emSlag:!!mech.slag.permanent, srcName:mech.name+" slag", color:kind.color, icon:"🔥" });
                   }
                 }
               }
@@ -18131,7 +19104,8 @@ thrall(){return gs(14)+
               st.timer -= dt;
               if(!st.casting && st.timer<=0 && !S.zoneFlood){
                 st.casting = true; st.castT = 0;
-                st.safeId = mech.safeRoomId; st.glyph = null;
+                st.safeId = mech.safeRoomId; st.glyph = null; st.hintText = null;
+                if(mech.invertP2 && (e._phase||0)>0){ st.inv = !st.inv; if(st.inv && roomById("bossroom")){ st.safeId = "bossroom"; st.glyph = "⬇"; st.hintText = mech.invertHint; } } // arcaneReworkV1
                 if(mech.altSafeRoomId && roomById(mech.altSafeRoomId) && roomById(mech.safeRoomId)){
                   st.flip = !st.flip; // alternates each cast
                   st.safeId = st.flip ? mech.safeRoomId : mech.altSafeRoomId;
@@ -18147,13 +19121,14 @@ thrall(){return gs(14)+
                   st.casting = false; st.timer = mechEvery(e, mech);
                   S.zoneFlood = {
                     mechId: mech.id, safeRoomId: st.safeId || mech.safeRoomId,
-                    tickDmg: Math.round(mech.tickDmg*(S.keystoneDmgMul||1)), tickInterval: mech.tickInterval, tickT: 0,
+                    _rampE: mech.ramp ? e : null, _hit: {},
+                    tickDmg: Math.round(mech.tickDmg*(S.keystoneDmgMul||1)*(mech.ramp ? emRampMul(e, "corrosion", mech.ramp) : 1)), tickInterval: mech.tickInterval, tickT: 0,
                     remaining: mech.duration, srcName: mech.name, color: kind.color,
-                    hintIcon: mech.hintIcon||ZONE_EVAC_DEFAULTS.hintIcon, hintText: mech.hintText||ZONE_EVAC_DEFAULTS.hintText,
+                    hintIcon: mech.hintIcon||ZONE_EVAC_DEFAULTS.hintIcon, hintText: (st.hintText||mech.hintText||ZONE_EVAC_DEFAULTS.hintText),
                     beaconGlyph: st.glyph||mech.beaconGlyph||ZONE_EVAC_DEFAULTS.beaconGlyph, beaconColor: mech.beaconColor||ZONE_EVAC_DEFAULTS.beaconColor,
                   };
                   e._lastSafeRoomId = st.safeId || mech.safeRoomId;
-                  pushLog("event", mech.floodMsg || `The floor floods. Get to the platform!`);
+                  pushLog("event", (st.hintText && mech.invertMsg) || mech.floodMsg || `The floor floods. Get to the platform!`);
                 }
               }
               // Frozen in place for the whole flood, not just the telegraph —
@@ -18326,7 +19301,8 @@ thrall(){return gs(14)+
                 if(st.castT >= mech.windup){
                   st.casting = false; st.timer = mechEvery(e, mech);
                   const tank = S.party.tank;
-                  if(tank.alive){
+                  if(tank.alive && mech.brace && emHasWax(tank)){ emShoveResult(e, mech, "braced"); }
+                  else if(tank.alive){
                     const dx = pitPos(mech).x - tank.x, dy = pitPos(mech).y - tank.y;
                     const distToPit = Math.hypot(dx,dy) || 1;
                     const ux = dx/distToPit, uy = dy/distToPit;
@@ -18342,11 +19318,13 @@ thrall(){return gs(14)+
                       const d = Math.round(scaledEnemyDmg(mech.catchDmg[0], mech.catchDmg[1]));
                       damageMember(catcher, d, mech.name, e);
                       pushLog("event", `${displayName(S.party[catcher])} catches ${displayName(tank)} before she goes over!`);
+                      emShoveResult(e, mech, "caught");
                     } else {
                       let newDist = distToPit - mech.pushDistance;
                       newDist = Math.max(newDist, mech.pillarRadius + 10);
                       pushEntity(tank, pitPos(mech).x - ux*newDist, pitPos(mech).y - uy*newDist, { dur:0.55, arc:34 });
                       pushLog("event", `${displayName(tank)} is shoved toward the forge pit!`);
+                      emShoveResult(e, mech, newDist <= mech.dangerRadius ? "lava" : "pushed");
                     }
                   }
                 }
@@ -18373,7 +19351,7 @@ thrall(){return gs(14)+
                 if(st.castT >= mech.windup){
                   st.casting = false; st.active = true; st.elapsed = 0;
                   st.offsetDeg = Math.random()*360;
-                  st.safeQuadrant = Math.floor(Math.random()*4);
+                  st.safeQuadrant = Math.floor(Math.random()*4); st.nextQ = arcNextQ(st); st._hits = 0;
                   st.rotateT = 0; st.tickTimer = 0; st.rotInt = modOf(e, mech, "rotateInterval");
                   pushLog("event", `${mech.name} opens: four wedges, one lit!`);
                 }
@@ -18382,11 +19360,12 @@ thrall(){return gs(14)+
                 st.elapsed += dt;
                 if(st.elapsed >= mech.duration){
                   st.active = false; st.timer = mechEvery(e, mech);
+                  if(mech.ramp) emRampAdd(e, "unspool", st._hits ? 1 : -1, "Unspooling", "var(--veil)");
                 } else {
                   st.rotateT += dt;
                   if(st.rotateT >= (st.rotInt || mech.rotateInterval)){
                     st.rotateT -= (st.rotInt || mech.rotateInterval);
-                    st.safeQuadrant = (st.safeQuadrant+1)%4;
+                    if(mech.previewP2 && (e._phase||0)>0){ st.safeQuadrant = (st.nextQ!=null ? st.nextQ : (st.safeQuadrant+1)%4); st.nextQ = arcNextQ(st); } else { st.safeQuadrant = (st.safeQuadrant+1)%4; st.nextQ = (st.safeQuadrant+1)%4; }
                   }
                   st.tickTimer -= dt;
                   if(st.tickTimer<=0){
@@ -18396,7 +19375,7 @@ thrall(){return gs(14)+
                       if(dist(m.x, m.y, e.x, e.y) > mech.radius) return;
                       const angleDeg = angleOf(m.x-e.x, m.y-e.y);
                       if(quadrantAngleIndex(mech, st, angleDeg) !== st.safeQuadrant){
-                        damageMember(key, mech.tickDmg, mech.name, e);
+                        if(mech.ramp){ if(st.rotateT >= (mech.grace||0)){ damageMember(key, Math.round(mech.tickDmg*(S.keystoneDmgMul||1)*emRampMul(e, "unspool", mech.ramp)), mech.name, e); st._hits = (st._hits||0) + 1; } } else damageMember(key, mech.tickDmg, mech.name, e);
                       }
                     });
                   }
@@ -19966,6 +20945,7 @@ thrall(){return gs(14)+
               const pm = S.party[d.partner];
               if(pm && pm.alive && dist(m.x,m.y,pm.x,pm.y) > dd.tether.breakDist) damageMember(key, dd.tether.dmg, d.name, null, true);
             }
+            if(d.ticksLeft<=0 && dd && dd.onExpire && m.alive) dd.onExpire(key, m, d); // emberReworkV1
             if(d.ticksLeft<=0 && dd && dd.spread && m.alive){ // Spread: bursts on natural expiry only (a cleanse removes it first)
               spawnFloatingText(m.x, m.y-12, "BURST!", "var(--blood)");
               Object.keys(S.party).forEach(k2=>{
@@ -20388,10 +21368,10 @@ thrall(){return gs(14)+
       Object.entries(S.party).forEach(([key,m])=>{
         if(!m.alive) return;
         if(safeRoom && inRoom(m.x,m.y,safeRoom)) return; // safe on the platform
-        damageMember(key, z.tickDmg, z.srcName, null, true);
+        damageMember(key, z.tickDmg, z.srcName, null, true); if(z._hit) z._hit[key] = 1;
       });
     }
-    if(z.remaining<=0) S.zoneFlood = null;
+    if(z.remaining<=0){ if(z._rampE) emRampAdd(z._rampE, "corrosion", Object.keys(z._hit||{}).length ? 1 : -1, "Corrosion", "var(--corrosion)"); S.zoneFlood = null; }
   }
 
   // The Wickfaded Widow's motehive pickup: a pulsing ground object that only
@@ -20514,6 +21494,7 @@ thrall(){return gs(14)+
         return;
       }
     }
+    { const _eh = emberHint(); if(_eh){ setHint(_eh); return; } } // emberReworkV1
     // Kestin Emberhollow's Emberfall is optional mitigation, not a required
     // dodge (see tryShelterBehindPillar's own comment) — healing through it
     // is a legitimate choice — so this is advisory only: it only fires while
@@ -20521,7 +21502,7 @@ thrall(){return gs(14)+
     // behind at all.
     { const ember = activeEmberfallWindup();
       if(ember && hasLineOfSight(ember.e.x, ember.e.y, S.party.self.x, S.party.self.y) && nearestShelterPillar(ember.e)){
-        setHint("🔥 A pillar could shield you from Emberfall!");
+        setHint(`🔥 A pillar could shield you from ${ember.mech.name}!`);
         return;
       }
     }
@@ -20997,6 +21978,7 @@ thrall(){return gs(14)+
     { const gaze = activeQuadrantGaze(); if(gaze) drawQuadrantGaze(gaze.e, gaze.mech, gaze.st); }
     { const brace = activeTidalBrace(); if(brace) drawTidalWarning(brace.e, brace.mech, brace.st); }
     drawEliteTelegraphs(); // Round 148
+    emberDrawWorld(); // emberReworkV1
 
     allActiveGroups().forEach(g=>{
       if(g.engaged) return;
@@ -21024,7 +22006,8 @@ thrall(){return gs(14)+
           const st = e.mech[mech.id];
           if(!st || !st.casting) return;
           const progress = mech.windup ? Math.min(1, st.castT/mech.windup) : 0;
-          if(mech.range){
+          if(mech.kind==="script"){ const _sf = EMBER_MECH[mech.fn]; if(_sf && _sf.draw) _sf.draw(e, mech, st, progress, kind); } // emberReworkV1
+          else if(mech.range){
             // Raid-wide range check: the true final radius as a dashed ring
             // from the moment the cast starts, with a solid inner circle
             // growing out to meet it — the shrinking gap between the two IS
@@ -21153,7 +22136,7 @@ thrall(){return gs(14)+
     (S.features||[]).forEach(f=>sprites.push({ wx:f.x, wy:f.y, draw:()=>drawFeature(f) }));
     sprites.push({ wx:0, wy:-99990, draw:drawTrapFloors }); trapSprites(sprites); // Round 152
     DECOR_DEFS.forEach(dc=>{ if(!dc.room.hidden) sprites.push({ wx:dc.x, wy:dc.y - (DECOR_FLAT.has(dc.type) ? 100000 : 0), draw:()=>drawDecor(dc) }); });
-    PILLAR_DEFS.forEach(pl=>sprites.push({ wx:pl.x, wy:pl.y, draw:()=> pl.prop ? drawProp(pl) : pl.lava ? drawLavaPit(pl) : pl.reef ? drawReefRock(pl) : pl.crackable ? drawCrackablePillar(pl) : drawPillar(pl) }));
+    PILLAR_DEFS.forEach(pl=>sprites.push({ wx:pl.x, wy:pl.y, draw:()=> pl.inkWall ? arcDrawInkWall(pl) : pl.prop ? drawProp(pl) : pl.lava ? drawLavaPit(pl) : pl.reef ? drawReefRock(pl) : pl.crackable ? drawCrackablePillar(pl) : drawPillar(pl) }));
     sprites.push({ wx:S.party.tank.x, wy:S.party.tank.y, draw:()=>drawUnitSprite(S.party.tank, resolveColor("var(--moss)"), "T") });
     sprites.push({ wx:S.party.dps.x,  wy:S.party.dps.y,  draw:()=>drawUnitSprite(S.party.dps,  resolveColor("var(--ember)"), S.party.dps.short||"D") });
     sprites.push({ wx:S.party.dpsCaster.x, wy:S.party.dpsCaster.y, draw:()=>drawUnitSprite(S.party.dpsCaster, resolveColor("var(--arcane)"), S.party.dpsCaster.short||"M") });
@@ -21168,6 +22151,7 @@ thrall(){return gs(14)+
     { const _r = S.arena && S.arena.raid; if(_r && _r.k && _r.k.gates){ drawRaidGate(_r); drawRaidWellRings(_r); drawRaidBank(_r); drawRaidDesp(_r); } } // above the darkness so the steal and the blasts are always readable
     drawDistortOverlay();
     drawSkyOverlay();
+    emberDrawTop(); // emberReworkV1
     // Round 40: floating combat text draws last, on top of everything else.
     (S.floatingText||[]).forEach(drawFloatingText);
   }
@@ -21856,19 +22840,19 @@ thrall(){return gs(14)+
       const m = S.party[k]; if(!m.alive) return;
       (m.debuffs||[]).forEach(d=>{
         const dd = DEBUFFS[d.id]; if(!dd) return;
-        if(dd.tether && d.partner && !seen.has(d.partner+"|"+k)){
+        if((dd.tether || dd.link) && d.partner && !seen.has(d.partner+"|"+k)){
           seen.add(k+"|"+d.partner);
           const p = S.party[d.partner]; if(!p || !p.alive) return;
-          const a = VIEW.project(m.x,m.y), b = VIEW.project(p.x,p.y), far = dist(m.x,m.y,p.x,p.y) > dd.tether.breakDist;
+          const a = VIEW.project(m.x,m.y), b = VIEW.project(p.x,p.y), far = dd.tether ? dist(m.x,m.y,p.x,p.y) > dd.tether.breakDist : false;
           ctx.strokeStyle = resolveColor(far ? "var(--blood)" : "var(--arcane)");
           ctx.lineWidth = far ? 3 : 2; ctx.globalAlpha = far ? 0.9 : 0.6; ctx.setLineDash(far ? [] : [5,4]);
           ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
         }
-        if(dd.spread){
+        if(dd.spread || dd.markRing){
           const p = VIEW.project(m.x,m.y), urgent = debuffRemaining(d) <= 3.5;
           ctx.strokeStyle = resolveColor("var(--blood)"); ctx.lineWidth = urgent ? 2.5 : 1.5;
           ctx.globalAlpha = urgent ? 0.5+0.4*pulse : 0.3; ctx.setLineDash([4,4]);
-          ctx.beginPath(); ctx.arc(p.x, p.y, dd.spread.radius*VIEW.scale, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(p.x, p.y, (dd.spread||dd.markRing).radius*VIEW.scale, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
         }
       });
     });
@@ -24214,7 +25198,7 @@ thrall(){return gs(14)+
       const kind = ENEMY_KINDS[e.kind];
       if(!kind || !kindMechs(kind) || !e.mech) return;
       kindMechs(kind).forEach(m=>{
-        if(!HAZARD_KINDS[m.kind]) return;
+        if(!HAZARD_KINDS[m.kind] && !m.hazard) return;
         const st = e.mech[m.id];
         if(st && (st.casting || st.active)) n++;
       });
@@ -24223,10 +25207,10 @@ thrall(){return gs(14)+
   }
   // Runs at the top of each mechanic's tick, before its own countdown.
   function mechPreTick(e, mech, st, dt){
-    if(st && BW_TAG_KINDS.has(mech.kind) && !(S.arena && S.arena.raid)){ if(st.casting && !st._bwSeen){ st._bwSeen = true; bulwarkMoment(mech.name); } if(!st.casting) st._bwSeen = false; }
+    if(st && (BW_TAG_KINDS.has(mech.kind) || mech.bulwark) && !(S.arena && S.arena.raid)){ if(st.casting && !st._bwSeen){ st._bwSeen = true; bulwarkMoment(mech.name); } if(!st.casting) st._bwSeen = false; }
     if(!st || st.casting || st.active) return;
     if(e._phaseBeat>0 || e._ward || e._wardPending || e._gateHold){ st.timer += dt; return; }   // beat: hold idle countdowns
-    if(HAZARD_KINDS[mech.kind] && st.timer - dt <= 0 && activeHazardCount() >= HAZARD_BUDGET){
+    if((HAZARD_KINDS[mech.kind] || mech.hazard) && st.timer - dt <= 0 && activeHazardCount() >= HAZARD_BUDGET){
       st.timer = dt + 1; st._budgetDelays = (st._budgetDelays||0) + 1;
     }
   }
@@ -31533,7 +32517,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 91f5d4aa74) */
+<script>/* phone app: offline cache (build 176ea40ec9) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
