@@ -3868,6 +3868,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(kind.tide && typeof tideBossTick==="function"){ tideBossTick(e, kind, dt); return; }
     if(kind.thicket && typeof thkBossTick==="function"){ thkBossTick(e, kind, dt); return; }
     if(kind.gloom && typeof glmBossTick==="function"){ glmBossTick(e, kind, dt); return; }
+    if(kind.iron && typeof irnBossTick==="function"){ irnBossTick(e, kind, dt); return; }
     const em = emOf(e), me = S.party.self;
     // Seal of Silence: a sealed companion can't start a special ability (they all wait on the global cooldown)
     ["tank","dps","dpsCaster"].forEach(k=>{ const m = S.party[k]; if(m.alive && partyHasDebuff(m, "silenced")) m.gcd = Math.max(m.gcd||0, 0.25); });
@@ -4132,6 +4133,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(k.tide && typeof tideDrawWorld==="function"){ tideDrawWorld(e, k, em, now, pulse); return; }
     if(k.thicket && typeof thkDrawWorld==="function"){ thkDrawWorld(e, k, em, now, pulse); return; }
     if(k.gloom && typeof glmDrawWorld==="function"){ glmDrawWorld(e, k, em, now, pulse); return; }
+    if(k.iron && typeof irnDrawWorld==="function"){ irnDrawWorld(e, k, em, now, pulse); return; }
     if(k.arcane==="custodian"){
       arcCells(e).forEach(c=>{
         const caged = em.cage && Math.abs(em.cage.x-c.x)<1 && Math.abs(em.cage.y-c.y)<1;
@@ -4161,6 +4163,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(k.tide && typeof tideHint==="function") return tideHint(e, k);
     if(k.thicket && typeof thkHint==="function") return thkHint(e, k);
     if(k.gloom && typeof glmHint==="function") return glmHint(e, k);
+    if(k.iron && typeof irnHint==="function") return irnHint(e, k);
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
     if(k.arcane==="custodian"){
       if(em.cage && S.party[em.cage.key]) return `🔓 Step on the glyph to free ${displayName(S.party[em.cage.key])} before the next Tide!`;
@@ -5012,6 +5015,181 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   })();
   if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { glmCandles, glmInLight });
 
+  // ===== ironReworkV1: Iron family boss reworks (the Iron Sentinel, the Hollow Choir) =====
+  // Design: boss review doc, Iron section. Machines run in cycles; jam them. Dispatched through the arc* hooks.
+
+  function irnAng(a){ return ((a%360)+360)%360; }
+  // ---------- The Iron Sentinel ----------
+  EMBER_MECH.fpeal = {
+    tick(e, mech, st, dt){
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys(k=>k!=="tank")) || "tank", m = S.party[key];
+        st.face = angleOf(m.x-e.x, m.y-e.y);
+        spawnFloatingText(e.x, e.y-60, "GET BEHIND IT", "var(--shield)");
+      });
+      if(r==="fire"){
+        const d = scaledEnemyDmg(mech.dmg[0], mech.dmg[1])*emRampMul(e, "heat", mech.ramp);
+        let front = 0;
+        Object.entries(S.party).forEach(([key,m])=>{ if(!m.alive) return;
+          if(angleDiff(angleOf(m.x-e.x, m.y-e.y), st.face) <= 90){ damageMember(key, Math.round(d), mech.name, e); if(key!=="tank") front++; } });
+        emRampAdd(e, "heat", front ? 1 : -1, "Heat", "var(--ember)");
+        st.face = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){
+      if(st.face==null) return;
+      const p = VIEW.project(e.x, e.y), R = 300*VIEW.scale, a = st.face*Math.PI/180;
+      ctx.save(); ctx.fillStyle = resolveColor("var(--blood)"); ctx.globalAlpha = 0.12+0.18*progress;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, R, a-Math.PI/2, a+Math.PI/2); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.85; ctx.strokeStyle = resolveColor("var(--blood)"); ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+    },
+    hazards(e, mech, st){
+      if(!st.casting || st.face==null) return [];
+      const face = st.face;
+      return [{ fn:(x,y)=>angleDiff(angleOf(x-e.x, y-e.y), face) <= 100, esc:(m)=>{ const r = Math.max(50, dist(m.x,m.y,e.x,e.y)), cur = angleOf(m.x-e.x, m.y-e.y);
+        const side = ((cur - face + 540)%360 - 180) >= 0 ? 1 : -1, tgt = irnAng(face + side*130)*Math.PI/180; return { x:e.x+Math.cos(tgt)*r-m.x, y:e.y+Math.sin(tgt)*r-m.y }; } }];
+    },
+  };
+  EMBER_MECH.gears = {
+    tick(e, mech, st, dt){
+      if(st.spin){
+        const s = st.spin, p2 = (e._phase||0)>0;
+        s.t += dt; s.ang = irnAng(s.ang + (p2 ? mech.speed*1.25 : mech.speed)*dt); s.tick -= dt;
+        if(s.tick<=0){ s.tick = 0.5; const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+          irnBeams(e, mech, st).forEach(b=>Object.entries(S.party).forEach(([key,m])=>{ if(m.alive && segmentDistance(m.x,m.y,e.x,e.y,b.x2,b.y2) <= mech.width) damageMember(key, d, mech.name, e); })); }
+        if(s.t >= mech.dur) st.spin = null;
+        return !!st.spin;
+      }
+      const r = emCast(e, mech, st, dt, ()=>{ st.ang0 = Math.random()*360; });
+      if(r==="fire") st.spin = { t:0, ang:st.ang0, tick:0.2 };
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){
+      if(st.casting){ irnBeams(e, mech, { spin:{ ang:st.ang0 } }).forEach(b=>drawLineTelegraph(e.x, e.y, b.x2, b.y2, mech.width, progress, "var(--wall)")); }
+    },
+    hazards(e, mech, st){
+      const out = [];
+      const add = (ang)=>irnBeams(e, mech, { spin:{ ang } }).forEach(b=>out.push({ line:true, x1:e.x, y1:e.y, x2:b.x2, y2:b.y2, radius:mech.width+HAZARD_SAFE_MARGIN }));
+      if(st.spin){ const sp = (e._phase||0)>0 ? mech.speed*1.25 : mech.speed; add(st.spin.ang); add(irnAng(st.spin.ang + sp*0.5)); }
+      else if(st.casting) add(st.ang0);
+      return out;
+    },
+  };
+  function irnBeams(e, mech, st){
+    const angs = [st.spin.ang]; if((e._phase||0)>0) angs.push(irnAng(st.spin.ang+180));
+    return angs.map(a=>({ x2:e.x+Math.cos(a*Math.PI/180)*mech.len, y2:e.y+Math.sin(a*Math.PI/180)*mech.len }));
+  }
+
+  // ---------- The Hollow Choir ----------
+  function irnFeedback(key, amount, srcName){
+    if(S._fbGuard || !(amount>0)) return;
+    const m = S.party[key]; if(!m || !m.debuffs || !m.debuffs.length) return;
+    const fb = m.debuffs.find(d=>d.id==="feedback"); if(!fb) return;
+    const pm = S.party[fb.partner]; if(!pm || !pm.alive) return;
+    S._fbGuard = true; try{ damageMember(fb.partner, Math.round(amount*0.4), "Feedback", null, true); } finally { S._fbGuard = false; }
+  }
+  EMBER_MECH.feedback = {
+    tick(e, mech, st, dt){
+      st.timer -= dt; if(st.timer>0) return false;
+      const pair = pickTetherPair(); if(!pair || pair.some(k=>partyHasDebuff(S.party[k], "feedback"))){ st.timer = 1; return false; }
+      st.timer = mechEvery(e, mech); emFirst(e, mech);
+      applyDebuff(pair[0], "feedback", { partner:pair[1] }); applyDebuff(pair[1], "feedback", { partner:pair[0] });
+      return false;
+    },
+  };
+  function irnChoirTick(e, kind, dt){
+    const em = emOf(e), p2 = (e._phase||0)>0;
+    // Feedback: cleansing one end breaks both
+    Object.entries(S.party).forEach(([k,m])=>{ if(!m.debuffs) return; const fb = m.debuffs.find(d=>d.id==="feedback"); if(!fb) return; const pm = S.party[fb.partner];
+      if(!pm || !pm.alive || !(pm.debuffs||[]).some(x=>x.id==="feedback")) m.debuffs = m.debuffs.filter(d=>d.id!=="feedback"); });
+    // Echo Fragments march to the Choir
+    (e._group ? e._group.enemies : []).forEach(a=>{
+      if(!a.alive || a===e || a.name!=="Echo Fragment") return;
+      a.atkEvery = 1e6; a.atkTimer = 1e6; a._priorityTarget = true; // companions turn on marching fragments
+      if(!a._marchInit){ a._marchInit = true; a._slowT = 1e9; a._slowMul = 0.0001; // they only march; start them at the far edge of the sanctum, away from the Choir
+        const br = roomById("bossroom");
+        if(br){ let best = null, bd = -1; [[0.1,0.15],[0.9,0.15],[0.1,0.85],[0.9,0.85],[0.5,0.1],[0.5,0.9]].forEach(([fx,fy])=>{ const x = br.x+br.w*fx, y = br.y+br.h*fy; if(!walkable(x,y)) return; const dd = dist(x,y,e.x,e.y) + Math.random()*40; if(dd>bd){ bd = dd; best = { x, y }; } }); if(best){ a.x = best.x + (Math.random()-0.5)*30; a.y = best.y + (Math.random()-0.5)*30; if(!walkable(a.x,a.y)){ a.x = best.x; a.y = best.y; } } } }
+      const d = dist(a.x,a.y,e.x,e.y);
+      if(d <= (kind.r||22)+16){
+        killEnemy(a, a._group);
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp*0.03);
+        emRampAdd(e, "chorus", 1, "Chorus", "var(--shield)");
+        spawnFloatingText(e.x, e.y-50, "ECHO ABSORBED", "var(--blood)");
+        return;
+      }
+      const sp = 18*dt; a.x += (e.x-a.x)/d*sp; a.y += (e.y-a.y)/d*sp;
+    });
+    // Harmony: Crescendo if it runs its course; endless with pulses in phase 2
+    const hb = (e.buffs||[]).find(b=>b.id==="harmony");
+    if(hb){
+      if(p2){ hb.remaining = Math.max(hb.remaining, 1); em.pulseT = (em.pulseT==null ? 2 : em.pulseT) - dt;
+        if(em.pulseT<=0){ em.pulseT = 2; const d = Math.round(scaledEnemyDmg(8, 11)*emRampMul(e, "chorus", 0.10)); Object.keys(S.party).forEach(k=>{ if(S.party[k].alive) damageMember(k, d, "Endless Harmony", e); }); } }
+      em.harmRem = hb.remaining; em.harmUp = true;
+    } else if(em.harmUp){
+      em.harmUp = false; em.pulseT = null;
+      if((em.harmRem||0) <= 0.15){ const d = Math.round(scaledEnemyDmg(26, 34)*emRampMul(e, "chorus", 0.10));
+        Object.keys(S.party).forEach(k=>{ if(S.party[k].alive) damageMember(k, d, "Crescendo", e); }); spawnFloatingText(e.x, e.y-60, "CRESCENDO", "var(--blood)"); emSparks(e.x, e.y); }
+      else { spawnFloatingText(e.x, e.y-60, "HARMONY BROKEN", "var(--moss)"); }
+    }
+  }
+
+  function irnBossTick(e, kind, dt){ if(kind.iron==="choir") irnChoirTick(e, kind, dt); }
+  function irnDrawWorld(e, k, em, now, pulse){
+    if(k.iron==="sentinel"){ const st = e.mech.ironsweep, mech = (kindMechs(k)||[]).find(m=>m.id==="ironsweep");
+      if(st && st.spin && mech) irnBeams(e, mech, st).forEach(b=>{ const a = VIEW.project(e.x, e.y), c = VIEW.project(b.x2, b.y2);
+        ctx.save(); ctx.strokeStyle = resolveColor("var(--blood)"); ctx.globalAlpha = 0.75; ctx.lineWidth = mech.width*2*VIEW.scale*0.6; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.restore(); }); }
+    if(k.iron==="choir"){ (e._group ? e._group.enemies : []).forEach(a=>{ if(!a.alive || a.name!=="Echo Fragment") return; const pa = VIEW.project(a.x, a.y), pb = VIEW.project(e.x, e.y);
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--shield)"); ctx.globalAlpha = 0.35+0.3*pulse; ctx.setLineDash([4,6]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.restore(); }); }
+  }
+  function irnHint(e, k){
+    const em = emOf(e);
+    if(k.iron==="sentinel"){
+      if((e.buffs||[]).some(b=>b.id==="ironclad")) return "✨ Purge near the Sentinel to strip Ironclad!";
+      const fp = e.mech.resonantpeal; if(fp && fp.casting && fp.face!=null && angleDiff(angleOf(S.party.self.x-e.x, S.party.self.y-e.y), fp.face) <= 90) return "⚙ Get behind the Sentinel before it fires!";
+      if(e.mech.ironsweep && e.mech.ironsweep.spin) return "⚙ Keep moving around it, ahead of the beam!";
+    } else if(k.iron==="choir"){
+      if((e.buffs||[]).some(b=>b.id==="harmony")) return (e._phase||0)>0 ? "✨ Purge the Harmony: it won't stop on its own!" : "✨ Purge the Harmony before it swells into a Crescendo!";
+      const fb = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "feedback")); if(fb.length) return `🔊 Cleanse ${arcName(S.party[fb[0]])} to break the Feedback!`;
+      if((e._group ? e._group.enemies : []).some(a=>a.alive && a.name==="Echo Fragment")) return "🎵 Echo Fragments are marching on the Choir: kill them first!";
+    }
+    return null;
+  }
+  DEBUFFS.feedback = { name:"Feedback", interval:1, ticks:10, maxStacks:1, link:true,
+    desc:"Linked by sound: 40% of any damage you take echoes to your partner, and theirs to you. Cleanse either end to break it." };
+
+  (function(){
+    const SN = ENEMY_KINDS.ironsentinel, HC = ENEMY_KINDS.hollowchoir;
+    SN.ember = true; SN.emberTick = "iron"; SN.arcane = "iron"; SN.iron = "sentinel"; SN.pillarLayout = [];
+    SN.phases = [ { at:0.5, tint:"#9fb4d6", everyMul:{}, note:"<b>Overdrive.</b> Grinding Gears now spins two beams, opposite each other, and turns 25% faster." } ];
+    SN.mechanics = [
+      { id:"resonantpeal", name:"Forward Peal", kind:"script", fn:"fpeal", bulwark:true, every:11, first:9, windup:2.8, dmg:[44,58], ramp:0.12, verb:"GET BEHIND", color:"var(--shield)",
+        trigger:"Every ~11s, the Sentinel turns toward someone and, after 2.8s, blasts everything in front of it (half the room). Each person besides Kessa caught in front adds Heat: +12% on the next, up to 3.",
+        counter:"Get behind the Sentinel before it fires; the red half-circle shows its front. Companions move on their own." },
+      { id:"ironsweep", name:"Grinding Gears", kind:"script", fn:"gears", hazard:true, every:16, first:15, windup:1.5, dur:6, speed:60, len:320, width:22, dmg:[12,16], verb:"MOVE", color:"var(--blood)",
+        trigger:"Every ~16s, after a 1.5s wind-up, a beam of force sweeps a full circle around the Sentinel over 6s.",
+        counter:"Keep moving around it ahead of the beam. Companions dodge on their own." },
+      { id:"ironclad", name:"Ironclad", kind:"selfBuff", every:20, first:13, duration:8, mitMul:0.6,
+        trigger:"Every ~20s, the Sentinel plates itself in Ironclad for 8s, taking 40% less damage.",
+        counter:"Cast Purge while in range to strip it." },
+    ];
+    HC.ember = true; HC.emberTick = "iron"; HC.arcane = "iron"; HC.iron = "choir";
+    HC.phases = [ { at:0.5, tint:"#b48cff", everyMul:{}, note:"<b>Endless Harmony.</b> Harmony no longer ends on its own: it pulses party damage every 2s until you Purge it." } ];
+    HC.mechanics = [
+      { id:"echofragments", name:"Echo Fragments", kind:"addWave", every:17, first:8, addKind:"add",
+        addNames:["Echo Fragment","Echo Fragment"], spawnPoints:[{dx:-85,dy:-60},{dx:-85,dy:60}],
+        trigger:"Every ~17s, two Echo Fragments appear at the edges and march to the Choir. Each one that arrives heals it 3% and adds a Chorus stack (+10% to Crescendo and phase-2 pulses, up to 3).",
+        counter:"Kill them on the way in." },
+      { id:"unravelingchoir", name:"Feedback", kind:"script", fn:"feedback", every:14, first:6, verb:"CLEANSE", color:"var(--arcane)",
+        trigger:"Every ~14s, two of you are linked by sound (your two damage dealers, or you and an ally): 40% of any damage one takes echoes to the other, for 10s.",
+        counter:"Cleanse either end to break it, sooner if one of them is Kessa." },
+      { id:"harmony", name:"Harmony", kind:"selfBuff", every:19, first:12, duration:6, mitMul:0.65,
+        trigger:"Every ~19s, the Choir joins in Harmony for 6s, taking 35% less damage. If it runs its full course, it ends in a Crescendo that hits the whole party.",
+        counter:"Purge breaks the Harmony early and prevents the Crescendo." },
+    ];
+  })();
+
   function kindMechs(k){ return k ? (k.mechanics || k.miniMechanics) : undefined; }
   const MINI_POOL = { ember:["slagmaw","cinderoracle","broodkiln"], tide:["undertoad","drownedcantor","brinematron"], thicket:["bramblehulk","sporecap","seedpod"], gloom:["barrowknight","dirgekeeper","gravecaller"], iron:["forgeguard","gearwarden","gearhive"], arcane:["runegolem","glyphweaver","riftmother"] }; // other families get theirs in later rounds
   function mkMini(kind, x, y){ const k = ENEMY_KINDS[kind]; return mkEnemy(kind, k.label, x, y); }
@@ -5797,8 +5975,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // room grows up/down about its centre and to the right, attached bays
   // (safe rooms, alcoves) move with the walls, and everything inside is
   // remapped proportionally. Keyed by boss kind so procedural runs reuse it.
-  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[360,320], brogar:[340,380], thornmother:[360,334], ironsentinel:[250,280],
-    hollowchoir:[250,210], riftboundcustodian:[380,300], wickfadedwidow:[350,316], ossric:[400,350], gravewellchoir:[360,360],
+  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[360,320], brogar:[340,380], thornmother:[360,334], ironsentinel:[380,340],
+    hollowchoir:[360,300], riftboundcustodian:[380,300], wickfadedwidow:[350,316], ossric:[400,350], gravewellchoir:[360,360],
     karrick:[500,440], verdantmaw:[360,316], ysolt:[340,300], brinecolossus:[360,320], kestin:[440,380], cartographer:[440,400] };
   // Round 123: every boss arena is 20% larger (each side) than its Round 110 size.
   // One knob; hand-authored (growBossArena) and procedural (generateDungeon) both read it.
@@ -12676,6 +12854,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // tick or a ground pool tick) — used by Fortified Stance, which only
   // weakens that kind of damage, not a direct hit.
   function damageMember(key, amount, srcName, sourceEnemy, isDot){
+    irnFeedback(key, amount, srcName); // ironReworkV1: Feedback echoes 40% to the linked partner
     const m = S.party[key];
     if(!m || !m.alive) return 0;
     if(S.arena && S.arena.raid && RAID_ATTR_SRC.has(srcName)) amount = amount*raidAttr();
@@ -33310,7 +33489,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 3c863d2e5d) */
+<script>/* phone app: offline cache (build b11aed6cca) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
