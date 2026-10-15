@@ -114,7 +114,7 @@
     --moss-soft: #47603f33;
     --ember: #9c4c2c;
     --ember-soft: #9c4c2c33;
-    --arcane: #47548a;
+    --arcane: #47548a; --cleanse: #7a3fa8; --cleanse-rgb: 122,63,168;
     --arcane-soft: #47548a33;
     --blood: #832c3b;
     --blood-soft: #832c3b33;
@@ -160,7 +160,7 @@
       --moss-soft: #8fb37f2e;
       --ember: #d97b5a;
       --ember-soft: #d97b5a2e;
-      --arcane: #8fa0e3;
+      --arcane: #8fa0e3; --cleanse: #b56cf0; --cleanse-rgb: 181,108,240;
       --arcane-soft: #8fa0e32e;
       --blood: #d4657a;
       --blood-soft: #d4657a33;
@@ -206,7 +206,7 @@
     --moss-soft: #8fb37f2e;
     --ember: #d97b5a;
     --ember-soft: #d97b5a2e;
-    --arcane: #8fa0e3;
+    --arcane: #8fa0e3; --cleanse: #b56cf0; --cleanse-rgb: 181,108,240;
     --arcane-soft: #8fa0e32e;
     --blood: #d4657a;
     --blood-soft: #d4657a33;
@@ -613,7 +613,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
   .unitframe.debuffed:not(.dead){ animation: debuffPulse 1.1s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce){
-    .unitframe.debuffed:not(.dead){ animation: none; background: var(--blood-soft); }
+    .unitframe.debuffed:not(.dead){ animation: none; } /* frameStatesV1: red wash is downed-only now */
   }
 
   .name .aggroIcon{ color: var(--ember); margin-left:5px; cursor:help; }
@@ -623,7 +623,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
   .unitframe.aggroWarn:not(.dead){ animation: aggroPulse .9s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce){
-    .unitframe.aggroWarn:not(.dead){ animation: none; border-color: var(--ember); box-shadow: 0 0 0 2px var(--ember-soft); }
+    .unitframe.aggroWarn:not(.dead){ animation: none; } /* frameStatesV1: aggro shows on the role badge */
+  .unitframe.aggroWarn:not(.dead) .glyph{ box-shadow: 0 0 0 2px var(--ember); }
   }
 
   /* min-height reserves a single pip's worth of vertical space so the row
@@ -646,7 +647,32 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
      Reuses the exact "✦ Cleansed" arcane color cleanseOneDebuff's floating
      text already established for this mechanic, so the pip and the text
      read as the same effect. */
-  .buffpip.cleanseKind{ border-color: var(--arcane); color: var(--arcane); }
+  .buffpip.cleanseKind{ border-color: var(--cleanse); color: var(--cleanse); }
+  /* frameStatesV1 */
+  .unitframe{ position:relative; isolation:isolate; }
+  .unitframe .clWash{ position:absolute; inset:0; z-index:-1; pointer-events:none; border-radius:inherit; display:none; --f:0;
+    background: linear-gradient(90deg, rgba(var(--cleanse-rgb),.38) 0, rgba(var(--cleanse-rgb),.30) calc(var(--f)*100%), rgba(var(--cleanse-rgb),.08) calc(var(--f)*100%), rgba(var(--cleanse-rgb),.08) 100%); }
+  .unitframe > i.clWash{ grid-column:auto; grid-row:auto; } /* abspos grid child with auto placement = whole frame, not column 2 */
+  .unitframe.clUrgent .clWash{ display:block; }
+  .unitframe .debuffrow.tUrgent .dot{ background:var(--cleanse); }
+  .unitframe .debuffrow.tMinor .dot{ background:rgba(var(--cleanse-rgb),.55); }
+  .unitframe .debuffrow.tLock .dot{ background:#8a8290; }
+  .unitframe .debuffrow.tMinor .dname, .unitframe .debuffrow.tLock .dname{ color:inherit; } /* red text is for danger to life, not every DoT */
+  .unitframe.clUrgent{ box-shadow: inset 4px 0 0 var(--cleanse); }
+  .unitframe.clUrgent.selected{ box-shadow: inset 4px 0 0 var(--cleanse), 0 0 0 1px var(--accent-soft) inset; }
+  .unitframe .ufDot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--cleanse); margin-left:5px; vertical-align:middle; }
+  .unitframe .ufChip{ display:inline-block; font-size:.6rem; line-height:1; padding:0 3px; margin-left:4px; border-radius:4px; border:1px solid currentColor; white-space:nowrap; font-weight:600; flex:0 0 auto; }
+  .unitframe .name{ display:flex; align-items:center; white-space:nowrap; overflow:hidden; min-width:0; } /* chips never wrap the name line: the name truncates instead */
+  .unitframe .name > b{ overflow:hidden; text-overflow:ellipsis; min-width:0; flex:0 1 auto; }
+  .unitframe .name > span{ flex:0 0 auto; }
+  .unitframe .ufChip.ward{ color:var(--shield); }
+  .unitframe .ufChip.lock{ opacity:.7; }
+  .unitframe .ufChip.link{ color:var(--cleanse); }
+  .unitframe [hidden]{ display:none !important; }
+  .unitframe .dname.tUrgent{ color:var(--cleanse); font-weight:600; }
+  .unitframe .dname.tLock{ opacity:.65; }
+  .phoneL .unitframe .ufChip{ font-size:.5rem; padding:0 2px; margin-left:3px; }
+  .phoneL .unitframe .ufDot{ width:6px; height:6px; margin-left:4px; }
   /* Round 64: Grievous' own pip — a "danger" kind distinct from every
      other buff-row entry here (all genuinely positive), so it can't read
      as a good thing just for sharing the row with HoTs/shields. */
@@ -2084,6 +2110,14 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         <button class="ghost" id="resetCancelBtn" type="button">Cancel</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="pauseOverlay" style="display:none;cursor:pointer"><!-- autoPauseV1 -->
+  <div class="card frame" style="max-width:380px;text-align:center">
+    <h2>Paused</h2>
+    <p>The fight paused while you were away.</p>
+    <button class="go" id="pauseResumeBtn" type="button">Resume</button>
   </div>
 </div>
 
@@ -28311,8 +28345,8 @@ thrall(){return gs(14)+
       const div = document.createElement("div");
       div.className = `unitframe ${cls}`;
       div.innerHTML = `
-        <div class="glyph">${letter}</div>
-        <div class="name"><b></b><span class="aggroIcon" hidden>⚠</span><span class="bwIcon" hidden title="Bulwark Stance ready">⛨</span></div>
+        <i class="clWash"></i><div class="glyph">${letter}</div>
+        <div class="name"><b></b><span class="aggroIcon" hidden>⚠</span><span class="bwIcon" hidden title="Bulwark Stance ready">⛨</span><span class="ufDot" hidden title="Minor affliction: cleanse when free"></span><span class="ufChip ward" hidden title="Wax Ward them">🕯</span><span class="ufChip lock" hidden title="Can't be cleansed: heal through it">🔒</span><span class="ufChip link" hidden></span></div>
         <div class="bars">
           <div class="bar hp"><i class="hpfill"></i><i class="healfill"></i><i class="shieldfill"></i><span class="num"></span></div>
         </div>
@@ -28348,6 +28382,8 @@ thrall(){return gs(14)+
         debuffRow,
         debuffName: div.querySelector(".dname"),
         debuffTime: div.querySelector(".dtime"),
+        clWash: div.querySelector(".clWash"), ufDot: div.querySelector(".ufDot"), wardChip: div.querySelector(".ufChip.ward"),
+        lockChip: div.querySelector(".ufChip.lock"), linkChip: div.querySelector(".ufChip.link"), // frameStatesV1
       };
       debuffRow.addEventListener("mouseenter", ()=>{
         const m = S.party[key];
@@ -28465,6 +28501,65 @@ thrall(){return gs(14)+
       partyFrameEls[key].ccdEls = ccdEls;
     });
   }
+  // ---- frameStatesV1: cleanse priority + frame marks
+  const CLEANSE_PRIO = {
+    saltcrust:"urgent", thornbind:"urgent", silenced:"urgent", feedback:"urgent", fateswap:"urgent", tether:"urgent",
+    fallingCoal:"urgent", moltenEmber:"urgent", emberBrand:"urgent", creepingThorn:"urgent", sporerot:"urgent", inkbound:"urgent",
+    afflicted:"urgent", wSiphon:"urgent",
+    scorch:"minor", branded:"minor", cinderbound:"minor", unraveling:"minor", corroded:"minor", witheringMark:"minor", tolled:"minor",
+    dirgeMark:"minor", resonance:"minor", emberbrand:"minor", threadbound:"minor", waterlogged:"minor", ashbound:"minor", weight:"minor",
+    dartVenom:"minor", piercingWound:"minor", necroticWound:"minor", sRot:"minor",
+  };
+  const WARD_FREES = { encased:1, heldunder:1, pinned:1 };
+  function debuffPriority(d){
+    const def = DEBUFFS[d.id] || {};
+    if(def.priority) return def.priority;
+    if(def.noCleanse || def.bane) return "locked";
+    if(CLEANSE_PRIO[d.id]) return CLEANSE_PRIO[d.id];
+    if(def.spread || def.escalate || def.link || def.onExpire || def.tether || (def.tickPctMax||0) >= 0.02) return "urgent";
+    return "minor";
+  }
+  function surgeRemaining(){ // seconds until the Brine Colossus's next Tidal Surge lands (Saltcrust's real deadline)
+    let best = null;
+    allActiveGroups().forEach(g=>g.enemies.forEach(e=>{
+      const st = e.alive && e.mech && e.mech.tidalsurge; if(!st) return;
+      const w = 2.2, r = st.casting ? Math.max(0, w-(st.castT||0)) : Math.max(0, st.timer||0) + w;
+      if(best==null || r<best) best = r;
+    }));
+    return best;
+  }
+  function urgentFill(d, m){ // 0 = just applied, 1 = out of time
+    if(d.id==="afflicted") return Math.max(0, Math.min(1, Math.log2(Math.max(1, d.tickDmg||1)) / Math.log2(Math.max(4, m.maxHp*0.25))));
+    if(d.id==="saltcrust"){ const r = surgeRemaining(); if(r!=null){ d._dlMax = Math.max(d._dlMax||0, r); return Math.max(0, Math.min(1, 1 - r/(d._dlMax||1))); } }
+    const tot = d.totalDuration || 0; if(!isFinite(tot) || tot<=0) return 0;
+    return Math.max(0, Math.min(1, 1 - debuffRemaining(d)/tot));
+  }
+  function tollTargets(){ const t = new Set();
+    allActiveGroups().forEach(g=>g.enemies.forEach(e=>{ const st = e.alive && e.mech && e.mech.tollone; if(st && st.casting && st.key) t.add(st.key); }));
+    return t; }
+  function frameCleanseState(key, m, els){
+    if(!els.clWash) return;
+    const live = m.alive && !m.downed;
+    const ds = live ? (m.debuffs||[]) : [];
+    let urgent = null, uFill = 0, minor = false, locked = false, ward = false, link = null;
+    ds.forEach(d=>{
+      const p = debuffPriority(d);
+      if(p==="urgent"){ const f = urgentFill(d, m); if(!urgent || f > uFill){ urgent = d; uFill = f; } }
+      else if(p==="minor") minor = true;
+      else { if(WARD_FREES[d.id]) ward = true; else locked = true; }
+      if(d.partner && S.party[d.partner]) link = d.partner;
+    });
+    if(live && tollTargets().has(key)) ward = true;
+    els.root.classList.toggle("clUrgent", !!urgent);
+    if(urgent) els.clWash.style.setProperty("--f", uFill.toFixed(3));
+    els.ufDot.hidden = !(minor && !urgent);
+    els.wardChip.hidden = !ward;
+    els.lockChip.hidden = !locked;
+    els.linkChip.hidden = !link;
+    if(link){ const pm = S.party[link]; const nm = pm.label==="you" ? "You" : String(pm.label||"").split(" ")[0]; const txt = "⛓ "+nm; if(els.linkChip.textContent!==txt) els.linkChip.textContent = txt; }
+    if(els.debuffName){ els.debuffName.classList.toggle("tUrgent", !!urgent); els.debuffName.classList.toggle("tLock", !urgent && !minor && (locked||ward)); }
+    if(els.debuffRow){ els.debuffRow.classList.toggle("tUrgent", !!urgent); els.debuffRow.classList.toggle("tMinor", !urgent && minor); els.debuffRow.classList.toggle("tLock", !urgent && !minor && (locked||ward)); }
+  }
   function updatePartyFrames(){
     const aggroHolders = aggroHoldersNow();
     ["self","tank","dps","dpsCaster"].forEach(key=>{
@@ -28493,7 +28588,7 @@ thrall(){return gs(14)+
       if(els.aggroIcon) els.aggroIcon.hidden = !hasAggroWarn;
       if(els.bwIcon) els.bwIcon.hidden = !(key==="tank" && m.alive && (m.ccds.bulwark||0)<=0 && !((m.mitigateT||0)>0));
       const _ph = document.documentElement.classList.contains("phoneL"); // phoneLayoutV2
-      els.nameB.textContent = m.label==="you" ? "You" : (_ph ? String(m.label||"").split(" ")[0] : m.label);
+      els.nameB.textContent = m.label==="you" ? "You" : String(m.label||"").split(" ")[0]; // frameStatesV1: first names everywhere
       els.hpBar.classList.toggle("low", hpPct<.4);
       els.hpFill.style.transform = `scaleX(${hpPct})`;
       if(els.shieldFill){
@@ -28542,6 +28637,7 @@ thrall(){return gs(14)+
       } else {
         els.debuffRow.classList.remove("active");
       }
+      frameCleanseState(key, m, els); // frameStatesV1
       if(els.buffPips){
         const buffs = activeBuffsFor(key, m);
         els.buffPips.forEach((pip,i)=>{
@@ -33078,6 +33174,15 @@ thrall(){return gs(14)+
     // begin), so there's no start-screen state to hide or restore.
     const leaveOv = document.getElementById("leaveOverlay");
     const closeLeave = ()=>{ leaveOv.style.display="none"; S.paused=false; };
+    // autoPauseV1: pause when hidden; resume only on the player's say-so
+    { const pOv = document.getElementById("pauseOverlay");
+      const autoPause = ()=>{ if(!S.started || S.over || S.paused || S._tutBlock) return; S.paused = true; S._autoPause = true; pOv.style.display = "flex"; try{ S.keys && S.keys.clear(); }catch(_){} S._joy = null; S.moveTo = null; };
+      const resume = ()=>{ if(!S._autoPause) return; S._autoPause = false; pOv.style.display = "none"; S.paused = false; S.tPrev = null; };
+      document.addEventListener("visibilitychange", ()=>{ if(document.hidden) autoPause(); });
+      window.addEventListener("pagehide", autoPause);
+      pOv.addEventListener("click", resume);
+      document.addEventListener("keydown", e=>{ if(S._autoPause){ e.preventDefault(); resume(); } }, true);
+      window.__autoPause = { pause:autoPause, resume }; }
     document.getElementById("arenaBtn").addEventListener("click", ()=>{ arenaStart(false); });
     document.getElementById("arRestart").addEventListener("click", arenaRestart);
     document.getElementById("raidEnterBtn").addEventListener("click", ()=>{ const r = RAIDS.find(x=>x.id===_raidSel); if(raidUnlocked() && r && !r.dummy) arenaStart(false, { stage:r.stages[0], level: r.normalOnly ? 0 : (raidTierOpen(_raidTier) ? _raidTier : 0) }); });
@@ -33691,7 +33796,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build f5d657983d) */
+<script>/* phone app: offline cache (build 686fabf01f) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
