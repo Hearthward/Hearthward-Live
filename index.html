@@ -3697,6 +3697,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     emBosses().forEach(([e,k])=>{
       (kindMechs(k)||[]).forEach(m=>{ const f = m.kind==="script" && EMBER_MECH[m.fn]; if(f && f.hazards) f.hazards(e, m, e.mech[m.id]).forEach(h=>hz.push(h)); });
       if(k.thicket && typeof thkHazards==="function") thkHazards(e, k, hz);
+      if(k.gloom && typeof glmHazards==="function") glmHazards(e, k, hz);
       if(k.emberTick==="karrick"){ const pm = emPitMech(e); if(pm){ const c = pitPos(pm); hz.push({ x:c.x, y:c.y, radius:pm.dangerRadius + HAZARD_SAFE_MARGIN }); } }
     });
   }
@@ -3866,6 +3867,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function arcBossTick(e, kind, dt){
     if(kind.tide && typeof tideBossTick==="function"){ tideBossTick(e, kind, dt); return; }
     if(kind.thicket && typeof thkBossTick==="function"){ thkBossTick(e, kind, dt); return; }
+    if(kind.gloom && typeof glmBossTick==="function"){ glmBossTick(e, kind, dt); return; }
     const em = emOf(e), me = S.party.self;
     // Seal of Silence: a sealed companion can't start a special ability (they all wait on the global cooldown)
     ["tank","dps","dpsCaster"].forEach(k=>{ const m = S.party[k]; if(m.alive && partyHasDebuff(m, "silenced")) m.gcd = Math.max(m.gcd||0, 0.25); });
@@ -4129,6 +4131,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function arcDrawWorld(e, k, em, now, pulse){
     if(k.tide && typeof tideDrawWorld==="function"){ tideDrawWorld(e, k, em, now, pulse); return; }
     if(k.thicket && typeof thkDrawWorld==="function"){ thkDrawWorld(e, k, em, now, pulse); return; }
+    if(k.gloom && typeof glmDrawWorld==="function"){ glmDrawWorld(e, k, em, now, pulse); return; }
     if(k.arcane==="custodian"){
       arcCells(e).forEach(c=>{
         const caged = em.cage && Math.abs(em.cage.x-c.x)<1 && Math.abs(em.cage.y-c.y)<1;
@@ -4157,6 +4160,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function arcHint(e, k){
     if(k.tide && typeof tideHint==="function") return tideHint(e, k);
     if(k.thicket && typeof thkHint==="function") return thkHint(e, k);
+    if(k.gloom && typeof glmHint==="function") return glmHint(e, k);
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
     if(k.arcane==="custodian"){
       if(em.cage && S.party[em.cage.key]) return `🔓 Step on the glyph to free ${displayName(S.party[em.cage.key])} before the next Tide!`;
@@ -4721,6 +4725,292 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     ];
   })();
   if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { thkBrood, thkGrowThicket });
+
+  // ===== gloomReworkV1: Gloom family boss reworks (the Wickfaded Widow, Thane Ossric, the Gravewell Knell) =====
+  // Design: boss review doc, Gloom section. The dark gathers on whoever is alone: candles gutter, a bell tolls for
+  // someone, a choir sings. Light and company are the answers. Dispatched through the arc* hooks for kinds with `gloom`.
+
+  function glmRoom(e){ return roomById("bossroom") || roomBoundsContaining(e.x, e.y); }
+  function glmAdd(e, name, x, y, hpMul){
+    const a = mkEnemy("add", name, x, y);
+    a.hp = Math.round(a.hp*(S.keystoneHpMul||1)*(hpMul||1)); a.maxHp = a.hp;
+    a._group = e._group; a._mechAdd = true; e._group.enemies.push(a);
+    return a;
+  }
+
+  // ---------- The Wickfaded Widow: candlelight ----------
+  function glmCandles(e){
+    const em = emOf(e); if(em.candles) return em.candles;
+    const br = glmRoom(e); em.candles = [];
+    if(!br) return em.candles;
+    [[0.2,0.22],[0.8,0.22],[0.2,0.78],[0.8,0.78]].forEach(([fx,fy])=>{
+      for(let f=0; f<=0.5; f+=0.05){ const x = br.x+br.w*(fx+(0.5-fx)*f), y = br.y+br.h*(fy+(0.5-fy)*f);
+        if(walkable(x, y) && walkable(x+20, y) && walkable(x-20, y)){ em.candles.push({ x, y, r:62, lit:true, relight:0 }); break; } }
+    });
+    return em.candles;
+  }
+  function glmInLight(e, x, y){ return glmCandles(e).some(c=>c.lit && dist(x, y, c.x, c.y) <= c.r); }
+  EMBER_MECH.wail = {
+    tick(e, mech, st, dt){
+      const r = emCast(e, mech, st, dt);
+      if(r==="fire"){
+        const d = scaledEnemyDmg(mech.dmg[0], mech.dmg[1]) * emRampMul(e, "gutter", mech.ramp);
+        let dark = 0;
+        Object.entries(S.party).forEach(([key,m])=>{ if(!m.alive) return; const lit = glmInLight(e, m.x, m.y);
+          damageMember(key, Math.round(lit ? d*0.5 : d), mech.name, e); if(!lit) dark++; });
+        emRampAdd(e, "gutter", dark ? 1 : -1, "Gutter", "var(--cobweb)");
+        // snuff the lit candle(s) nearest her
+        const n = (e._phase||0)>0 ? 2 : 1;
+        glmCandles(e).filter(c=>c.lit).sort((a,b)=>dist(a.x,a.y,e.x,e.y)-dist(b.x,b.y,e.x,e.y)).slice(0, n).forEach(c=>{ c.lit = false; c.relight = 0; spawnFloatingText(c.x, c.y-30, "SNUFFED", "var(--cobweb)"); });
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){ drawGroundTelegraph(e.x, e.y, 54, progress, "var(--cobweb)"); },
+    hazards(e, mech, st){
+      if(!st.casting) return [];
+      return [{ fn:(x,y)=>!glmInLight(e, x, y), esc:(m)=>{ let best = null, bd = Infinity;
+        glmCandles(e).forEach(c=>{ if(!c.lit) return; const dd = dist(m.x,m.y,c.x,c.y); if(dd<bd){ bd = dd; best = { x:c.x-m.x, y:c.y-m.y }; } });
+        return best || { x:0, y:0 }; } }];
+    },
+  };
+  EMBER_MECH.spinneret = {
+    tick(e, mech, st, dt){
+      st.timer -= dt; if(st.timer>0) return false;
+      st.timer = mechEvery(e, mech);
+      const me = S.party.self; if(!me.alive) return false;
+      emFirst(e, mech);
+      [-1,1].forEach(s=>{ const a = glmAdd(e, "Spiderling", e.x+s*30, e.y+20, mech.hpMul||0.45); a._forcedTargetKey = "self"; a._spider = true; a._spiderAt = emNow(); });
+      spawnFloatingText(me.x, me.y-30, "SPIDERLINGS · MISDIRECT YOURSELF", "var(--arcane)");
+      pushLog("event", "Spiderlings drop from the web and rush you. Misdirection on yourself hands them to Kessa.");
+      return false;
+    },
+  };
+
+  // ---------- Thane Ossric: the bell tolls ----------
+  EMBER_MECH.tollone = {
+    tick(e, mech, st, dt){
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys()); if(!key) return false;
+        st.key = key; st.n = 3;
+        spawnFloatingText(S.party[key].x, S.party[key].y-34, "THE BELL TOLLS · WAX WARD", "var(--shield)");
+      });
+      if(st.casting && st.key){ const left = Math.ceil((mech.windup - st.castT)/(mech.windup/3)); if(left < st.n && left>0){ st.n = left; const m = S.party[st.key]; if(m) spawnFloatingText(m.x, m.y-30, String(left), "var(--toll)"); } }
+      if(r==="fire" && st.key){
+        const m = S.party[st.key];
+        if(m && m.alive){
+          const warded = emHasWax(m);
+          let d = scaledEnemyDmg(mech.dmg[0], mech.dmg[1]); if(warded) d *= (mech.wardMul||0.25);
+          damageMember(st.key, Math.round(d), mech.name, e);
+          spawnFloatingText(m.x, m.y-30, warded ? "WARDED" : "TOLLED", warded ? "var(--shield)" : "var(--toll)"); emSparks(m.x, m.y);
+        }
+        st.key = null;
+      }
+      return false;
+    },
+    draw(e, mech, st, progress){ const m = st.key && S.party[st.key]; if(m && m.alive) drawGroundTelegraph(m.x, m.y, 22, progress, "var(--toll)"); },
+  };
+  EMBER_MECH.gravebells = {
+    tick(e, mech, st, dt){
+      st.timer -= dt; if(st.timer>0) return false;
+      st.timer = mechEvery(e, mech);
+      const br = glmRoom(e); if(!br) return false;
+      emFirst(e, mech);
+      const spots = [[0.12,0.5],[0.88,0.5],[0.5,0.12],[0.5,0.88]].sort(()=>Math.random()-0.5).slice(0,2);
+      spots.forEach(([fx,fy])=>{
+        let x = br.x+br.w*fx, y = br.y+br.h*fy;
+        for(let k=0;k<8 && !walkable(x,y);k++){ x += (br.x+br.w/2-x)*0.15; y += (br.y+br.h/2-y)*0.15; }
+        const b = glmAdd(e, "Grave Bell", x, y, mech.hpMul||0.8);
+        b._bell = true; b._ringT = 3; b.atkEvery = 1e6; b.atkTimer = 1e6; b._slowT = 1e9; b._slowMul = 0.0001;
+        b.buffs = [{ id:"ringing", label:"Ringing", purgeable:true, remaining:1e9 }];
+      });
+      pushLog("event", "Two grave bells crash down at the edges of the hall. Break them, or Purge near one to silence it.");
+      return false;
+    },
+  };
+  // Double Toll (phase 2): a second Tolling Wave from where the bell lands, 2s after each wave
+  function glmEchoTick(e, kind, dt){
+    const em = emOf(e), wm = (kindMechs(kind)||[]).find(m=>m.id==="soundwavering"), st = wm && e.mech[wm.id];
+    if(!wm || !st) return;
+    if((e._phase||0)>0 && st.active && !st._echoed){ st._echoed = true;
+      const br = glmRoom(e); let x = e.x, y = e.y;
+      for(let k=0;k<20;k++){ const a = Math.random()*Math.PI*2, R = 110+Math.random()*60; const px = e.x+Math.cos(a)*R, py = e.y+Math.sin(a)*R; if(walkable(px,py)){ x = px; y = py; break; } }
+      em.echo = { x, y, t:-2, st:{ elapsed:0, baseAngle:Math.random()*360, gapCount:wm.gapCount, ringSpeed:st.ringSpeed||wm.ringSpeed }, hit:{} };
+      spawnFloatingText(x, y-30, "THE BELL LANDS", "var(--toll)");
+    }
+    if(!st.active) st._echoed = false;
+    const ec = em.echo; if(!ec) return;
+    ec.t += dt;
+    if(ec.t < 0) return;
+    ec.st.elapsed = ec.t;
+    const radius = ec.t*ec.st.ringSpeed;
+    if(radius - wm.edgeWidth/2 > wm.maxRadius){ em.echo = null; return; }
+    const d = Math.round(scaledEnemyDmg(wm.dmg[0], wm.dmg[1])*0.8*emRampMul(e, "dissonance", wm.ramp));
+    Object.entries(S.party).forEach(([key,m])=>{
+      if(!m.alive || ec.hit[key]) return;
+      if(Math.abs(dist(m.x,m.y,ec.x,ec.y)-radius) > wm.edgeWidth/2) return;
+      ec.hit[key] = true;
+      const ang = angleOf(m.x-ec.x, m.y-ec.y);
+      if(!ringGapAngles(wm, ec.st).some(g=>angleDiff(ang,g) <= wm.gapWidthDeg/2)) damageMember(key, d, "Double Toll", e);
+    });
+  }
+  function glmOssricTick(e, kind, dt){
+    glmEchoTick(e, kind, dt);
+    // grave bells ring until broken or Purged
+    (e._group ? e._group.enemies : []).forEach(b=>{
+      if(!b._bell || !b.alive) return;
+      if(!(b.buffs||[]).some(x=>x.id==="ringing")){ spawnFloatingText(b.x, b.y-24, "SILENCED", "var(--moss)"); killEnemy(b, b._group); pushLog("event", "Purge silences a grave bell."); return; }
+      b._ringT -= dt;
+      if(b._ringT<=0){ b._ringT = 3; const d = Math.round(scaledEnemyDmg(7, 10));
+        Object.keys(S.party).forEach(k=>{ if(S.party[k].alive) damageMember(k, d, "Grave Bell", b); }); spawnFloatingText(b.x, b.y-24, "DONG", "var(--toll)"); }
+    });
+  }
+
+  // ---------- The Gravewell Knell: the choir ----------
+  EMBER_MECH.chorus = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.chorus){
+        const c = em.chorus; c.t += dt; c.tick -= dt;
+        if(c.tick<=0){ c.tick += 1; c.i++;
+          const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1])*(1+0.25*(c.i-1))*emRampMul(e, "swell", mech.ramp));
+          Object.keys(S.party).forEach(k=>{ if(S.party[k].alive) damageMember(k, d, mech.name, e, true); });
+        }
+        if(c.t >= (mech.dur||6)) em.chorus = null;
+        return false;
+      }
+      st.timer -= dt; if(st.timer>0) return false;
+      const cv = e.mech.shardconverge; if(cv && (cv.casting || cv.active)){ st.timer = 1; return false; }
+      st.timer = mechEvery(e, mech); emFirst(e, mech);
+      em.chorus = { t:0, tick:1, i:0 };
+      spawnFloatingText(e.x, e.y-60, "KEENING CHORUS · TOP OFF", "var(--dirge)");
+      pushLog("event", "The choir begins to keen. It grows louder for 6s.");
+      return false;
+    },
+  };
+  function glmConvergeEnd(e, mech, st){
+    const kind = ENEMY_KINDS[e.kind]; if(!kind || kind.gloom!=="knell") return;
+    emRampAdd(e, "swell", st._caught ? 1 : -1, "Swell", "var(--dirge)"); st._caught = 0;
+    // Shatter Echo: three splinters fly to the room's edges and hum for 10s
+    for(let i=0;i<3;i++){
+      const a = (st.baseAngle + i*120 + 60)*Math.PI/180, R = mech.orbitRadius + 70;
+      let x = e.x+Math.cos(a)*R, y = e.y+Math.sin(a)*R;
+      for(let k=0;k<6 && !walkable(x,y);k++){ x = e.x+(x-e.x)*0.85; y = e.y+(y-e.y)*0.85; }
+      S.groundPools.push({ x, y, radius:34, tickDmg:Math.round(4*(S.keystoneDmgMul||1)), tickInterval:0.6, tickT:0, remaining:10, srcName:"Shatter Echo", color:"var(--dirge)", icon:"💠", _splinter:true });
+    }
+    // Counterpoint (phase 2): the anchor jumps across and the shards sweep again 3s later
+    if((e._phase||0)>0 && !st._second){ st._second = true; st.baseAngle = (st.baseAngle+180)%360; st.casting = true; st.castT = mech.windup - 3; st.timer = mechEvery(e, mech);
+      spawnFloatingText(e.x, e.y-60, "COUNTERPOINT", "var(--dirge)"); }
+    else st._second = false;
+  }
+  function glmKnellTick(e, kind, dt){
+    const em = emOf(e);
+    em.splT = (em.splT||0) - dt;
+    if(em.splT<=0){ em.splT = 0.6; S.groundPools.forEach(p=>{ if(!p._splinter) return; Object.keys(S.party).forEach(k=>{ const m = S.party[k]; if(m.alive && dist(m.x,m.y,p.x,p.y) <= p.radius) addDebuffStack(k, "resonance"); }); }); }
+  }
+
+  // ---------- dispatch, drawing, hints ----------
+  function glmBossTick(e, kind, dt){
+    const em = emOf(e);
+    if(kind.gloom==="widow"){
+      // relight: the healer stands in an unlit candle for 2s
+      const me = S.party.self;
+      glmCandles(e).forEach(c=>{ if(c.lit) return; if(me.alive && dist(me.x,me.y,c.x,c.y) <= 26){ c.relight += dt; if(c.relight >= 2){ c.lit = true; c.relight = 0; spawnFloatingText(c.x, c.y-30, "RELIT", "var(--accent)"); } } else c.relight = Math.max(0, c.relight - dt); });
+      // Misdirection on yourself hands the spiderlings to Kessa
+      const md = S._lastMD;
+      (e._group ? e._group.enemies : []).forEach(a=>{ if(a._spider && a.alive && a._forcedTargetKey==="self" && md && md.key==="self" && md.at >= a._spiderAt - 0.05){ a._forcedTargetKey = null; spawnFloatingText(a.x, a.y-18, "TO KESSA", "var(--moss)"); } });
+    } else if(kind.gloom==="ossric") glmOssricTick(e, kind, dt);
+    else if(kind.gloom==="knell") glmKnellTick(e, kind, dt);
+  }
+  function glmDrawWorld(e, k, em, now, pulse){
+    if(k.gloom==="widow"){
+      glmCandles(e).forEach(c=>{ const p = VIEW.project(c.x, c.y), s = VIEW.scale;
+        ctx.save();
+        if(c.lit){ const g = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, c.r*s); g.addColorStop(0, "rgba(255,210,130,.35)"); g.addColorStop(1, "rgba(255,210,130,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, c.r*s, 0, Math.PI*2); ctx.fill();
+          ctx.strokeStyle = "rgba(255,210,130,.5)"; ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(p.x, p.y, c.r*s, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.fillStyle = "#d8cfb8"; ctx.fillRect(p.x-3*s, p.y-14*s, 6*s, 14*s);
+        if(c.lit){ ctx.fillStyle = "#ffcc66"; ctx.beginPath(); ctx.ellipse(p.x, p.y-18*s, 3*s, (5+pulse)*s, 0, 0, Math.PI*2); ctx.fill(); }
+        else if(c.relight>0){ ctx.strokeStyle = "#ffcc66"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y-6*s, 16*s, -Math.PI/2, -Math.PI/2+Math.PI*2*Math.min(1, c.relight/2)); ctx.stroke(); }
+        ctx.restore(); });
+    } else if(k.gloom==="ossric" && em.echo && em.echo.t>=0){
+      const wm = (kindMechs(k)||[]).find(m=>m.id==="soundwavering");
+      if(wm) drawSoundwaveRing({ x:em.echo.x, y:em.echo.y, kind:e.kind }, wm, em.echo.st);
+    } else if(k.gloom==="ossric" && em.echo){ const p = VIEW.project(em.echo.x, em.echo.y);
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--toll)"); ctx.lineWidth = 3; ctx.globalAlpha = 0.6+0.3*pulse; ctx.beginPath(); ctx.arc(p.x, p.y, 18*VIEW.scale, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
+    if(k.gloom==="knell" && em.chorus){ const p = VIEW.project(e.x, e.y), s = VIEW.scale;
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--dirge)"); ctx.lineWidth = 2; for(let i=0;i<3;i++){ ctx.globalAlpha = 0.5 - i*0.12; ctx.beginPath(); ctx.arc(p.x, p.y, (40+((now*60+i*30)%90))*s, 0, Math.PI*2); ctx.stroke(); } ctx.restore(); }
+  }
+  function glmHazards(e, k, hz){
+    const em = emOf(e);
+    if(k.gloom==="ossric" && em.echo){ const wm = (kindMechs(k)||[]).find(m=>m.id==="soundwavering"); if(!wm) return;
+      const ec = em.echo, R = Math.max(0, ec.t)*ec.st.ringSpeed;
+      const test = (x,y)=>{ const d = dist(x,y,ec.x,ec.y); if(d < R - wm.edgeWidth || d > R + 50) return false; const ang = angleOf(x-ec.x, y-ec.y); return !ringGapAngles(wm, ec.st).some(g=>angleDiff(ang,g) <= wm.gapWidthDeg/2 - 6); };
+      hz.push({ fn:test, esc:(m)=>{ const d = dist(m.x,m.y,ec.x,ec.y)||1, ang = angleOf(m.x-ec.x, m.y-ec.y); let best = null, bd = 999;
+        ringGapAngles(wm, ec.st).forEach(g=>{ const df = angleDiff(ang, g); if(df<bd){ bd = df; best = g; } });
+        if(best==null) return { x:0, y:0 }; const a = best*Math.PI/180; return { x:ec.x+Math.cos(a)*d-m.x, y:ec.y+Math.sin(a)*d-m.y }; } });
+    }
+  }
+  function glmHint(e, k){
+    const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
+    if(k.gloom==="widow"){
+      if((e._group ? e._group.enemies : []).some(a=>a._spider && a.alive && a._forcedTargetKey==="self")) return "🕷 Spiderlings are on you: cast Misdirection on yourself!";
+      if(ST("witheringwail") && ST("witheringwail").casting && !glmInLight(e, me.x, me.y)) return "🕯 Get into a candle's light before the Wail!";
+      const unlit = glmCandles(e).filter(c=>!c.lit); if(unlit.length>=2) return "🕯 Stand in a dark candle for 2s to relight it.";
+    } else if(k.gloom==="ossric"){
+      const t = ST("tollone"); if(t && t.casting && t.key && S.party[t.key]) return `🔔 The bell tolls for ${arcName(S.party[t.key])}: Wax Ward them!`;
+      if((e._group ? e._group.enemies : []).some(a=>a._bell && a.alive)) return "🔔 Purge near a grave bell to silence it!";
+      if(em.echo) return "🔔 A second wave is coming from the bell: find a gap in both!";
+    } else if(k.gloom==="knell"){
+      if(em.chorus) return "🎶 The Keening Chorus is building: keep everyone topped off!";
+      if(S.groundPools.some(p=>p._splinter && dist(me.x,me.y,p.x,p.y) <= p.radius)) return "💠 Step out of the humming splinter!";
+    }
+    return null;
+  }
+
+  (function(){
+    const W = ENEMY_KINDS.wickfadedwidow, O = ENEMY_KINDS.ossric, K = ENEMY_KINDS.gravewellchoir;
+    W.ember = true; W.emberTick = "gloom"; W.arcane = "gloom"; W.gloom = "widow"; W.pillarLayout = [];
+    W.phases = [ { at:0.5, tint:"#c58cff", everyMul:{}, mods:{ manasiphon:{ decoy:true } }, note:"<b>Wickfade.</b> Each Snuffing Wail now puts out two candles, and every Mana Siphon also spawns a false motehive (the real one pulses steadily; the decoy flickers)." } ];
+    W.mechanics = [
+      { id:"witheringwail", name:"Snuffing Wail", kind:"script", fn:"wail", bulwark:true, every:12, first:9, windup:2.4, dmg:[36,48], ramp:0.12, verb:"GET IN LIGHT", color:"var(--accent)",
+        trigger:"Every ~12s, after a 2.4s wind-up, a wail that hits the whole party. Anyone standing in a lit candle's glow takes half. Each Wail snuffs the lit candle nearest her. Each one that catches someone in the dark adds Gutter: +12% on the next, up to 3.",
+        counter:"Stand in candlelight when it lands. Relight a dark candle by standing in it for 2s. Companions find the light on their own." },
+      { id:"spinneret", name:"Spinneret", kind:"script", fn:"spinneret", every:18, first:8, hpMul:0.45, verb:"MISDIRECT", color:"var(--arcane)",
+        trigger:"Every ~18s, two Spiderlings drop from her web and go straight for you, ignoring Kessa.",
+        counter:"Cast Misdirection on yourself and they turn to Kessa. Otherwise kite them while Rook/Vex and Mira/Wren kill them." },
+      { id:"manasiphon", name:"Mana Siphon", kind:"manaDrain", every:20, drainAmt:40,
+        motehive:{ radius:22, duration:8, threatPull:500, dmgTakenMul:1.25, manaRegen:34 },
+        spawnPoints:[ {dx:-80,dy:50}, {dx:80,dy:-50}, {dx:0,dy:80} ],
+        trigger:"Every ~20s, the Widow drains a burst of mana from you, and a pulsing motehive appears in her web.",
+        counter:"Only you can claim the motehive. Walk into its glow for a big mana gain; it marks you, and you take extra damage while it lasts. Skip it if your mana is fine." },
+    ];
+    O.ember = true; O.emberTick = "gloom"; O.arcane = "gloom"; O.gloom = "ossric";
+    O.phases = [ { at:0.5, tint:"#e8e2c8", everyMul:{}, note:"<b>Double Toll.</b> Ossric hurls his bell into the hall: every Tolling Wave is followed 2s later by a second wave expanding from where the bell landed, with its own gaps." } ];
+    O.mechanics = [
+      { id:"tollone", name:"Toll for One", kind:"script", fn:"tollone", every:15, first:8, windup:3.9, dmg:[60,80], wardMul:0.25, verb:"WAX WARD", color:"var(--shield)",
+        trigger:"Every ~15s, the bell tolls for one party member: 3, 2, 1 counts down over their head, then a heavy blow.",
+        counter:"Wax Ward them before the count ends: it soaks most of the blow." },
+      { id:"gravebells", name:"Grave Bells", kind:"script", fn:"gravebells", every:22, first:12, hpMul:0.8, verb:"PURGE", color:"var(--shield)",
+        trigger:"Every ~22s, two grave bells crash down at the edges of the hall and ring every 3s, hitting the whole party.",
+        counter:"Break them, or walk within range of one and Purge to silence it at once." },
+      { id:"soundwavering", name:"Tolling Wave", kind:"expandingRing", every:20, first:10, windup:1.5,
+        ringSpeed:70, maxRadius:260, edgeWidth:16, gapCount:2, gapWidthDeg:55, gapRotationDeg:50, dmg:[50,68], ramp:0.12,
+        trigger:"Every ~20s, a 1.5s wind-up before a wave of sound expands outward from Ossric. Each person it hits adds Dissonance: +12% on the next wave, up to 3.",
+        counter:"Dash sideways into one of the green gaps as the edge nears your distance from him. Companions do this on their own. A clean wave clears a Dissonance stack." },
+    ];
+    K.ember = true; K.emberTick = "gloom"; K.arcane = "gloom"; K.gloom = "knell";
+    K.phases = [ { at:0.5, tint:"#7f9cff", everyMul:{}, note:"<b>Counterpoint.</b> Each convergence now sweeps twice: the anchor jumps to the opposite side and the shards sweep again 3s later, flipping the safe zone." } ];
+    K.mechanics = [
+      { id:"keeningchorus", name:"Keening Chorus", kind:"script", fn:"chorus", every:24, first:12, dur:6, dmg:[7,10], ramp:0.12, verb:"TOP OFF", color:"var(--shield)",
+        trigger:"Every ~24s (never during a convergence), the choir keens for 6s: party-wide damage every second, 25% louder each second. Each person caught by the shards adds Swell: +12% to the next Chorus, up to 3.",
+        counter:"Top everyone off before it starts and save Second Wind for the loud end." },
+      { id:"shardconverge", name:"Converging Shards", kind:"converging", every:21, first:8, windup:2,
+        convergeDuration:4.2, orbitRadius:120, bandWidth:60, debuff:"resonance", tickInterval:0.4,
+        trigger:"Every ~21s, a chime before two purple crystals sweep in from either side into the blue anchor crystal. When they crash, the anchor shatters into three splinters that hum at the room's edges for 10s, stacking Resonance on anyone in them.",
+        counter:"Stand in the green SAFE zone opposite the anchor (or outside the ring), then stay out of the splinters. Companions reposition on their own." },
+    ];
+  })();
+  if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { glmCandles, glmInLight });
 
   function kindMechs(k){ return k ? (k.mechanics || k.miniMechanics) : undefined; }
   const MINI_POOL = { ember:["slagmaw","cinderoracle","broodkiln"], tide:["undertoad","drownedcantor","brinematron"], thicket:["bramblehulk","sporecap","seedpod"], gloom:["barrowknight","dirgekeeper","gravecaller"], iron:["forgeguard","gearwarden","gearhive"], arcane:["runegolem","glyphweaver","riftmother"] }; // other families get theirs in later rounds
@@ -5508,7 +5798,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // (safe rooms, alcoves) move with the walls, and everything inside is
   // remapped proportionally. Keyed by boss kind so procedural runs reuse it.
   const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[360,320], brogar:[340,380], thornmother:[360,334], ironsentinel:[250,280],
-    hollowchoir:[250,210], riftboundcustodian:[380,300], wickfadedwidow:[240,220], ossric:[400,350], gravewellchoir:[360,360],
+    hollowchoir:[250,210], riftboundcustodian:[380,300], wickfadedwidow:[350,316], ossric:[400,350], gravewellchoir:[360,360],
     karrick:[500,440], verdantmaw:[360,316], ysolt:[340,300], brinecolossus:[360,320], kestin:[440,380], cartographer:[440,400] };
   // Round 123: every boss arena is 20% larger (each side) than its Round 110 size.
   // One knob; hand-authored (growBossArena) and procedural (generateDungeon) both read it.
@@ -19704,8 +19994,9 @@ thrall(){return gs(14)+
                 const radius = mech.inward ? mech.maxRadius - st.elapsed*(st.ringSpeed || mech.ringSpeed) : st.elapsed * (st.ringSpeed || mech.ringSpeed);
                 if(mech.inward ? radius + mech.edgeWidth/2 < 0 : radius - mech.edgeWidth/2 > mech.maxRadius){
                   st.active = false; st.timer = mechEvery(e, mech);
+                  if(mech.ramp){ emRampAdd(e, "dissonance", st._hits ? 1 : -1, "Dissonance", "var(--toll)"); st._hits = 0; } // gloomReworkV1
                 } else {
-                  const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+                  const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1])*(mech.ramp ? emRampMul(e, "dissonance", mech.ramp) : 1));
                   Object.entries(S.party).forEach(([key,m])=>{
                     if(!m.alive || st.hitMembers[key]) return;
                     const dfromBoss = dist(m.x, m.y, e.x, e.y);
@@ -19714,7 +20005,7 @@ thrall(){return gs(14)+
                     const angleDeg = angleOf(m.x-e.x, m.y-e.y);
                     const safe = ringGapAngles(mech, st).some(g => angleDiff(angleDeg,g) <= mech.gapWidthDeg/2);
                     if(!safe){
-                      damageMember(key, d, mech.name, e);
+                      damageMember(key, d, mech.name, e); st._hits = (st._hits||0) + 1;
                     } else if(key==="self"){
                       pushLog("event", "You dash through a gap in the wave!");
                     }
@@ -19756,6 +20047,7 @@ thrall(){return gs(14)+
                   st.active = false; st.timer = mechEvery(e, mech);
                   { const ar = st.baseAngle*Math.PI/180;
                     spawnAoeBurst(e.x+Math.cos(ar)*mech.orbitRadius, e.y+Math.sin(ar)*mech.orbitRadius, "var(--blood)"); }
+                  glmConvergeEnd(e, mech, st); // gloomReworkV1
                 } else if(st.tickTimer<=0){
                   st.tickTimer = mech.tickInterval;
                   const { A, angleB, angleC } = convergenceFragAngles(mech, st);
@@ -19765,7 +20057,7 @@ thrall(){return gs(14)+
                     if(r < mech.orbitRadius - mech.bandWidth || r > mech.orbitRadius + mech.bandWidth) return;
                     const angleDeg = angleOf(m.x-e.x, m.y-e.y);
                     const caught = angleBetweenShort(angleDeg, A, angleB) || angleBetweenShort(angleDeg, angleC, A);
-                    if(caught) addDebuffStack(key, mech.debuff);
+                    if(caught){ addDebuffStack(key, mech.debuff); st._caught = (st._caught||0) + 1; }
                   });
                 }
               }
@@ -33018,7 +33310,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 86a4906e3e) */
+<script>/* phone app: offline cache (build 3c863d2e5d) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>

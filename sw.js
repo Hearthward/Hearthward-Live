@@ -1,5 +1,5 @@
-// Hearthward phone app service worker — build 86a4906e3e
-const CACHE = "hearthward-86a4906e3e";
+// Hearthward phone app service worker — build 3c863d2e5d
+const CACHE = "hearthward-3c863d2e5d";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())); });
 self.addEventListener("activate", e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.indexOf("hearthward-")===0 && k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
