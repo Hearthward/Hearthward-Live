@@ -3293,7 +3293,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // The first time each mechanic appears, name it over the boss (lesson 5: make a big deal of it).
   function emFirst(e, mech){ const em = emOf(e); if(em.seen[mech.id]) return; em.seen[mech.id] = true; const v = mechVerb(mech); spawnFloatingText(e.x, e.y-76, mech.name.toUpperCase()+" · "+v.verb, v.color); }
   function emHasWax(m){ return !!(m && (m.shields||[]).some(s=>s.source==="waxward" && s.amount>0)); }
-  function emIsEncased(m){ return !!(m && m.debuffs && m.debuffs.length && m.debuffs.some(d=>d.id==="encased" || d.id==="caged")); }
+  function emIsEncased(m){ return !!(m && m.debuffs && m.debuffs.length && m.debuffs.some(d=>d.id==="encased" || d.id==="caged" || d.id==="devoured")); }
   // rooted: can't move (Encased, Catalogued, Pinned); the pin tick also holds them against AI code that moves them directly
   const EM_ROOT_IDS = { encased:1, caged:1, pinned:1 };
   function emIsRooted(m){ return !!(m && m.debuffs && m.debuffs.length && m.debuffs.some(d=>EM_ROOT_IDS[d.id])); }
@@ -3696,6 +3696,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function emberHazards(hz){
     emBosses().forEach(([e,k])=>{
       (kindMechs(k)||[]).forEach(m=>{ const f = m.kind==="script" && EMBER_MECH[m.fn]; if(f && f.hazards) f.hazards(e, m, e.mech[m.id]).forEach(h=>hz.push(h)); });
+      if(k.thicket && typeof thkHazards==="function") thkHazards(e, k, hz);
       if(k.emberTick==="karrick"){ const pm = emPitMech(e); if(pm){ const c = pitPos(pm); hz.push({ x:c.x, y:c.y, radius:pm.dangerRadius + HAZARD_SAFE_MARGIN }); } }
     });
   }
@@ -3864,6 +3865,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function arcName(m){ return displayName(m)==="you" ? "yourself" : displayName(m); }
   function arcBossTick(e, kind, dt){
     if(kind.tide && typeof tideBossTick==="function"){ tideBossTick(e, kind, dt); return; }
+    if(kind.thicket && typeof thkBossTick==="function"){ thkBossTick(e, kind, dt); return; }
     const em = emOf(e), me = S.party.self;
     // Seal of Silence: a sealed companion can't start a special ability (they all wait on the global cooldown)
     ["tank","dps","dpsCaster"].forEach(k=>{ const m = S.party[k]; if(m.alive && partyHasDebuff(m, "silenced")) m.gcd = Math.max(m.gcd||0, 0.25); });
@@ -4126,6 +4128,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---------- drawing + hints ----------
   function arcDrawWorld(e, k, em, now, pulse){
     if(k.tide && typeof tideDrawWorld==="function"){ tideDrawWorld(e, k, em, now, pulse); return; }
+    if(k.thicket && typeof thkDrawWorld==="function"){ thkDrawWorld(e, k, em, now, pulse); return; }
     if(k.arcane==="custodian"){
       arcCells(e).forEach(c=>{
         const caged = em.cage && Math.abs(em.cage.x-c.x)<1 && Math.abs(em.cage.y-c.y)<1;
@@ -4153,6 +4156,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
   function arcHint(e, k){
     if(k.tide && typeof tideHint==="function") return tideHint(e, k);
+    if(k.thicket && typeof thkHint==="function") return thkHint(e, k);
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
     if(k.arcane==="custodian"){
       if(em.cage && S.party[em.cage.key]) return `🔓 Step on the glyph to free ${displayName(S.party[em.cage.key])} before the next Tide!`;
@@ -4471,6 +4475,252 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     ];
   })();
   if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { tideUndertowCtx, tideLandsShort, tideSheltered });
+
+  // ===== thicketReworkV1: Thicket family boss reworks (the Thornmother, the Verdant Maw) =====
+  // Design: boss review doc, Thicket section. The garden grows if you let it: adds harden into thickets, buffs ripen
+  // into bursts, the room closes in. Both bosses' kit answer is Purge. Dispatched through arcBossTick/arcDrawWorld/
+  // arcHint for kinds with `thicket`.
+
+  function thkRoom(e){ return roomById("bossroom") || roomBoundsContaining(e.x, e.y); }
+  function thkBrood(e){ return (e._group ? e._group.enemies : []).filter(a=>a.alive && a._sprout); }
+
+  function thkBossTick(e, kind, dt){
+    const em = emOf(e);
+    if(kind.thicket==="thornmother"){
+      // Overgrowth: a bloom that fades with any of its Bramblings alive hardens into a permanent thicket
+      S.groundPools.forEach(p=>{
+        if(p.srcName!=="Thorned Bloom" || p._thkDone || p.remaining > dt) return;
+        p._thkDone = true;
+        const kin = thkBrood(e).some(a=>a._bloomPool===p);
+        if(kin) thkGrowThicket(e, p.x, p.y); else spawnFloatingText(p.x, p.y-16, "WITHERS", "var(--moss)");
+      });
+      // thickets prick anyone brushing them
+      em.prickT = (em.prickT||0) - dt;
+      if(em.prickT<=0){ em.prickT = 1;
+        PILLAR_DEFS.forEach(t=>{ if(!t.thicket) return; Object.entries(S.party).forEach(([k,m])=>{ if(m.alive && dist(m.x,m.y,t.x,t.y) <= t.r+10) damageMember(k, Math.round(6*(S.keystoneDmgMul||1)), "Thorn thicket", e, true); }); });
+      }
+      // Mother's Nurture: heals her for every Brambling alive until it runs out or is Purged
+      if(em.nurture){
+        const up = (e.buffs||[]).some(b=>b.id==="nurture");
+        if(!up){ if(em.nurture.t>0.05){ spawnFloatingText(e.x, e.y-60, "NURTURE PURGED", "var(--moss)"); pushLog("event", "Purge cuts the Thornmother off from her brood."); } em.nurture = null; }
+        else if(em.nurture.t<=0){ e.buffs = e.buffs.filter(b=>b.id!=="nurture"); em.nurture = null; }
+        else { em.nurture.t -= dt; const n = thkBrood(e).length; if(n){ e.hp = Math.min(e.maxHp, e.hp + e.maxHp*0.01*n*dt); em.nurture.healed = (em.nurture.healed||0) + e.maxHp*0.01*n*dt; } }
+      }
+      // Bloom Season (phase 2): a closing ring of thorns, pushed back by every Brambling killed
+      if((e._phase||0)>0){
+        const br = thkRoom(e);
+        if(!em.ring && br){ const R0 = Math.hypot(br.w, br.h)/2; em.ring = { x:br.x+br.w/2, y:br.y+br.h/2, R:R0, R0, Rmin:110, tickT:1 };
+          spawnFloatingText(em.ring.x, em.ring.y-40, "BLOOM SEASON · KILL BRAMBLINGS", "var(--moss)");
+          pushLog("event", "Thorns begin closing in from the walls. Every Brambling you kill pushes them back."); }
+        const ring = em.ring;
+        if(ring){
+          const alive = new Set(thkBrood(e)); let killed = 0;
+          (em.lastBrood||[]).forEach(a=>{ if(!alive.has(a) && !a.alive) killed++; });
+          em.lastBrood = Array.from(alive);
+          if(killed){ ring.R = Math.min(ring.R0, ring.R + 34*killed); spawnFloatingText(ring.x, ring.y-ring.R, "THORNS RECEDE", "var(--moss)"); }
+          ring.R = Math.max(ring.Rmin, ring.R - 5*dt);
+          ring.tickT -= dt;
+          if(ring.tickT<=0){ ring.tickT = 1; Object.entries(S.party).forEach(([k,m])=>{ if(m.alive && dist(m.x,m.y,ring.x,ring.y) > ring.R) damageMember(k, Math.round(9*(S.keystoneDmgMul||1)), "Closing thorns", e, true); }); }
+        }
+      } else em.lastBrood = thkBrood(e);
+    } else if(kind.thicket==="verdantmaw"){
+      // Ripening: Purge before it bursts, or the whole party takes it
+      if(em.ripe){
+        const up = (e.buffs||[]).some(b=>b.id==="ripening");
+        em.ripe.t -= dt;
+        if(!up && em.ripe.t>0){ em.ripe = null; spawnFloatingText(e.x, e.y-60, "SPORES PURGED", "var(--moss)"); emRampAdd(e, "overripe", -1, "Overripe", "var(--bloom)"); pushLog("event", "Purge pops the ripening spores harmlessly."); }
+        else if(em.ripe.t<=0){
+          e.buffs = (e.buffs||[]).filter(b=>b.id!=="ripening");
+          const d = Math.round(scaledEnemyDmg(em.ripe.dmg[0], em.ripe.dmg[1])*emRampMul(e, "overripe", 0.12));
+          Object.keys(S.party).forEach(k=>{ if(S.party[k].alive) damageMember(k, d, "Ripened spores", e); });
+          spawnFloatingText(e.x, e.y-60, "SPORES BURST", "var(--bloom)"); emSparks(e.x, e.y);
+          emRampAdd(e, "overripe", 1, "Overripe", "var(--bloom)"); em.ripe = null;
+        }
+      }
+      // Devour: the swallowed one rides inside the Maw until broken out
+      if(em.devour){
+        const v = em.devour, m = S.party[v.key];
+        v.t -= dt; v.tick -= dt;
+        if(m && m.alive){ m.x = e.x; m.y = e.y; m._pin = { x:e.x, y:e.y }; }
+        const dealt = v.hp0 - e.hp;
+        if(!m || !m.alive){ em.devour = null; }
+        else if(dealt >= e.maxHp*v.breakPct || v.t<=0){
+          m.debuffs = (m.debuffs||[]).filter(d=>d.id!=="devoured"); m._pin = null;
+          const a = Math.random()*Math.PI*2; pushEntity(m, e.x+Math.cos(a)*70, e.y+Math.sin(a)*70, { dur:0.5, arc:30 });
+          spawnFloatingText(e.x, e.y-50, dealt >= e.maxHp*v.breakPct ? "BROKEN FREE" : "SPAT OUT", "var(--moss)");
+          pushLog("event", `${displayName(m)} ${dealt >= e.maxHp*v.breakPct ? "is cut free of" : "is spat out by"} the Maw.`);
+          em.devour = null;
+        } else if(v.tick<=0){ v.tick += 1; damageMember(v.key, Math.round(scaledEnemyDmg(v.dmg[0], v.dmg[1])), "Digested", e, true); }
+      }
+    }
+  }
+  function thkGrowThicket(e, x, y){
+    const n = PILLAR_DEFS.filter(p=>p.thicket).length, cap = 4;
+    if(n>=cap){ spawnFloatingText(x, y-16, "WITHERS", "var(--moss)"); return; }
+    const t = { id:"thicket"+n, x, y, r:24, thicket:true, prop:false };
+    PILLAR_DEFS.push(t);
+    // nobody gets stuck inside it
+    Object.values(S.party).concat(e._group ? e._group.enemies : []).forEach(m=>{ if(m.alive && dist(m.x,m.y,x,y) < t.r+8){ const a = Math.atan2(m.y-y, m.x-x)||0; pushEntity(m, x+Math.cos(a)*(t.r+20), y+Math.sin(a)*(t.r+20), { dur:0.3, arc:8 }); } });
+    spawnFloatingText(x, y-30, "OVERGROWTH", "var(--blood)"); emSparks(x, y);
+    pushLog("event", "A bloom left to its Bramblings hardens into a thorn thicket.");
+  }
+  EMBER_MECH.nurture = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.nurture){ st.timer = Math.max(st.timer, mechEvery(e, mech)*0.5); return false; }
+      st.timer -= dt; if(st.timer>0) return false;
+      st.timer = mechEvery(e, mech); emFirst(e, mech);
+      e.buffs = (e.buffs||[]).filter(b=>b.id!=="nurture");
+      e.buffs.push({ id:"nurture", label:"Mother's Nurture", purgeable:true, remaining:(mech.dur||8)+0.5 });
+      em.nurture = { t:mech.dur||8 };
+      spawnFloatingText(e.x, e.y-60, "NURTURE · PURGE IT", "var(--shield)");
+      pushLog("event", "The Thornmother draws life from her brood. Purge it, or kill the Bramblings.");
+      return false;
+    },
+  };
+  EMBER_MECH.ripening = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.ripe){ st.timer = Math.max(st.timer, 2); return false; }
+      st.timer -= dt; if(st.timer>0) return false;
+      { const cn = e.mech.chokingcanopy; if(cn && (cn.casting || S.zoneFlood || cn.timer < 8)){ st.timer = 2; return false; } } // Purge has to be reachable
+      st.timer = mechEvery(e, mech); emFirst(e, mech);
+      e.buffs = (e.buffs||[]).filter(b=>b.id!=="ripening");
+      e.buffs.push({ id:"ripening", label:"Ripening", purgeable:true, remaining:(mech.dur||6)+0.5 });
+      em.ripe = { t:mech.dur||6, tot:mech.dur||6, dmg:mech.dmg };
+      spawnFloatingText(e.x, e.y-60, "RIPENING · PURGE IT", "var(--shield)");
+      return false;
+    },
+  };
+  EMBER_MECH.devour = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.devour && !st.casting){ st.timer = Math.max(st.timer, 3); return false; }
+      { const cn = e.mech.chokingcanopy; // never into a Canopy: the party has to be able to reach the Maw
+        if(!st.casting && st.timer<=dt && cn && (cn.casting || S.zoneFlood || cn.timer < 12)) st.timer = Math.max(st.timer, 2); }
+      const r = emCast(e, mech, st, dt, ()=>{
+        const key = emPick(emAliveKeys(k=>(k==="dps" || k==="dpsCaster") && !emIsRooted(S.party[k])));
+        if(!key) return false; st.key = key;
+        spawnFloatingText(S.party[key].x, S.party[key].y-30, "DEVOUR!", "var(--bloom)");
+      });
+      if(r==="fire" && st.key){
+        const m = S.party[st.key];
+        if(m && m.alive){
+          if(m.casting) m.casting = null;
+          applyDebuff(st.key, "devoured");
+          m.x = e.x; m.y = e.y; m._pin = { x:e.x, y:e.y };
+          em.devour = { key:st.key, t:mech.dur||8, tick:1, hp0:e.hp, breakPct:mech.breakPct||0.06, dmg:mech.dmg };
+          pushLog("event", `The Verdant Maw swallows ${displayName(m)} whole! Hack them free (about ${Math.round((mech.breakPct||0.06)*100)}% of its health) and keep them alive.`);
+        }
+        st.key = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){ const m = st.key && S.party[st.key]; if(m && m.alive) drawLineTelegraph(e.x, e.y, m.x, m.y, 18, progress, "var(--bloom)"); },
+  };
+  // Overgrown Hollows (phase 2): the Canopy seeds half of the safe hollow with thorns
+  function thkCanopyStart(e, mech, st){
+    const em = emOf(e);
+    if(em.devour){ // the Maw retches up whoever is inside before the room seals
+      const m = S.party[em.devour.key];
+      if(m){ m.debuffs = (m.debuffs||[]).filter(d=>d.id!=="devoured"); m._pin = null; const a = Math.random()*Math.PI*2; pushEntity(m, e.x+Math.cos(a)*70, e.y+Math.sin(a)*70, { dur:0.5, arc:30 }); spawnFloatingText(e.x, e.y-50, "SPAT OUT", "var(--moss)"); }
+      em.devour = null;
+    }
+    if(!mech.thornsP2 || !((e._phase||0)>0)) return;
+    const r = roomById(st.safeId || mech.safeRoomId); if(!r) return;
+    const left = Math.random()<0.5, rad = Math.min(r.w*0.18, r.h*0.45);
+    S.groundPools.push({ x:r.x + r.w*(left?0.22:0.78), y:r.y+r.h/2, radius:rad, tickDmg:Math.round(9*(S.keystoneDmgMul||1)), tickInterval:0.5, tickT:0,
+      remaining:(mech.windup||3)+(mech.duration||8), srcName:"Hollow thorns", color:"var(--bloom)", icon:"🌿" });
+  }
+
+  function thkDrawThicket(pl){
+    const p = VIEW.project(pl.x, pl.y), r = pl.r*VIEW.scale, now = (S.tPrev||0)/1000;
+    ctx.save();
+    ctx.fillStyle = "#1d3a17"; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "#5f8f3a"; ctx.lineWidth = 2;
+    for(let i=0;i<10;i++){ const a = i*Math.PI/5 + 0.2*Math.sin(now+i); ctx.beginPath(); ctx.moveTo(p.x+Math.cos(a)*r*0.4, p.y+Math.sin(a)*r*0.4); ctx.lineTo(p.x+Math.cos(a)*r*1.18, p.y+Math.sin(a)*r*1.18); ctx.stroke(); }
+    ctx.fillStyle = "#b8322a"; for(let i=0;i<4;i++){ const a = i*1.7+0.5; ctx.beginPath(); ctx.arc(p.x+Math.cos(a)*r*0.55, p.y+Math.sin(a)*r*0.55, 2.2*VIEW.scale, 0, Math.PI*2); ctx.fill(); }
+    ctx.restore();
+  }
+  function thkDrawWorld(e, k, em, now, pulse){
+    if(em.ring){ const p = VIEW.project(em.ring.x, em.ring.y), R = em.ring.R*VIEW.scale;
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--moss)"); ctx.lineWidth = 4; ctx.globalAlpha = 0.55+0.3*pulse; ctx.setLineDash([10,6]);
+      ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 0.12; ctx.fillStyle = resolveColor("var(--blood)"); ctx.beginPath(); ctx.rect(p.x-2000, p.y-2000, 4000, 4000); ctx.arc(p.x, p.y, R, 0, Math.PI*2, true); ctx.fill("evenodd"); ctx.restore(); }
+    if(em.nurture){ thkBrood(e).forEach(a=>{ const pa = VIEW.project(a.x, a.y), pb = VIEW.project(e.x, e.y);
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--moss)"); ctx.lineWidth = 2; ctx.globalAlpha = 0.5+0.3*pulse; ctx.setLineDash([4,5]);
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.restore(); }); }
+    if(em.ripe){ const p = VIEW.project(e.x, e.y), s = VIEW.scale, f = 1 - em.ripe.t/em.ripe.tot;
+      ctx.save(); ctx.fillStyle = resolveColor("var(--bloom)"); ctx.globalAlpha = 0.35+0.4*f;
+      ctx.beginPath(); ctx.arc(p.x, p.y-46*s, (10+16*f)*s*(1+0.08*pulse), 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.9; ctx.strokeStyle = resolveColor("var(--shield)"); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y-46*s, 30*s, -Math.PI/2, -Math.PI/2 + Math.PI*2*f); ctx.stroke(); ctx.restore(); }
+    if(em.devour){ const p = VIEW.project(e.x, e.y), s = VIEW.scale, v = em.devour, f = Math.min(1, (v.hp0-e.hp)/(e.maxHp*v.breakPct));
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--bloom)"); ctx.lineWidth = 4; ctx.globalAlpha = 0.8;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 40*s, -Math.PI/2, -Math.PI/2 + Math.PI*2*f); ctx.stroke();
+      ctx.fillStyle = resolveColor("var(--bloom)"); ctx.textAlign = "center"; ctx.font = `700 ${Math.round(Math.max(10, 12*s))}px 'Space Mono', monospace`;
+      ctx.fillText(`${displayName(S.party[v.key]||{label:"?"}).toUpperCase()} INSIDE · ${Math.round(f*100)}%`, p.x, p.y+56*s); ctx.restore(); }
+  }
+  function thkHazards(e, k, hz){
+    const em = emOf(e);
+    if(em.ring) hz.push({ inv:true, x:em.ring.x, y:em.ring.y, radius:Math.max(30, em.ring.R - HAZARD_SAFE_MARGIN - 16) });
+  }
+  function thkHint(e, k){
+    const me = S.party.self, em = emOf(e);
+    if(k.thicket==="thornmother"){
+      if(em.nurture) return "✨ Purge near the Thornmother: she's feeding on her brood!";
+      const tb = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "thornbind")); if(tb.length) return `✂ Cleanse ${arcName(S.party[tb[0]])} free of the thorns!`;
+      if(em.ring && dist(me.x, me.y, em.ring.x, em.ring.y) > em.ring.R - 20) return "🌿 Get inside the ring before the thorns close on you!";
+      if(thkBrood(e).length && S.groundPools.some(p=>p.srcName==="Thorned Bloom" && p.remaining<2.5)) return "🗡 Kill the Bramblings before their bloom hardens into a thicket!";
+    } else if(k.thicket==="verdantmaw"){
+      if(em.ripe) return `✨ Purge near the Maw before the spores burst (${Math.max(1, Math.ceil(em.ripe.t))}s)!`;
+      if(em.devour && S.party[em.devour.key]) return `❤ Keep ${displayName(S.party[em.devour.key])} alive while the party cuts them free!`;
+    }
+    return null;
+  }
+
+  DEBUFFS.thornbind = { name:"Thornbind", tickDmg:6, tickPctMax:0.03, interval:1, ticks:6, maxStacks:1,
+    desc:"Wrapped in thorns: can't move, and they bite every second. Cleanse it to cut them free." };
+  DEBUFFS.devoured = { name:"Devoured", bane:true, noCleanse:true, interval:1, ticks:8, maxStacks:1,
+    desc:"Swallowed by the Maw: can't move or act, digested every second. The party breaks you out by damaging it, or it spits you out after 8s." };
+  EM_ROOT_IDS.thornbind = 1; EM_ROOT_IDS.devoured = 1;
+
+  (function(){
+    const TM = ENEMY_KINDS.thornmother, VM = ENEMY_KINDS.verdantmaw;
+    TM.ember = true; TM.emberTick = "thicket"; TM.arcane = "thicket"; TM.thicket = "thornmother";
+    TM.phases = [ { at:0.5, tint:"#8bd46e", everyMul:{}, note:"<b>Bloom Season.</b> A ring of thorns closes in slowly from the walls, hurting anyone outside it. Every Brambling you kill pushes it back out." } ];
+    TM.mechanics = [
+      { id:"thornedbloom", name:"Thorned Bloom", kind:"groundPool", anchorRole:"random", every:12, first:7, windup:1.5, radius:45, sprout:{ addKind:"add", names:["Brambling","Brambling"], offsets:[{dx:-26,dy:0},{dx:26,dy:0}], max:4 }, tickDmg:8, tickInterval:0.5, duration:6,
+        trigger:"Every ~12s, a patch of thorned bloom forms under a random party member (1.5s telegraph) and sprouts two Bramblings (up to 4 alive). When a bloom fades while any of its Bramblings is still alive, it hardens into a permanent thorn thicket (up to four) that blocks movement and line of sight and pricks anyone touching it.",
+        counter:"Step clear of the bloom, then kill its Bramblings before it fades (6s) and the patch withers away instead." },
+      { id:"thornbind", name:"Thornbind", kind:"debuffApply", every:13, first:9, debuff:"thornbind", verb:"CLEANSE", color:"var(--arcane)",
+        trigger:"Every ~13s, thorns wrap a party member: they can't move and take 3% of their health every second for 6s.",
+        counter:"Cleanse them free, especially if a bloom is about to land under them." },
+      { id:"nurture", name:"Mother's Nurture", kind:"script", fn:"nurture", every:20, first:15, dur:8, verb:"PURGE", color:"var(--shield)",
+        trigger:"Every ~20s, the Thornmother draws on her brood: for 8s she heals 1% of her health per second for each Brambling alive.",
+        counter:"Purge near her to cut it off, or kill the Bramblings so there's nothing to feed on." },
+    ];
+    VM.ember = true; VM.emberTick = "thicket"; VM.arcane = "thicket"; VM.thicket = "verdantmaw";
+    VM.phases = [ { at:0.5, tint:"#7ddc4a", everyMul:{}, note:"<b>Overgrown Hollows.</b> Each Choking Canopy now seeds half of the safe hollow with thorns: squeeze into the clear half together, with the Root Lashers in there too." } ];
+    VM.mechanics = [
+      { id:"chokingcanopy", name:"Choking Canopy", kind:"zoneFlood", every:24, first:14, windup:3, tickDmg:16, tickInterval:0.75, duration:8,
+        safeRoomId:"roothollow", altSafeRoomId:"roothollowN", safeRoomStyle:"hollow", safeW:220, safeH:110, thornsP2:true, floodMsg:"Vines choke the chamber - reach the glowing hollow!",
+        hintIcon:"🌿", hintText:"Head for the steady glowing hollow - the flickering one is a trap!",
+        beaconGlyph:"⬇", beaconColor:"var(--bloom)",
+        trigger:"Every ~24s, a canopy begins sealing off the chamber. After a 3s warning, one of two root hollows (below or above the arena) glows steady while the other flickers dark. It alternates each time.",
+        counter:"Get into the steady glowing hollow before it seals; the flickering one is the trap. Companions head there on their own. Anyone left outside takes heavy damage every tick for ~8s. In phase 2, half the hollow is thorns: use the clear half." },
+      { id:"ripening", name:"Ripening", kind:"script", fn:"ripening", every:17, first:9, dur:6, dmg:[22,30], verb:"PURGE", color:"var(--shield)",
+        trigger:"Every ~17s (never around a Canopy), the Maw swells with spores (a growing bloom on its back). Six seconds later they burst over the whole party. Each burst adds Overripe: +12% on the next one, up to 3.",
+        counter:"Purge near the Maw before it bursts: the spores pop harmlessly and an Overripe stack clears." },
+      { id:"devour", name:"Devour", kind:"script", fn:"devour", every:22, first:13, windup:1.5, dur:8, breakPct:0.06, dmg:[8,11], verb:"HEAL + CUT", color:"var(--bloom)",
+        trigger:"Every ~22s, the Maw swallows Rook/Vex or Mira/Wren whole. Inside, they can't act and are digested every second, for up to 8s.",
+        counter:"Keep them alive while the party hacks them free: about 6% of the Maw's health breaks them out (the ring around it fills). It never happens in the 12s before a Canopy, and the Maw spits them out when a Canopy begins." },
+      { id:"rootlashers", name:"Root Lashers", kind:"addWave", every:19, addKind:"add", anchorRoomId:"roothollow", anchorFollowsSafe:true,
+        addNames:["Root Lasher","Root Lasher"], spawnPoints:[{dx:-50,dy:-17.5},{dx:50,dy:2.5}],
+        trigger:"Every ~19s, two Root Lashers stir awake in the hollow below.",
+        counter:"Kill them quickly. They are most dangerous when the party is crowded into the hollow during a Choking Canopy." },
+    ];
+  })();
+  if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { thkBrood, thkGrowThicket });
 
   function kindMechs(k){ return k ? (k.mechanics || k.miniMechanics) : undefined; }
   const MINI_POOL = { ember:["slagmaw","cinderoracle","broodkiln"], tide:["undertoad","drownedcantor","brinematron"], thicket:["bramblehulk","sporecap","seedpod"], gloom:["barrowknight","dirgekeeper","gravecaller"], iron:["forgeguard","gearwarden","gearhive"], arcane:["runegolem","glyphweaver","riftmother"] }; // other families get theirs in later rounds
@@ -5257,9 +5507,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // room grows up/down about its centre and to the right, attached bays
   // (safe rooms, alcoves) move with the walls, and everything inside is
   // remapped proportionally. Keyed by boss kind so procedural runs reuse it.
-  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[360,320], brogar:[340,380], thornmother:[280,260], ironsentinel:[250,280],
+  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[360,320], brogar:[340,380], thornmother:[360,334], ironsentinel:[250,280],
     hollowchoir:[250,210], riftboundcustodian:[380,300], wickfadedwidow:[240,220], ossric:[400,350], gravewellchoir:[360,360],
-    karrick:[500,440], verdantmaw:[310,260], ysolt:[340,300], brinecolossus:[360,320], kestin:[440,380], cartographer:[440,400] };
+    karrick:[500,440], verdantmaw:[360,316], ysolt:[340,300], brinecolossus:[360,320], kestin:[440,380], cartographer:[440,400] };
   // Round 123: every boss arena is 20% larger (each side) than its Round 110 size.
   // One knob; hand-authored (growBossArena) and procedural (generateDungeon) both read it.
   const BOSS_ARENA_SCALE = 1.2;
@@ -10168,7 +10418,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     // each run, so a "Descend Again" on the same dungeon would otherwise
     // start with whatever cracks/shattered state the PREVIOUS attempt left
     // them in. Reset explicitly here, every fresh run.
-    for(let _i=PILLAR_DEFS.length-1;_i>=0;_i--) if(PILLAR_DEFS[_i].inkWall) PILLAR_DEFS.splice(_i,1); // arcaneReworkV1
+    for(let _i=PILLAR_DEFS.length-1;_i>=0;_i--) if(PILLAR_DEFS[_i].inkWall || PILLAR_DEFS[_i].thicket) PILLAR_DEFS.splice(_i,1); // arcaneReworkV1
     PILLAR_DEFS.forEach(p=>{ if(p.crackable){ p.cracks = 0; p.shattered = false; } if(p._lit){ p._lit = false; if(p._blos0===undefined) delete p.blocksLOS; else p.blocksLOS = p._blos0; } });
     S.losWarnT = 0;
     S.volcanicTimer = VOLCANIC_INTERVAL*0.5; // first eruption comes a bit sooner than a full interval
@@ -12887,13 +13137,22 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
      never a teleport). Gates lift when the group is cleared; freshRun drops
      them with the rest of the run state. Not used in raids or the arena. */
   const SEAL_SLAB = 16, SEAL_INSET = 34;
+  function sealExemptIds(g){
+    const ids = new Set();
+    (g.enemies||[]).forEach(e=>(kindMechs(ENEMY_KINDS[e.kind])||[]).forEach(m=>{ if(m.kind==="zoneFlood") [m.safeRoomId, m.altSafeRoomId].forEach(id=>{ if(id) ids.add(id); }); }));
+    if(!ids.size) return ids;
+    const safe = ROOMS.filter(r=>ids.has(r.id));
+    ROOMS.forEach(C=>{ if(C.id===g.room || ids.has(C.id)) return; // the stairs/necks that lead into a safe room
+      if(safe.some(S2=>Math.min(C.x+C.w, S2.x+S2.w) > Math.max(C.x, S2.x) && Math.min(C.y+C.h, S2.y+S2.h) > Math.max(C.y, S2.y))) ids.add(C.id); });
+    return ids;
+  }
   function sealInside(R, x, y){ return x>=R.x && x<=R.x+R.w && y>=R.y && y<=R.y+R.h; }
   function beginRoomSeal(g){
     if(S.arena || S.seal || !g.room) return;
     const R = ROOMS.find(r=>r.id===g.room); if(!R) return;
-    const slabs = [];
+    const slabs = [], _ex = sealExemptIds(g); // thicketReworkV1 fix
     ROOMS.forEach(C=>{
-      if(C===R) return;
+      if(C===R || _ex.has(C.id)) return;
       const ix0=Math.max(R.x,C.x), iy0=Math.max(R.y,C.y), ix1=Math.min(R.x+R.w,C.x+C.w), iy1=Math.min(R.y+R.h,C.y+C.h);
       if(ix1<=ix0 || iy1<=iy0) return; // doesn't touch this room
       const ext = { L:R.x-C.x, R:(C.x+C.w)-(R.x+R.w), T:R.y-C.y, B:(C.y+C.h)-(R.y+R.h) };
@@ -12909,11 +13168,11 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       slabs.push({ rect, ex, ey });
     });
     if(!slabs.length) return;
-    S.seal = { g, R, slabs, closed:false, t:0 };
+    S.seal = { g, R, slabs, closed:false, t:0, ex:ROOMS.filter(r=>_ex.has(r.id)) };
   }
   function sealOutsiders(){
     const sl = S.seal, out = [];
-    Object.values(S.party).forEach(m=>{ if((m.alive || m.downed) && !m.imprisoned && !sealInside(sl.R, m.x, m.y)) out.push(m); });
+    Object.values(S.party).forEach(m=>{ if((m.alive || m.downed) && !m.imprisoned && !sealInside(sl.R, m.x, m.y) && !(sl.ex||[]).some(r=>inRoom(m.x, m.y, r))) out.push(m); });
     livingEnemiesOf(sl.g).forEach(e=>{ if(!sealInside(sl.R, e.x, e.y)) out.push(e); });
     return out;
   }
@@ -19151,7 +19410,7 @@ thrall(){return gs(14)+
                       if(!walkable(sx,sy)){ sx = st.anchorX; sy = st.anchorY; }
                       const add = mkEnemy(mech.sprout.addKind, (mech.sprout.names&&mech.sprout.names[i])||"Sprout", sx, sy);
                       add.hp = Math.round(add.hp*(S.keystoneHpMul||1)); add.maxHp = add.hp;
-                      add._group = e._group; add._mechAdd = true; add._sprout = true;
+                      add._group = e._group; add._mechAdd = true; add._sprout = true; add._bloomPool = S.groundPools[S.groundPools.length-1]; // thicketReworkV1
                       e._group.enemies.push(add); alive++;
                     });
                     pushLog("event", `Bramblings sprout from the bloom!`);
@@ -19353,6 +19612,7 @@ thrall(){return gs(14)+
                   const sr = roomById(st.safeId), br0 = roomById("bossroom");
                   if(sr && br0) st.glyph = sr.y < br0.y ? "⬆" : "⬇";
                 }
+                thkCanopyStart(e, mech, st); // thicketReworkV1
                 pushLog("event", `${e.name} begins ${mech.name}!`);
               }
               if(st.casting){
@@ -22377,7 +22637,7 @@ thrall(){return gs(14)+
     (S.features||[]).forEach(f=>sprites.push({ wx:f.x, wy:f.y, draw:()=>drawFeature(f) }));
     sprites.push({ wx:0, wy:-99990, draw:drawTrapFloors }); trapSprites(sprites); // Round 152
     DECOR_DEFS.forEach(dc=>{ if(!dc.room.hidden) sprites.push({ wx:dc.x, wy:dc.y - (DECOR_FLAT.has(dc.type) ? 100000 : 0), draw:()=>drawDecor(dc) }); });
-    PILLAR_DEFS.forEach(pl=>sprites.push({ wx:pl.x, wy:pl.y, draw:()=> pl.inkWall ? arcDrawInkWall(pl) : pl.prop ? drawProp(pl) : pl.lava ? drawLavaPit(pl) : pl.reef ? drawReefRock(pl) : pl.crackable ? drawCrackablePillar(pl) : drawPillar(pl) }));
+    PILLAR_DEFS.forEach(pl=>sprites.push({ wx:pl.x, wy:pl.y, draw:()=> pl.thicket ? thkDrawThicket(pl) : pl.inkWall ? arcDrawInkWall(pl) : pl.prop ? drawProp(pl) : pl.lava ? drawLavaPit(pl) : pl.reef ? drawReefRock(pl) : pl.crackable ? drawCrackablePillar(pl) : drawPillar(pl) }));
     sprites.push({ wx:S.party.tank.x, wy:S.party.tank.y, draw:()=>drawUnitSprite(S.party.tank, resolveColor("var(--moss)"), "T") });
     sprites.push({ wx:S.party.dps.x,  wy:S.party.dps.y,  draw:()=>drawUnitSprite(S.party.dps,  resolveColor("var(--ember)"), S.party.dps.short||"D") });
     sprites.push({ wx:S.party.dpsCaster.x, wy:S.party.dpsCaster.y, draw:()=>drawUnitSprite(S.party.dpsCaster, resolveColor("var(--arcane)"), S.party.dpsCaster.short||"M") });
@@ -32758,7 +33018,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build db0e811a55) */
+<script>/* phone app: offline cache (build 86a4906e3e) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
