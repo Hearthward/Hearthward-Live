@@ -23359,21 +23359,21 @@ thrall(){return gs(14)+
       for(let i=0;i<unit*22;i++){ // cobbles
         const x = rnd()*W, y = rnd()*H, rx = 6+rnd()*6;
         flBlob(g,rnd,x,y,rx,rx*0.8,flRGBA(rnd()<0.5?ink:hi,0.10+rnd()*0.10));
-        g.strokeStyle = flRGBA(ink,0.28); g.lineWidth = 1; g.stroke();
+        g.strokeStyle = flRGBA(ink,0.18); g.lineWidth = 1; g.stroke();
       }
-      for(let i=0;i<unit*7;i++) flBlob(g,rnd,rnd()*W,rnd()*H,12+rnd()*22,9+rnd()*15,"rgba(70,125,40,"+(0.22+rnd()*0.18)+")");
-      for(let i=0;i<unit*5;i++) flBlob(g,rnd,rnd()*W,rnd()*H,5+rnd()*9,4+rnd()*6,"rgba(150,205,70,0.30)");
+      for(let i=0;i<unit*7;i++) flBlob(g,rnd,rnd()*W,rnd()*H,12+rnd()*22,9+rnd()*15,"rgba(70,125,40,"+(0.13+rnd()*0.12)+")");
+      for(let i=0;i<unit*5;i++) flBlob(g,rnd,rnd()*W,rnd()*H,5+rnd()*9,4+rnd()*6,"rgba(150,205,70,0.15)");
       const nr = Math.max(1, Math.round(unit*0.9));
       for(let i=0;i<nr;i++){ // roots: wide dark underlay + lighter bark, with a side branch
         const edge = rnd()<0.5, x = edge?(rnd()<0.5?0:W):rnd()*W, y = edge?rnd()*H:(rnd()<0.5?0:H);
         const ang = Math.atan2(H/2-y+(rnd()-0.5)*H*0.5, W/2-x+(rnd()-0.5)*W*0.5), len = 40+rnd()*Math.min(W,H)*0.6;
-        flCrack(g,rnd,x,y,ang,len,5.2,"rgba(28,18,8,0.75)",null);
-        flCrack(g,rnd,x,y,ang,len,3.0,"rgba(105,72,38,0.9)",null);
-        flCrack(g,rnd,x+Math.cos(ang)*len*0.4,y+Math.sin(ang)*len*0.4,ang+0.9,len*0.4,1.8,"rgba(90,60,30,0.85)",null);
+        flCrack(g,rnd,x,y,ang,len,5.2,"rgba(28,18,8,0.5)",null);
+        flCrack(g,rnd,x,y,ang,len,3.0,"rgba(105,72,38,0.6)",null);
+        flCrack(g,rnd,x+Math.cos(ang)*len*0.4,y+Math.sin(ang)*len*0.4,ang+0.9,len*0.4,1.8,"rgba(90,60,30,0.55)",null);
       }
-      for(let i=0;i<unit*7;i++){ const x = rnd()*W, y = rnd()*H; g.strokeStyle = "rgba(60,120,30,0.8)"; g.lineWidth = 1.2; g.lineCap="round";
+      for(let i=0;i<unit*7;i++){ const x = rnd()*W, y = rnd()*H; g.strokeStyle = "rgba(60,120,30,0.5)"; g.lineWidth = 1.2; g.lineCap="round";
         for(let k=-1;k<=1;k++){ g.beginPath(); g.moveTo(x+k*1.6,y); g.lineTo(x+k*3.2,y-5-rnd()*3); g.stroke(); } }
-      for(let i=0;i<unit*2;i++){ g.fillStyle = rnd()<0.5?"rgba(235,110,150,0.85)":"rgba(250,215,90,0.85)"; g.beginPath(); g.arc(rnd()*W,rnd()*H,1.5,0,6.2832); g.fill(); }
+      for(let i=0;i<unit*2;i++){ g.fillStyle = rnd()<0.5?"rgba(235,110,150,0.55)":"rgba(250,215,90,0.55)"; g.beginPath(); g.arc(rnd()*W,rnd()*H,1.5,0,6.2832); g.fill(); }
   }
   function paintFloorGloom(F){
     const {g,W,H,rnd,dark,ink,hi,unit,area,room,pal,isCorr}=F;
@@ -23410,19 +23410,19 @@ thrall(){return gs(14)+
   }
   function paintFloorArcane(F){
     const {g,W,H,rnd,dark,ink,hi,unit,area,room,pal,isCorr}=F;
-      const ts = 44, gl = "rgba(224,92,240,0.16)", li = "rgba(236,150,255,0.85)";
+      const ts = 44, gl = "rgba(224,92,240,0.06)", li = "rgba(236,150,255,0.42)";
       g.fillStyle = "rgba(20,8,40,0.18)"; g.fillRect(0,0,W,H);
       for(let y=0;y<H;y+=ts) for(let x=0;x<W;x+=ts){
         const v = rnd(); g.fillStyle = flRGBA(v<0.5?[10,4,25]:[180,140,255], v<0.5?0.10+v*0.16:0.03+(v-0.5)*0.1); g.fillRect(x,y,ts,ts);
-        g.strokeStyle = flRGBA(ink,0.55); g.lineWidth = 1.3; g.strokeRect(x,y,ts,ts);
+        g.strokeStyle = flRGBA(ink,0.5); g.lineWidth = 1.3; g.strokeRect(x,y,ts,ts);
         g.strokeStyle = gl; g.lineWidth = 4; g.strokeRect(x+5,y+5,ts-10,ts-10);
-        g.strokeStyle = "rgba(224,92,240,0.55)"; g.lineWidth = 1; g.strokeRect(x+5,y+5,ts-10,ts-10);
+        g.strokeStyle = "rgba(224,92,240,0.22)"; g.lineWidth = 1; g.strokeRect(x+5,y+5,ts-10,ts-10);
       }
       for(let y=0;y<=H;y+=ts) for(let x=0;x<=W;x+=ts){ g.fillStyle = li; g.beginPath(); g.moveTo(x,y-2.2); g.lineTo(x+2.2,y); g.lineTo(x,y+2.2); g.lineTo(x-2.2,y); g.closePath(); g.fill(); }
       const nf = Math.max(1, Math.round(unit*0.5));
-      for(let i=0;i<nf;i++) flCrack(g,rnd,rnd()*W,rnd()*H,rnd()*6.28,26+rnd()*40,1.2,"rgba(255,225,255,0.95)","rgba(224,92,240,0.28)");
+      for(let i=0;i<nf;i++) flCrack(g,rnd,rnd()*W,rnd()*H,rnd()*6.28,26+rnd()*40,1.2,"rgba(255,225,255,0.6)","rgba(224,92,240,0.14)");
       for(let i=0;i<unit*1.2;i++){ const x = rnd()*W, y = rnd()*H, s = 3+rnd()*4; g.beginPath(); g.moveTo(x,y-s*1.6); g.lineTo(x+s,y+s*0.6); g.lineTo(x-s,y+s*0.6); g.closePath();
-        g.fillStyle = rnd()<0.5?"rgba(230,140,255,0.8)":"rgba(255,225,120,0.8)"; g.fill(); g.strokeStyle = flRGBA(ink,0.6); g.lineWidth = 0.8; g.stroke(); }
+        g.fillStyle = rnd()<0.5?"rgba(230,140,255,0.5)":"rgba(255,225,120,0.5)"; g.fill(); g.strokeStyle = flRGBA(ink,0.6); g.lineWidth = 0.8; g.stroke(); }
   }
   function decorCorridorRunner(F){
     const {g,W,H,hi}=F;
@@ -23643,6 +23643,192 @@ thrall(){return gs(14)+
     else { ctx.globalAlpha=.8; ctx.lineWidth=2*Math.max(2,3*VIEW.scale); }
     ctx.stroke(); ctx.globalAlpha=1; ctx.lineJoin="miter";
   }
+  // ---- wallsV1: dungeon walls, edge shadows, doorways and void texture --------------------------------------
+  // A world-aligned layer drawn right after drawFloors(). The world is cut into WL_CH-unit chunks; each visible chunk is
+  // painted once into an offscreen canvas (cached until the room set, family or theme changes) and blitted every frame.
+  // Per chunk, in order: faint rock texture in the void, a soft drop shadow, a family-material wall band outside every
+  // room edge (rooms that touch erase each other's walls, so only the outer edge of the footprint gets a wall), a soft
+  // shadow along the inside of real walls (blurred void mask, so doorways stay clear), and threshold stones + jambs
+  // where corridors meet rooms. The old thin rim (drawRoomRim) still draws underneath as the full-map/fallback edge.
+  const WL_CH = 384, WL_M = 48, WL_R = 2, WL_T = 12, WL_MAXBUILD = 1, WL_CACHE = 48, WL_G = 4;
+  const WALL_MAT = {
+    ember:   { base:[58,42,38],  mortar:[24,14,12], hi:[120,92,80],  vary:0.22, edge:[255,120,50], edgeA:0.22, kind:"basalt" },
+    arcane:  { base:[48,38,68],  mortar:[18,12,30], hi:[110,92,150], vary:0.18, edge:[200,120,255], edgeA:0.16, kind:"rune" },
+    tide:    { base:[44,62,68],  mortar:[16,26,30], hi:[110,150,156], vary:0.2, edge:[70,150,90],   edgeA:0.55, kind:"stones" },
+    thicket: { base:[44,58,32],  mortar:[22,28,14], hi:[96,128,64],  vary:0.25, edge:[60,100,40],   edgeA:0.45, kind:"hedge" },
+    gloom:   { base:[54,50,64],  mortar:[22,18,30], hi:[112,104,128], vary:0.2, edge:[150,120,200], edgeA:0.0,  kind:"brick" },
+    iron:    { base:[60,60,70],  mortar:[26,26,32], hi:[130,130,144], vary:0.12, edge:[255,200,90], edgeA:0.0,  kind:"plate" },
+  };
+  let _wl = { sig:"", chunks:new Map(), pats:{} };
+  function wlRgb(c,a){ return "rgba("+(c[0]|0)+","+(c[1]|0)+","+(c[2]|0)+","+(a==null?1:a)+")"; }
+  function wlShade(c,k){ return [Math.max(0,Math.min(255,c[0]*k)),Math.max(0,Math.min(255,c[1]*k)),Math.max(0,Math.min(255,c[2]*k))]; }
+  function wlPatternCanvas(fam){
+    const M = WALL_MAT[fam] || WALL_MAT.iron, U = 48, P = U*WL_R; // tile = 48 world units
+    const cv = document.createElement("canvas"); cv.width = cv.height = P;
+    const g = cv.getContext("2d"); if(!g) return null;
+    g.scale(WL_R, WL_R);
+    const rnd = flRng((fam.length*7919 + fam.charCodeAt(0)*131)>>>0);
+    g.fillStyle = wlRgb(M.mortar); g.fillRect(0,0,U,U);
+    const block = (x,y,w,h)=>{ const k = 1 + (rnd()-0.5)*2*M.vary; g.fillStyle = wlRgb(wlShade(M.base,k)); g.fillRect(x,y,w,h);
+      g.fillStyle = wlRgb(M.hi,0.18); g.fillRect(x,y,w,1.2); g.fillStyle = "rgba(0,0,0,0.22)"; g.fillRect(x,y+h-1.2,w,1.2); };
+    if(M.kind==="plate"){
+      for(let y=0;y<U;y+=24) for(let x=0;x<U;x+=24){ block(x+0.6,y+0.6,22.8,22.8);
+        g.fillStyle = wlRgb(M.hi,0.7); [[3,3],[21,3],[3,21],[21,21]].forEach(([a,b])=>{ g.beginPath(); g.arc(x+a,y+b,1.1,0,6.2832); g.fill(); }); }
+      g.fillStyle = "rgba(224,177,74,0.35)"; g.fillRect(0,23.3,U,1.4);
+    } else if(M.kind==="brick"){
+      for(let r=0;r<4;r++){ const y = r*12, off = r%2 ? 12 : 0; for(let x=-off;x<U;x+=24) block(x+0.8,y+0.8,22.4,10.4); }
+      for(let i=0;i<3;i++) flCrack(g,rnd,rnd()*U,rnd()*U,rnd()*6.28,6+rnd()*8,0.6,"rgba(10,6,16,0.6)",null);
+    } else if(M.kind==="stones"){
+      for(let i=0;i<14;i++){ const x = rnd()*U, y = rnd()*U, rx = 5+rnd()*5; const k = 1+(rnd()-0.5)*2*M.vary;
+        [[0,0],[U,0],[-U,0],[0,U],[0,-U]].forEach(([dx,dy])=>{ flBlob(g,rnd,x+dx,y+dy,rx,rx*0.75,wlRgb(wlShade(M.base,k))); }); }
+      for(let i=0;i<6;i++){ g.fillStyle = "rgba(120,200,200,0.18)"; g.beginPath(); g.arc(rnd()*U,rnd()*U,1+rnd()*1.5,0,6.2832); g.fill(); }
+    } else if(M.kind==="hedge"){
+      g.fillStyle = wlRgb(wlShade(M.base,0.7)); g.fillRect(0,0,U,U);
+      for(let i=0;i<34;i++){ const x = rnd()*U, y = rnd()*U, rx = 3+rnd()*4.5, k = 0.75+rnd()*0.6;
+        [[0,0],[U,0],[-U,0],[0,U],[0,-U]].forEach(([dx,dy])=>{ flBlob(g,rnd,x+dx,y+dy,rx,rx*0.8,wlRgb(wlShade(M.base,k))); }); }
+      for(let i=0;i<2;i++) flCrack(g,rnd,rnd()*U,rnd()*U,rnd()*6.28,14+rnd()*12,1.6,"rgba(70,48,24,0.8)",null);
+    } else { // basalt / rune: offset ashlar blocks
+      for(let r=0;r<3;r++){ const y = r*16, off = (r*13)%24; for(let x=-off;x<U;x+=24) block(x+0.8,y+0.8,22.4,14.4); }
+      if(M.kind==="basalt") for(let i=0;i<2;i++) flCrack(g,rnd,rnd()*U,rnd()*U,rnd()*6.28,8+rnd()*10,0.7,"rgba(255,140,60,0.75)","rgba(255,110,40,0.18)");
+      if(M.kind==="rune") for(let i=0;i<4;i++){ const x = 4+rnd()*(U-8), y = 3+rnd()*(U-6); g.strokeStyle = "rgba(190,130,255,0.32)"; g.lineWidth = 0.7;
+        g.beginPath(); g.moveTo(x-2,y-2); g.lineTo(x+2,y+2); g.moveTo(x+2,y-2); g.lineTo(x,y); g.stroke(); }
+    }
+    return cv;
+  }
+  function wlPattern(g, fam){
+    if(!_wl.pats[fam]) _wl.pats[fam] = wlPatternCanvas(fam) || "none";
+    const cv = _wl.pats[fam]; if(cv==="none") return wlRgb((WALL_MAT[fam]||WALL_MAT.iron).base);
+    const p = g.createPattern(cv, "repeat");
+    if(p && p.setTransform && typeof DOMMatrix!=="undefined") p.setTransform(new DOMMatrix().scale(1/WL_R));
+    return p || wlRgb((WALL_MAT[fam]||WALL_MAT.iron).base);
+  }
+  function wlPath(g, rooms){ g.beginPath(); rooms.forEach(r=>{ const pts = roomOutline(r); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]); g.closePath(); }); }
+  function wlRoomBox(r){ if(!r.poly) return [r.x,r.y,r.x+r.w,r.y+r.h]; let a=1e9,b=1e9,c=-1e9,d=-1e9; r.poly.forEach(([x,y])=>{ a=Math.min(a,x); b=Math.min(b,y); c=Math.max(c,x); d=Math.max(d,y); }); return [a,b,c,d]; }
+  // Corridor mouths: where a corridor leaves a (non-corridor) room. Returns [{x,y,horiz,half}] in world units.
+  function wlDoorways(rooms){
+    const out = [], solid = rooms.filter(r=>r.kind!=="corridor");
+    rooms.filter(r=>r.kind==="corridor" && !r.poly).forEach(c=>{
+      const horiz = c.w >= c.h, len = horiz ? c.w : c.h, half = (horiz ? c.h : c.w)/2;
+      const at = t => horiz ? [c.x+t, c.y+c.h/2] : [c.x+c.w/2, c.y+t];
+      [[0,1],[len,-1]].forEach(([t0,dir])=>{
+        let p = at(t0 + dir*1), host = solid.find(o=>inRoom(p[0],p[1],o));
+        let t = t0;
+        if(host){ for(let k=0;k<len && inRoom(...at(t + dir*1), host);k+=2) t += dir*2; }
+        else { const q = at(t0 - dir*3); host = solid.find(o=>inRoom(q[0],q[1],o)); if(!host) return; }
+        const m = at(t); out.push({ x:m[0], y:m[1], horiz, half, dir });
+      });
+    });
+    return out;
+  }
+  function wlBuildChunk(ci, cj, rooms, fam, light){
+    const x0 = ci*WL_CH - WL_M, y0 = cj*WL_CH - WL_M, SZ = WL_CH + 2*WL_M, PX = SZ*WL_R;
+    const pad = WL_M + WL_T + 30;
+    const near = rooms.filter(r=>{ const b = wlRoomBox(r); return b[2] > x0-pad && b[0] < x0+SZ+pad && b[3] > y0-pad && b[1] < y0+SZ+pad; });
+    if(!near.length) return { empty:true };
+    // scratch canvases are reused between builds (allocating ~1000px canvases per layer was the main build cost)
+    let sn = 0; const pool = _wl.pool || (_wl.pool = []);
+    const mk = ()=>{ let c = pool[sn]; if(!c){ c = pool[sn] = document.createElement("canvas"); c.width = c.height = PX; } sn++;
+      const g = c.getContext("2d"); g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.clearRect(0,0,PX,PX);
+      g.setTransform(WL_R,0,0,WL_R,-x0*WL_R,-y0*WL_R); return [c,g]; };
+    const [cv, g] = mk(); if(!g || !g.setTransform) return null;
+    const M = WALL_MAT[fam] || WALL_MAT.iron;
+    g.lineJoin = "round"; g.lineCap = "round";
+    // 1. void texture (dark theme only), kept outside the walls
+    if(!light){
+      const [vc, vg] = mk(); const rnd = flRng(((ci*92821)^(cj*68917)^0x5bd1)>>>0);
+      for(let i=0;i<70;i++){ const x = x0+rnd()*SZ, y = y0+rnd()*SZ; vg.fillStyle = rnd()<0.5 ? "rgba(255,255,255,0.025)" : "rgba(0,0,0,0.22)"; flBlob(vg,rnd,x,y,4+rnd()*16,3+rnd()*11,vg.fillStyle); }
+      for(let i=0;i<6;i++) flCrack(vg,rnd,x0+rnd()*SZ,y0+rnd()*SZ,rnd()*6.28,20+rnd()*40,1,"rgba(0,0,0,0.35)",null);
+      vg.globalCompositeOperation = "destination-out"; wlPath(vg, near); vg.fill(); vg.lineWidth = 2*WL_T; vg.stroke();
+      g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(vc,0,0); g.restore();
+    }
+    // 2. drop shadow onto the void, nudged down
+    { const [sc, sg] = mk(); sg.lineJoin = "round"; sg.translate(0, 4);
+      [[WL_T+18,0.10],[WL_T+11,0.14],[WL_T+5,0.18]].forEach(([w,a])=>{ wlPath(sg, near); sg.lineWidth = 2*w; sg.strokeStyle = "rgba(0,0,0,"+(light?a*0.5:a)+")"; sg.stroke(); });
+      sg.setTransform(WL_R,0,0,WL_R,-x0*WL_R,-y0*WL_R); sg.globalCompositeOperation = "destination-out"; wlPath(sg, near); sg.fill();
+      g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(sc,0,0); g.restore(); }
+    // 3. wall band: dark outline, lit outer lip, material body, dark face where wall meets floor; then the floors erase it
+    { const [wc, wg] = mk(); wg.lineJoin = "round";
+      const st = (w, style)=>{ wlPath(wg, near); wg.lineWidth = 2*w; wg.strokeStyle = style; wg.stroke(); };
+      st(WL_T+1.6, wlRgb(wlShade(M.mortar,0.6)));
+      st(WL_T, wlRgb(M.hi, 0.5));
+      st(WL_T-1.6, wlPattern(wg, fam));
+      st(WL_T-1.6, light ? "rgba(236,224,204,0.42)" : "rgba(0,0,0,0.12)"); // daylight theme: lift the stone so walls aren't black bars
+      st(4.5, "rgba(0,0,0,0.55)");
+      if(M.edgeA > 0) st(2.2, wlRgb(M.edge, M.edgeA));
+      wg.globalCompositeOperation = "destination-out"; wlPath(wg, near); wg.fill();
+      g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(wc,0,0); g.restore(); }
+    // 4. inner edge shadow: blur the void mask by down/up-scaling, keep it inside rooms
+    { const [ac, ag] = mk();
+      ag.fillStyle = "#000"; ag.fillRect(x0,y0,SZ,SZ); ag.globalCompositeOperation = "destination-out"; wlPath(ag, near); ag.fill();
+      const bl = _wl.blur || (_wl.blur = [document.createElement("canvas"), document.createElement("canvas")]);
+      const blur = (src, f, k)=>{ const s = bl[k], n = Math.max(4, Math.round(PX/f)); if(s.width!==n){ s.width = s.height = n; } const sg2 = s.getContext("2d"); sg2.clearRect(0,0,n,n); sg2.imageSmoothingEnabled = true; sg2.drawImage(src,0,0,n,n); return s; };
+      const b1 = blur(ac, 8, 0), b2 = blur(b1, 20, 1);
+      const [oc, og] = mk(); og.setTransform(1,0,0,1,0,0); og.imageSmoothingEnabled = true; og.globalAlpha = light ? 0.35 : 0.85; og.drawImage(b2,0,0,PX,PX); og.globalAlpha = 1;
+      og.setTransform(WL_R,0,0,WL_R,-x0*WL_R,-y0*WL_R); og.globalCompositeOperation = "destination-in"; wlPath(og, near); og.fill();
+      g.save(); g.setTransform(1,0,0,1,0,0); g.drawImage(oc,0,0); g.restore(); }
+    // 5. doorways: a threshold stone across the corridor mouth and a wall jamb either side
+    wlDoorways(near).forEach(d=>{
+      const dep = 7, h = d.half;
+      g.save(); g.translate(d.x, d.y); if(!d.horiz) g.rotate(Math.PI/2);
+      g.fillStyle = wlRgb(wlShade(M.base,0.85)); g.fillRect(-dep/2, -h+1, dep, 2*h-2);
+      g.fillStyle = wlRgb(M.hi,0.35); g.fillRect(-dep/2, -h+1, 1.2, 2*h-2); g.fillStyle = "rgba(0,0,0,0.35)"; g.fillRect(dep/2-1.2, -h+1, 1.2, 2*h-2);
+      g.fillStyle = "rgba(0,0,0,0.25)"; for(let y=-h+1+10; y<h-4; y+=12) g.fillRect(-dep/2, y, dep, 0.8);
+      [-1,1].forEach(sd=>{ const jy = sd<0 ? -h-1 : h-4; g.fillStyle = wlRgb(wlShade(M.mortar,0.7)); g.fillRect(-dep/2-1.5, jy-0.5, dep+3, 6);
+        g.fillStyle = wlPattern(g, fam); g.fillRect(-dep/2-1, jy, dep+2, 5); g.fillStyle = wlRgb(M.hi,0.6); g.fillRect(-dep/2-1, jy, dep+2, 1); });
+      g.restore();
+    });
+    // keep only the chunk's own square (margins exist so shadows and blur don't clip at the seams)
+    // (plus a small gutter of real neighbouring pixels, so smoothing at the chunk edge doesn't leave a faint seam)
+    const N = WL_CH*WL_R + 2*WL_G, own = document.createElement("canvas"); own.width = own.height = N;
+    own.getContext("2d").drawImage(cv, WL_M*WL_R-WL_G, WL_M*WL_R-WL_G, N, N, 0, 0, N, N);
+    return { cv:own };
+  }
+  function wlHalf(ch){ // half-size copy for zoomed-out views (fewer pixels to scale every frame)
+    if(!ch.half){ const n = (WL_CH*WL_R + 2*WL_G)>>1, c = document.createElement("canvas"); c.width = c.height = n; const g = c.getContext("2d"); g.imageSmoothingEnabled = true; g.drawImage(ch.cv,0,0,n,n); ch.half = c; }
+    return ch.half;
+  }
+  function wlSig(rooms, fam){
+    let s = fam+"|"+themeKey()+"|"+rooms.length;
+    for(let i=0;i<rooms.length;i++){ const r = rooms[i]; s += "|"+(r.x|0)+","+(r.y|0)+","+(r.w|0)+","+(r.h|0)+(r.poly?"p"+r.poly.length:""); }
+    return s;
+  }
+  function drawWallLayer(){
+    const _t0 = (typeof performance!=="undefined") ? performance.now() : 0;
+    try{ drawWallLayerInner(); } finally { if(_t0 && typeof window!=="undefined"){ const w = window.__wlStat || (window.__wlStat = {n:0, ms:0, max:0}); const dt = performance.now()-_t0; w.n++; w.ms += dt; w.max = Math.max(w.max, dt); } }
+  }
+  function drawWallLayerInner(){
+    if(typeof window!=="undefined" && window.__noWalls) return;
+    if(typeof document==="undefined" || !document.createElement) return;
+    const scale = VIEW.scale; if(scale*44 < 6 || S.mapMode==="full") return; // full-map view: the thin rims are enough
+    const rooms = ROOMS.filter(r=>!r.hidden); if(!rooms.length) return;
+    const fam = floorStyleName(), sig = wlSig(rooms, fam);
+    if(sig !== _wl.sig){ _wl.sig = sig; _wl.chunks = new Map(); }
+    const light = (()=>{ const bg = flHex(resolveColor("var(--bg)")); return (bg[0]*0.3+bg[1]*0.59+bg[2]*0.11) > 140; })();
+    const W = LW(), H = LH();
+    // visible world box from the projection (VIEW is uniform scale + offset)
+    const p0 = VIEW.project(0,0), wx0 = -p0.x/scale, wy0 = -p0.y/scale, wx1 = wx0 + W/scale, wy1 = wy0 + H/scale;
+    const i0 = Math.floor(wx0/WL_CH), i1 = Math.floor(wx1/WL_CH), j0 = Math.floor(wy0/WL_CH), j1 = Math.floor(wy1/WL_CH);
+    let built = 0;
+    const build = (i, j)=>{ const key = i+","+j; let ch;
+      try{ ch = wlBuildChunk(i, j, rooms, fam, light); }catch(err){ ch = null; window.__wallErr = String(err && err.stack || err); }
+      _wl.chunks.set(key, ch);
+      if(_wl.chunks.size > WL_CACHE){ const k0 = _wl.chunks.keys().next().value; _wl.chunks.delete(k0); }
+      return ch; };
+    ctx.save(); ctx.imageSmoothingEnabled = true;
+    const half = scale < 1.0;
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){
+      let ch = _wl.chunks.get(i+","+j);
+      if(ch===undefined){ if(built >= WL_MAXBUILD) continue; built++; ch = build(i, j); }
+      if(!ch || ch.empty) continue;
+      const q = VIEW.project(i*WL_CH, j*WL_CH), src = half ? wlHalf(ch) : ch.cv, f = half ? 0.5 : 1, gp = WL_G*f, n = WL_CH*WL_R*f;
+      ctx.drawImage(src, gp, gp, n, n, q.x, q.y, WL_CH*scale, WL_CH*scale);
+    }
+    ctx.restore();
+    // nothing new on screen this frame: pre-build one chunk just outside the view, so walking rarely builds on screen
+    if(!built){ outer: for(let j=j0-1;j<=j1+1;j++) for(let i=i0-1;i<=i1+1;i++){ if(!_wl.chunks.has(i+","+j)){ build(i, j); break outer; } } }
+  }
+  // ---- end wallsV1
+
   // Unified floor: rims for every room, then corridor floors, then room floors (rooms last so a corridor's end tucks under the
   // room it joins instead of sitting on top of it as a pasted rectangle).
   function drawFloors(){
@@ -23650,6 +23836,7 @@ thrall(){return gs(14)+
     const ordered = vis.filter(r=>r.kind==="corridor").concat(vis.filter(r=>r.kind!=="corridor"));
     ordered.forEach(drawRoomRim);
     ordered.forEach(drawFloor);
+    drawWallLayer(); // wallsV1
   }
 
   // Tints every room EXCEPT the current zoneFlood's safe room — full
@@ -33489,7 +33676,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build b11aed6cca) */
+<script>/* phone app: offline cache (build f8b7ab9933) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
