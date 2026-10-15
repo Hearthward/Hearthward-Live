@@ -3863,6 +3863,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 
   function arcName(m){ return displayName(m)==="you" ? "yourself" : displayName(m); }
   function arcBossTick(e, kind, dt){
+    if(kind.tide && typeof tideBossTick==="function"){ tideBossTick(e, kind, dt); return; }
     const em = emOf(e), me = S.party.self;
     // Seal of Silence: a sealed companion can't start a special ability (they all wait on the global cooldown)
     ["tank","dps","dpsCaster"].forEach(k=>{ const m = S.party[k]; if(m.alive && partyHasDebuff(m, "silenced")) m.gcd = Math.max(m.gcd||0, 0.25); });
@@ -4124,6 +4125,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 
   // ---------- drawing + hints ----------
   function arcDrawWorld(e, k, em, now, pulse){
+    if(k.tide && typeof tideDrawWorld==="function"){ tideDrawWorld(e, k, em, now, pulse); return; }
     if(k.arcane==="custodian"){
       arcCells(e).forEach(c=>{
         const caged = em.cage && Math.abs(em.cage.x-c.x)<1 && Math.abs(em.cage.y-c.y)<1;
@@ -4150,6 +4152,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     }
   }
   function arcHint(e, k){
+    if(k.tide && typeof tideHint==="function") return tideHint(e, k);
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
     if(k.arcane==="custodian"){
       if(em.cage && S.party[em.cage.key]) return `🔓 Step on the glyph to free ${displayName(S.party[em.cage.key])} before the next Tide!`;
@@ -4231,6 +4234,243 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     ];
   })();
   if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { arcCells, arcWallPlan, arcSealedCast, arcFateSwap });
+
+  // ===== tideReworkV1: Tide family boss reworks (Murk, the Brine Colossus) =====
+  // Design: boss review doc, Tide section. The sea pulls and pushes: Murk drags you in and holds you under, the
+  // Colossus throws you out against the rocks. The danger is where the water leaves you.
+  // Rides the Ember script engine; dispatched through arcBossTick/arcDrawWorld/arcHint for kinds with `tide`.
+
+  function tideRoom(e){ return roomById("bossroom") || roomBoundsContaining(e.x, e.y); }
+  const TIDE_DIRS = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+  function tideEdgeDir(){ return Object.assign({}, TIDE_DIRS[Math.floor(Math.random()*4)]); }
+
+  function tideBossTick(e, kind, dt){
+    const em = emOf(e);
+    if(kind.tide==="murk" && (e._phase||0)>0 && !em.whirl){ // Maelstrom opens
+      const br = tideRoom(e);
+      const cx = br ? br.x+br.w/2 : e.x, cy = br ? br.y+br.h/2 : e.y;
+      const pool = { x:cx, y:cy, radius:40, tickDmg:Math.round(10*(S.keystoneDmgMul||1)), tickInterval:0.5, tickT:0, remaining:1e9, permanent:true,
+        srcName:"The Maelstrom", color:"var(--arcane)", icon:"🌀", _whirl:true };
+      S.groundPools.push(pool); em.whirl = pool;
+      spawnFloatingText(cx, cy-50, "MAELSTROM · STAY CLEAR", "var(--arcane)");
+      pushLog("event", "A maelstrom opens in the middle of the chamber. Every Undertow now drags you toward it, and it grows.");
+    }
+  }
+  // Undertow context: where it pulls from, how far, how hard (Murk's Pressure ramp and Maelstrom); defaults match the
+  // original Undertow for every other boss that uses it.
+  function tideUndertowCtx(e, mech){
+    const c = { x:e.x, y:e.y, range:mech.range, pull:mech.pullDist, stop:30+bossReach(e), mul:1 };
+    if(!mech.ramp && !mech.maelstromP2) return c;
+    const em = emOf(e);
+    if(mech.ramp){ c.mul = emRampMul(e, "pressure", mech.ramp); c.pull = mech.pullDist*c.mul; }
+    if(mech.maelstromP2 && em.whirl && (e._phase||0)>0){
+      const w = em.whirl;
+      c.x = w.x; c.y = w.y; c.range = 1e9; c.pull = 60*c.mul; c.stop = Math.max(0, w.radius-8);
+      w.radius = Math.min(110, w.radius+12); // it grows with every Undertow
+    }
+    return c;
+  }
+
+  // ---------- Murk ----------
+  EMBER_MECH.heldunder = {
+    tick(e, mech, st, dt){
+      const em = emOf(e);
+      if(em.held){
+        const h = em.held, m = S.party[h.key];
+        h.t -= dt; h.tick -= dt;
+        const release = ()=>{ m.debuffs = (m.debuffs||[]).filter(d=>d.id!=="heldunder"); m._pin = null; em.held = null; };
+        if(!m || !m.alive){ em.held = null; }
+        else if(emHasWax(m)){ release(); spawnFloatingText(m.x, m.y-24, "AIR POCKET", "var(--shield)"); emRampAdd(e, "pressure", -1, "Pressure", "var(--arcane)"); pushLog("event", `Wax Ward gives ${displayName(m)} a pocket of air.`); }
+        else {
+          if(h.tick<=0){ h.tick += 1; damageMember(h.key, Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1])), mech.name, e); }
+          if(h.t<=0 && em.held){ release(); emRampAdd(e, "pressure", 1, "Pressure", "var(--arcane)"); }
+        }
+        return false;
+      }
+      st.timer -= dt; if(st.timer>0) return false;
+      st.timer = mechEvery(e, mech);
+      const key = emPick(emAliveKeys(k=>k!=="tank" && !emIsRooted(S.party[k])));
+      if(!key) return false;
+      const m = S.party[key]; emFirst(e, mech);
+      applyDebuff(key, "heldunder"); m._pin = { x:m.x, y:m.y }; if(key==="self" && m.casting) m.casting = null;
+      em.held = { key, t:mech.dur||6, tick:1 };
+      spawnFloatingText(m.x, m.y-30, key==="self" ? "HELD UNDER · WARD YOURSELF" : "HELD UNDER · WAX WARD", "var(--shield)");
+      pushLog("event", `${e.name} drags ${displayName(m)} beneath the water!`);
+      return false;
+    },
+  };
+
+  // ---------- The Brine Colossus ----------
+  function tideDir(e, st, x, y){ if(st.dir) return st.dir; const dx = x-e.x, dy = y-e.y, r = Math.hypot(dx,dy)||1; return { x:dx/r, y:dy/r }; }
+  function tideLandsShort(e, mech, st, x, y){
+    const u = tideDir(e, st, x, y), land = pushLanding({ x, y }, u.x, u.y, mech.pushDistance);
+    return dist(x, y, land.x, land.y) < mech.pushDistance - 8;
+  }
+  function tideSafeEsc(test, m){
+    for(let r=20; r<=140; r+=20){
+      for(let i=0;i<12;i++){ const a = i*Math.PI/6, x = m.x+Math.cos(a)*r, y = m.y+Math.sin(a)*r;
+        if(walkable(x, y) && !test(x, y)) return { x:x-m.x, y:y-m.y }; }
+    }
+    return { x:0, y:0 };
+  }
+  function tideSafeSpot(test, m){ const v = tideSafeEsc(test, m); return (v.x||v.y) ? { x:m.x+v.x, y:m.y+v.y } : null; }
+  EMBER_MECH.surge = {
+    tick(e, mech, st, dt){
+      const r = emCast(e, mech, st, dt, ()=>{ st.dir = (mech.rogueP2 && (e._phase||0)>0) ? tideEdgeDir() : null; });
+      if(r==="fire"){
+        const base = scaledEnemyDmg(mech.slamDmg[0], mech.slamDmg[1]) * emRampMul(e, "battered", mech.ramp);
+        let dashed = 0;
+        Object.entries(S.party).forEach(([key,m])=>{
+          if(!m.alive) return;
+          const u = tideDir(e, st, m.x, m.y), pre = { x:m.x, y:m.y }, land = pushLanding(m, u.x, u.y, mech.pushDistance);
+          pushEntity(m, land.x, land.y, { dur:0.6, arc:36 });
+          if(dist(pre.x, pre.y, land.x, land.y) < mech.pushDistance - 8){
+            dashed++;
+            let dmg = base;
+            if(partyHasDebuff(m, "saltcrust")){ dmg *= 2; m.debuffs = m.debuffs.filter(d=>d.id!=="saltcrust"); spawnFloatingText(pre.x, pre.y-30, "CRUST SHATTERS", "var(--blood)"); }
+            damageMember(key, Math.round(dmg), "Dashed against the reef", e);
+            spawnFloatingText(pre.x, pre.y-16, "DASHED", "var(--brine)");
+          }
+        });
+        pushLog("event", `${mech.name} crashes over the party!`);
+        emRampAdd(e, "battered", dashed ? 1 : -1, "Battered", "var(--brine)");
+        st.dir = null;
+      }
+      return !!st.casting || r==="fire";
+    },
+    draw(e, mech, st, progress){
+      if(st.dir) tideDrawFlow(e, st.dir, progress, "var(--brine)");
+      else drawGroundTelegraph(e.x, e.y, 56, progress, "var(--brine)");
+      const me = S.party.self, test = (x,y)=>tideLandsShort(e, mech, st, x, y);
+      if(me.alive && test(me.x, me.y)){ // where you'd hit, and the nearest spot that's clear
+        const u = tideDir(e, st, me.x, me.y), land = pushLanding(me, u.x, u.y, mech.pushDistance), pb = VIEW.project(land.x, land.y), rr = 14*VIEW.scale;
+        ctx.save(); ctx.strokeStyle = resolveColor("var(--blood)"); ctx.lineWidth = 3; ctx.globalAlpha = 0.9;
+        ctx.beginPath(); ctx.moveTo(pb.x-rr, pb.y-rr); ctx.lineTo(pb.x+rr, pb.y+rr); ctx.moveTo(pb.x+rr, pb.y-rr); ctx.lineTo(pb.x-rr, pb.y+rr); ctx.stroke();
+        const sp = tideSafeSpot(test, me);
+        if(sp){ const ps = VIEW.project(sp.x, sp.y); ctx.strokeStyle = resolveColor("var(--shield)"); ctx.beginPath(); ctx.arc(ps.x, ps.y, rr, 0, Math.PI*2); ctx.stroke(); }
+        ctx.restore();
+      }
+    },
+    hazards(e, mech, st){ if(!st.casting) return []; const test = (x,y)=>tideLandsShort(e, mech, st, x, y); return [{ fn:test, esc:(m)=>tideSafeEsc(test, m) }]; },
+  };
+  function tideSheltered(x, y, dir){ return segmentBlockedByPillar(x, y, x-dir.x*420, y-dir.y*420); }
+  EMBER_MECH.breaker = {
+    tick(e, mech, st, dt){
+      if(!st.casting && st.timer<=dt){ const s = e.mech.tidalsurge; if(s && (s.casting || s.timer < 6)) st.timer = Math.max(st.timer, 2); } // never on top of a Surge
+      const r = emCast(e, mech, st, dt, ()=>{ st.dir = tideEdgeDir(); });
+      if(r==="fire" && st.dir){
+        const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+        Object.entries(S.party).forEach(([key,m])=>{
+          if(!m.alive || tideSheltered(m.x, m.y, st.dir)) return;
+          damageMember(key, d, mech.name, e);
+          const land = pushLanding(m, st.dir.x, st.dir.y, 40); pushEntity(m, land.x, land.y, { dur:0.4, arc:10 });
+          spawnFloatingText(m.x, m.y-14, "SWEPT", "var(--brine)");
+        });
+        st.dir = null;
+      }
+      return false; // she keeps fighting while the wave rolls in
+    },
+    draw(e, mech, st, progress){
+      if(!st.dir) return;
+      tideDrawFlow(e, st.dir, progress, "var(--shield)");
+      PILLAR_DEFS.forEach(p=>{ if(p.shattered || p.blocksLOS===false || p.lava) return; // the lee of each rock
+        const lx = p.x+st.dir.x*(p.r+16), ly = p.y+st.dir.y*(p.r+16); drawGroundTelegraph(lx, ly, 16, 1, "var(--moss)"); });
+    },
+    hazards(e, mech, st){
+      if(!st.casting || !st.dir) return [];
+      const dir = st.dir, test = (x,y)=>!tideSheltered(x, y, dir);
+      return [{ fn:test, esc:(m)=>{
+        let best = null, bd = Infinity;
+        PILLAR_DEFS.forEach(p=>{ if(p.shattered || p.blocksLOS===false || p.lava) return; const lx = p.x+dir.x*(p.r+16), ly = p.y+dir.y*(p.r+16); if(!walkable(lx, ly)) return; const dd = dist(m.x,m.y,lx,ly); if(dd<bd){ bd = dd; best = { x:lx-m.x, y:ly-m.y }; } });
+        return best || { x:0, y:0 }; } }];
+    },
+  };
+  // three long arrows across the chamber in the water's direction
+  function tideDrawFlow(e, dir, progress, color){
+    const br = tideRoom(e); if(!br) return;
+    const col = resolveColor(color);
+    for(const f of [0.25, 0.5, 0.75]){
+      let x1, y1, x2, y2;
+      if(dir.x){ y1 = y2 = br.y+br.h*f; x1 = dir.x>0 ? br.x+20 : br.x+br.w-20; x2 = dir.x>0 ? br.x+br.w-20 : br.x+20; }
+      else { x1 = x2 = br.x+br.w*f; y1 = dir.y>0 ? br.y+20 : br.y+br.h-20; y2 = dir.y>0 ? br.y+br.h-20 : br.y+20; }
+      drawLineTelegraph(x1, y1, x2, y2, 10, progress, color);
+      const p = VIEW.project(x2, y2), s = 14*VIEW.scale, a = Math.atan2(dir.y, dir.x);
+      ctx.save(); ctx.fillStyle = col; ctx.globalAlpha = 0.85; ctx.beginPath();
+      ctx.moveTo(p.x+Math.cos(a)*s, p.y+Math.sin(a)*s); ctx.lineTo(p.x+Math.cos(a+2.5)*s, p.y+Math.sin(a+2.5)*s); ctx.lineTo(p.x+Math.cos(a-2.5)*s, p.y+Math.sin(a-2.5)*s);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+
+  function tideDrawWorld(e, k, em, now, pulse){
+    if(em.held){ const m = S.party[em.held.key]; if(m && m.alive){ const p = VIEW.project(m.x, m.y), s = VIEW.scale;
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--arcane)"); ctx.lineWidth = 2.5; ctx.globalAlpha = 0.8;
+      for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(p.x, p.y, (10+i*7)*s, now*3+i*2, now*3+i*2+4.2); ctx.stroke(); } ctx.restore(); } }
+    if(em.whirl){ const w = em.whirl, p = VIEW.project(w.x, w.y), r = w.radius*VIEW.scale;
+      ctx.save(); ctx.strokeStyle = resolveColor("var(--arcane)"); ctx.lineWidth = 2; ctx.globalAlpha = 0.55;
+      for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(p.x, p.y, r*(0.35+i*0.2), -now*2+i, -now*2+i+3.6); ctx.stroke(); } ctx.restore();
+      const ut = e.mech.undertow; // during the Undertow, arrows show the pull toward the whirlpool
+      if(ut && ut.casting){ ctx.save(); ctx.strokeStyle = resolveColor("var(--arcane)"); ctx.globalAlpha = 0.5+0.4*pulse; ctx.lineWidth = 3;
+        for(let i=0;i<8;i++){ const a = i*Math.PI/4, R1 = r+90*VIEW.scale, R2 = r+30*VIEW.scale; ctx.beginPath(); ctx.moveTo(p.x+Math.cos(a)*R1, p.y+Math.sin(a)*R1); ctx.lineTo(p.x+Math.cos(a)*R2, p.y+Math.sin(a)*R2); ctx.stroke(); }
+        ctx.restore(); } }
+  }
+  function tideHint(e, k){
+    const me = S.party.self, em = emOf(e), ST = id=>e.mech[id], M = id=>(kindMechs(k)||[]).find(m=>m.id===id);
+    if(k.tide==="murk"){
+      if(em.held && S.party[em.held.key]) return `🫧 Wax Ward ${arcName(S.party[em.held.key])} to give them air!`;
+      if(em.whirl && ST("undertow") && ST("undertow").casting && dist(me.x, me.y, em.whirl.x, em.whirl.y) < em.whirl.radius+80) return "🌀 Get away from the whirlpool before the Undertow drags you in!";
+    } else if(k.tide==="colossus"){
+      const sm = M("tidalsurge"), ss = ST("tidalsurge");
+      if(ss && ss.casting && sm && tideLandsShort(e, sm, ss, me.x, me.y)) return "🌊 Move: the surge will dash you against the rocks!";
+      const bs = ST("breaker"); if(bs && bs.casting && bs.dir && !tideSheltered(me.x, me.y, bs.dir)) return "🪨 Get behind a reef rock before the Breaker hits!";
+      const salted = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "saltcrust"));
+      if(salted.length && ss && (ss.casting || ss.timer < 6)) return `🧂 Cleanse ${arcName(S.party[salted[0]])} before the Surge shatters the crust!`;
+    }
+    return null;
+  }
+
+  // ---------- new marks ----------
+  DEBUFFS.heldunder = { name:"Held Under", bane:true, noCleanse:true, interval:1, ticks:6, maxStacks:1,
+    desc:"Dragged beneath the water: can't move, and drowning every second. Wax Ward gives them air and frees them at once." };
+  DEBUFFS.saltcrust = { name:"Saltcrust", interval:1, ticks:14, maxStacks:1,
+    desc:"Crusted in salt. If the next Tidal Surge dashes you against a rock or wall, the crust shatters for double damage. Cleanse it first." };
+  EM_ROOT_IDS.heldunder = 1;
+
+  // ---------- the bosses ----------
+  (function(){
+    const MK = ENEMY_KINDS.murk, BC = ENEMY_KINDS.brinecolossus;
+    MK.ember = true; MK.emberTick = "tide"; MK.arcane = "tide"; MK.tide = "murk";
+    MK.phases = [ { at:0.5, tint:"#4fc3d9", everyMul:{}, note:"<b>Maelstrom.</b> A whirlpool opens in the middle of the chamber. Standing in it hurts, it grows with every Undertow, and the Undertow now drags everyone toward the whirlpool instead of toward Murk. Stand well away from it when he winds up." } ];
+    MK.mechanics = [
+      { id:"undertow", name:"Undertow", kind:"undertow", every:14, first:8, windup:2.0, range:150, pullDist:40, dmg:[10,14], exceptRole:"tank", ramp:0.12, maelstromP2:true,
+        trigger:"Every ~14s, after a 2s wind-up, the Undertow drags everyone except Kessa toward Murk, dealing damage and interrupting any cast. Each Held Under that runs its course adds Pressure: +12% to its damage and pull, up to 3.",
+        counter:"Don't be mid-cast when it lands, and step back out afterwards. In phase 2 it drags you toward the whirlpool: stand far from it." },
+      { id:"bilgesurge", name:"Bilge Surge", kind:"groundPool", anchorRole:"nontank", every:15, first:11, windup:1.6, radius:45, growPerAdd:0.1, growCap:0.3, tickDmg:9, tickInterval:0.5, duration:6,
+        trigger:"Every ~15s, a pool begins forming under a random party member other than Kessa (you included), with a 1.6s telegraph. Every Silt Crawler alive when it fires makes it 10% bigger (up to +30%).",
+        counter:"Step out of the circle before it surges. Kill the Crawlers to keep it small." },
+      { id:"siltcrawlers", name:"Silt Crawlers", kind:"addWave", every:20, addKind:"add",
+        addNames:["Silt Crawler","Silt Crawler"], spawnPoints:[{dx:-85,dy:-85},{dx:-85,dy:85}],
+        trigger:"Every ~20s, two Silt Crawlers spawn at the chamber's edges.",
+        counter:"Kill them quickly. Left alive, they hit the party and swell every Bilge Surge." },
+      { id:"heldunder", name:"Held Under", kind:"script", fn:"heldunder", every:18, first:13, dur:6, dmg:[9,12], verb:"WAX WARD", color:"var(--shield)",
+        trigger:"Every ~18s, Murk drags a party member other than Kessa beneath the water: they can't move and take damage every second for 6s.",
+        counter:"Wax Ward them: the shield is an air pocket and frees them at once. Otherwise heal them through it. Each one left to run its course adds Pressure; each one freed clears a stack." },
+    ];
+    BC.ember = true; BC.emberTick = "tide"; BC.arcane = "tide"; BC.tide = "colossus";
+    BC.pillarLayout = [[0.24,0.28,26,{reef:true}],[0.74,0.22,26,{reef:true}],[0.28,0.76,26,{reef:true}],[0.76,0.74,26,{reef:true}]];
+    BC.phases = [ { at:0.5, tint:"#5cc8ff", everyMul:{}, note:"<b>Rogue Wave.</b> Tidal Surge no longer pushes away from her: it rolls in from a random edge (big arrows show which way) and shoves everyone the same direction. Keep rocks and walls out of the way downstream of you." } ];
+    BC.mechanics = [
+      { id:"tidalsurge", name:"Tidal Surge", kind:"script", fn:"surge", bulwark:true, every:17, first:10, windup:2.2, pushDistance:110, slamDmg:[24,32], ramp:0.12, rogueP2:true, verb:"FIND SPACE", color:"var(--brine)",
+        trigger:"Every ~17s she rears back for 2.2s, then slams the tide flat, shoving everyone straight away from her. Anyone dashed against a reef rock or wall takes a heavy hit and adds Battered: +12% on the next Surge, up to 3.",
+        counter:"Make sure there's open floor behind you (a red X marks where you'd hit and a blue ring the nearest clear spot). Companions sidestep on their own. A Surge that dashes nobody clears a Battered stack." },
+      { id:"saltcrust", name:"Saltcrust", kind:"debuffApply", every:13, first:6, debuff:"saltcrust", verb:"CLEANSE", color:"var(--arcane)",
+        trigger:"Every ~13s, a party member crusts over with salt. If the next Surge dashes them into a rock or wall, the crust shatters for double damage.",
+        counter:"Cleanse it before the Surge, starting with whoever is standing nearest a rock or wall." },
+      { id:"breaker", name:"Breaker", kind:"script", fn:"breaker", every:20, first:16, windup:3, dmg:[30,40], verb:"SHELTER", color:"var(--shield)",
+        trigger:"Every ~20s (never right before a Surge), a wall of water rolls across the chamber from one edge, with a 3s warning (arrows show its direction). Anyone not sheltered behind a reef rock is hit hard and swept along.",
+        counter:"Get into the lee of a reef rock: the green circles behind each rock are safe. Companions shelter on their own." },
+    ];
+  })();
+  if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { tideUndertowCtx, tideLandsShort, tideSheltered });
 
   function kindMechs(k){ return k ? (k.mechanics || k.miniMechanics) : undefined; }
   const MINI_POOL = { ember:["slagmaw","cinderoracle","broodkiln"], tide:["undertoad","drownedcantor","brinematron"], thicket:["bramblehulk","sporecap","seedpod"], gloom:["barrowknight","dirgekeeper","gravecaller"], iron:["forgeguard","gearwarden","gearhive"], arcane:["runegolem","glyphweaver","riftmother"] }; // other families get theirs in later rounds
@@ -5017,9 +5257,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // room grows up/down about its centre and to the right, attached bays
   // (safe rooms, alcoves) move with the walls, and everything inside is
   // remapped proportionally. Keyed by boss kind so procedural runs reuse it.
-  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[250,230], brogar:[340,380], thornmother:[280,260], ironsentinel:[250,280],
+  const BOSS_ARENA_SIZE = { ashguard:[320,280], murk:[360,320], brogar:[340,380], thornmother:[280,260], ironsentinel:[250,280],
     hollowchoir:[250,210], riftboundcustodian:[380,300], wickfadedwidow:[240,220], ossric:[400,350], gravewellchoir:[360,360],
-    karrick:[500,440], verdantmaw:[310,260], ysolt:[340,300], brinecolossus:[320,280], kestin:[440,380], cartographer:[440,400] };
+    karrick:[500,440], verdantmaw:[310,260], ysolt:[340,300], brinecolossus:[360,320], kestin:[440,380], cartographer:[440,400] };
   // Round 123: every boss arena is 20% larger (each side) than its Round 110 size.
   // One knob; hand-authored (growBossArena) and procedural (generateDungeon) both read it.
   const BOSS_ARENA_SCALE = 1.2;
@@ -18865,8 +19105,8 @@ thrall(){return gs(14)+
               if(!st.casting && st.timer<=0){
                 const anchorRole = mech.anchorRole || "self";
                 let anchor;
-                if(anchorRole==="random"){
-                  const aliveKeys = Object.keys(S.party).filter(k=>S.party[k].alive);
+                if(anchorRole==="random" || anchorRole==="nontank"){ // tideReworkV1: nontank
+                  const aliveKeys = Object.keys(S.party).filter(k=>S.party[k].alive && (anchorRole!=="nontank" || k!=="tank"));
                   anchor = aliveKeys.length ? S.party[aliveKeys[Math.floor(Math.random()*aliveKeys.length)]] : null;
                 } else {
                   anchor = S.party[anchorRole];
@@ -18944,17 +19184,18 @@ thrall(){return gs(14)+
                 st.castT += dt;
                 if(st.castT >= mech.windup){
                   st.casting = false; st.timer = mechEvery(e, mech);
-                  const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
+                  const _U = tideUndertowCtx(e, mech); // tideReworkV1
+                  const d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1])*_U.mul);
                   Object.entries(S.party).forEach(([key,m])=>{
                     if(!m.alive || key===mech.exceptRole) return;
-                    const dd = dist(m.x,m.y,e.x,e.y);
-                    if(mech.range && dd > mech.range) return;
+                    const dd = dist(m.x,m.y,_U.x,_U.y);
+                    if(_U.range && dd > _U.range) return;
                     damageMember(key, d, mech.name, e);
                     if(key==="self" && m.casting){ m.casting = null; pushLog("event", `The ${mech.name} interrupts your cast!`); }
-                    const move = Math.min(mech.pullDist, Math.max(0, dd-(30+bossReach(e))));
+                    const move = Math.min(_U.pull, Math.max(0, dd-_U.stop));
                     if(move>0 && dd>0.001){
                       for(const f of [1,0.5,0.25]){
-                        const nx = m.x+(e.x-m.x)/dd*move*f, ny = m.y+(e.y-m.y)/dd*move*f;
+                        const nx = m.x+(_U.x-m.x)/dd*move*f, ny = m.y+(_U.y-m.y)/dd*move*f;
                         if(walkable(nx,ny)){ pushEntity(m, nx, ny, { dur:Math.min(0.5, 0.18+move*f/450), arc:0 }); break; }
                       }
                     }
@@ -32517,7 +32758,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 176ea40ec9) */
+<script>/* phone app: offline cache (build db0e811a55) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
