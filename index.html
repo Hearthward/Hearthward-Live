@@ -2565,7 +2565,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 
   const ENEMY_KINDS = {
     dummy: { hp:100000, dmg:[0,0], atkEvery:999, r:16, color:"#c9a86a", label:"Target Dummy", excludeFromCompletion:true, dummy:true },
-    husk:  { hp:150, dmg:[16,24], atkEvery:1.6, r:13, color:"var(--wall)", label:"Husk" },
+    husk:  { hp:150, dmg:[11,17], atkEvery:1.6, r:13, color:"var(--wall)", label:"Husk" },
     whelp: { hp:85,  dmg:[9,15],  atkEvery:1.0, r:10, color:"var(--ember)", label:"Cinder Whelp" },
     // A small, generic add-kind reused by every boss's addWave mechanic
     // (see mkEnemy calls below) — each mkEnemy() call gives it its own
@@ -5252,7 +5252,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   };
   const ELITE_IDS = Object.keys(ELITE_DEFS);
   const ELITE_OK_KINDS = new Set(["husk","whelp","slinger","acolyte","chanter","warder","anchorite","ritualist"]);
-  const ELITE_FIRST = [2, 3.5], ELITE_REPEAT = [15, 19];
+  const ELITE_FIRST = [2, 3.5], ELITE_REPEAT = [8, 10]; // balanceV1: was 15-19
   const ELITE_SINGLE_P = 0.22, ELITE_DUO_P = 0.08; // per eligible main-path pack: ~1 fight in 3, about 1 in 12 an elite duo with no other trash
   // Post-pass over a generated dungeon's packs (own PRNG, so the layout RNG is untouched). Optional/spur packs, dormant
   // packs and the boss are never touched; at least one elite is guaranteed once there are 3+ eligible packs.
@@ -5291,7 +5291,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     };
     if(kindMechs(k)){
       e.mech = {};
-      kindMechs(k).forEach(m=>{ e.mech[m.id] = { timer: (m.first!=null ? m.first : m.every*0.5), casting:false, castT:0 }; }); if(k.ember) emberOnSpawn(e, k);
+      kindMechs(k).forEach(m=>{ let t0 = (m.first!=null ? m.first : m.every*0.5); if(k.phases && !k.raid) t0 = Math.max(Math.min(t0, 5), t0*0.6); /* balanceV1: boss first casts x0.6, min 5 s */ e.mech[m.id] = { timer: t0, casting:false, castT:0 }; }); if(k.ember) emberOnSpawn(e, k);
     }
     return e;
   }
@@ -8612,7 +8612,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   const KEYSTONE_TIMER_STEP = 50;
   function keystoneTimer(level){ return level<=0 ? KEYSTONE_BASE_TIMER : KEYSTONE_BASE_TIMER + (level-1)*KEYSTONE_TIMER_STEP; }
 
-  const DUNGEON_BASE_HP = 1.5, DUNGEON_BASE_DMG = 6, DUNGEON_BASE_RAMP = 20; // keystone +1 and up: dungeon baseline (the per-level steps below scale from here), phased in from +1 (no change) to full at +20
+  const DUNGEON_BASE_HP = 1.5, DUNGEON_BASE_DMG = 6, DUNGEON_BASE_RAMP = 20, DUNGEON_BASE_DMG_RAMP = 60; // balanceV1: damage reaches full at +60 // keystone +1 and up: dungeon baseline (the per-level steps below scale from here), phased in from +1 (no change) to full at +20
+  function dunBaseMulR(full, level, ramp){ const f = Math.max(0, Math.min(1, (level-1)/(ramp-1))); return 1 + (full-1)*f; } // balanceV1
   function dunBaseMul(full, level){ const f = Math.max(0, Math.min(1, (level-1)/(DUNGEON_BASE_RAMP-1))); return 1 + (full-1)*f; }
   const KEYSTONE_HP_STEP = 0.05;  // Round 66: was 0.10 — halved alongside DMG_STEP now that the same 13.5x gear-power climb (Common Q1 -> Hearthfired Q5) is spread over roughly double the levels (bands now span 20 levels each instead of 10 — see the rarity-band rework below), so the two curves stay in the same relative relationship they always had, not suddenly softer or harder against gear.
   const KEYSTONE_DMG_STEP = 0.03; // Round 66: was 0.06, same reasoning as HP_STEP above — kept
@@ -8752,7 +8753,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   const KEYSTONE_MODIFIER_ORDER = ["bursting","quickening","sanguine","fortified","volcanic",
     "necrotic","spiteful","bolstering","afflicted","grievous","incorporeal","storming","explosive","quaking","provoked"];
   const KEYSTONE_MODIFIER_CAP = 5;        // max simultaneously active, independent of pool size
-  const KEYSTONE_MODIFIER_TIER_SPAN = 10; // levels per +1 modifier count
+  const KEYSTONE_MODIFIER_TIER_SPAN = 20; // balanceV1: was 10 // levels per +1 modifier count
 
   // Round 61: tags describing what CATEGORY of thing a modifier does,
   // separate from the id-pair MODIFIER_EXCLUSION_GROUPS below — so a new
@@ -10961,10 +10962,16 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     // against the party (see scaledEnemyDmg); keystoneHpMul is applied once,
     // here, since enemy HP doesn't change mid-run.
     S.keystoneHpMul = keystoneHpMul(level) * (S.mods.includes("fortified") ? FORTIFIED_HP_MUL : 1) * PARTY_DUAL_DPS_HP_MUL * (level>0 ? dunBaseMul(S._simDunHp||DUNGEON_BASE_HP, level) : 1);
-    S.keystoneDmgMul = keystoneDmgMul(level) * (S.mods.includes("fortified") ? FORTIFIED_DMG_MUL : 1) * (level>0 ? dunBaseMul(S._simDunDmg||DUNGEON_BASE_DMG, level) : 1);
+    S.keystoneDmgMul = keystoneDmgMul(level) * (S.mods.includes("fortified") ? FORTIFIED_DMG_MUL : 1) * (level>0 ? dunBaseMulR(S._simDunDmg||DUNGEON_BASE_DMG, level, DUNGEON_BASE_DMG_RAMP) : 1);
     [...S.packs.flatMap(p=>p.enemies), ...S.boss.enemies].forEach(e=>{
       e.hp = Math.round(e.hp*S.keystoneHpMul); e.maxHp = e.hp;
     });
+    if(level>0 && !S.arena){ // balanceV1: bosses and elites live long enough for their mechanics to matter
+      const M = bossHpMulFor(level);
+      S.boss.enemies.forEach(e=>{ if(FAMILY_BY_BOSS[e.kind]){ e.hp = Math.round(e.hp*M); e.maxHp = e.hp; } });
+      S.packs.forEach(p=>p.enemies.forEach(e=>{ if(e.elite){ e.hp = Math.round(e.hp*ELITE_HP_MUL); e.maxHp = e.hp; } }));
+    }
+    S.strain = { n:0, last:-99, hitAt:{} };
 
     // "Forces cleared" bar: sum every living pack enemy's weight (bosses are
     // worth 0 — see enemyWeight), then require just enough of that total
@@ -12888,7 +12895,65 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // isDot (optional) marks a damage-over-time source (a lingering debuff
   // tick or a ground pool tick) — used by Fortified Stance, which only
   // weakens that kind of damage, not a direct hit.
+  // ---- balanceV1: boss HP curve, failed-mechanic damage, Strain, basic attacks on non-tanks ----
+  const ELITE_HP_MUL = 4, BAL_STRAIN_DMG = 0.40, BAL_STRAIN_AUTO = 0.05, BAL_STRAIN_DECAY = 15, BAL_NT_AUTO = 0.5;
+  function bossHpMulFor(K){ return K<=80 ? 1.2 + 0.012*(K-1) : Math.min(3.8, 2.15 + 0.022*(Math.min(K,200)-80)); }
+  // srcName -> [share of the victim's max HP, mode, who]. who: self = only a failure when it lands on the healer (Harpoon), others = only on allies (Chain Arc's jumps). x = scale from the mechanic's nominal damage (answers that reduce the
+  // hit keep reducing it), r = set directly (no nominal), z = zone tick (scale from nominal, failure counted once per 4 s).
+  const MECH_FAIL = {
+    "Emberfall":[0.35], "Toll for One":[0.35], "Forward Peal":[0.35], "Anvil Strike":[0.35], "Cinderburst":[0.35], "Molten Lash":[0.35],
+    "Tidal Surge":[0.35], "Breaker":[0.35], "Foretold Lances":[0.35], "Cone":[0.35], "Soak":[0.35], "Harpoon":[0.25,"x","self"], "Chain Arc":[0.20,"x","others"],
+    "Tolling Wave":[0.25], "Snuffing Wail":[0.25], "Ripening":[0.25], "Double Toll":[0.25,"r"], "Crescendo":[0.25,"r"],
+    "Scorched Earth":[0.05,"z"], "Bilge Surge":[0.05,"z"], "Thorned Bloom":[0.05,"z"], "Choking Canopy":[0.05,"z"], "Corrosive Tide":[0.05,"z"],
+    "Fourfold Gaze":[0.05,"z"], "Redraw":[0.05,"z"], "Pinned":[0.06,"z"], "Held Under":[0.06,"z"], "Grinding Gears":[0.06,"z"], "Undertow":[0.05,"z"],
+    "Grave Bell":[0.05,"rz"], "Endless Harmony":[0.05,"rz"], "Thorn thicket":[0.03,"rz"],
+  };
+  let _balNom = null;
+  function balNominal(src){
+    if(!_balNom){ _balNom = {};
+      const av = d=> Array.isArray(d) ? (d[0]+d[1])/2 : (typeof d==="number" ? d : 0);
+      Object.keys(FAMILY_BY_BOSS).forEach(kid=>{ const k = ENEMY_KINDS[kid]; if(!k) return; const all = [];
+        (k.phases||[]).forEach(p=>(p.mechanics||[]).forEach(m=>all.push(m))); (kindMechs(k)||[]).forEach(m=>all.push(m));
+        all.forEach(m=>{ const v = av(m.dmg) || av(m.slamDmg) || av(m.tickDmg); if(v && !_balNom[m.name]) _balNom[m.name] = v; }); });
+      Object.values(ELITE_DEFS).forEach(D=>{ const v = av(D.dmg); if(v && !_balNom[D.name]) _balNom[D.name] = v; }); }
+    return _balNom[src] || 0;
+  }
+  function balIsBossOrElite(se){ return !!(se && (se.elite || FAMILY_BY_BOSS[se.kind])); }
+  function balAdjust(key, amount, src, se, isDot){
+    if(S.arena || !(S.level>0) || typeof src!=="string") return amount;
+    const m = S.party[key]; if(!m) return amount;
+    const ST = S.strain || (S.strain = { n:0, last:-99, hitAt:{} });
+    if(se && src===se.name){ // a basic attack
+      if(key!=="tank") amount *= BAL_NT_AUTO;
+      if(ST.n>0 && balIsBossOrElite(se)) amount *= 1 + BAL_STRAIN_AUTO*ST.n;
+      return amount;
+    }
+    const f = MECH_FAIL[src]; if(!f) return amount;
+    if((f[2]==="self" && key!=="self") || (f[2]==="others" && key==="self")) return amount; // Harpoon caught by an ally / Chain Arc's first strike: the intended outcome, not a failure
+    const pct = f[0], mode = f[1]||"x", zone = mode.indexOf("z")>=0;
+    const target = pct * m.maxHp * (1 + BAL_STRAIN_DMG*ST.n);
+    const nom = mode.indexOf("r")>=0 ? 0 : balNominal(src) * (S.keystoneDmgMul||1);
+    const ratio = nom>0 ? amount/nom : 1;
+    const out = nom>0 ? target*ratio : target;
+    if(ratio >= 0.6){ // a real failure, not one the answer mostly absorbed
+      const now = S.runTimer||0, gap = zone ? 4 : 2;
+      if(now - (ST.hitAt[src]==null ? -99 : ST.hitAt[src]) > gap){
+        ST.hitAt[src] = now; ST.n++; ST.last = now; if(S._simStrainLog) S._simStrainLog.push(src+'|'+key+'|'+Math.round(ratio*100));
+        spawnFloatingText(m.x, m.y-34, "STRAIN ×"+ST.n, "var(--blood)");
+        pushLog("event", `${src} lands: Strain builds (×${ST.n}). Each stack makes failed mechanics and the boss's blows hit harder.`);
+      }
+    }
+    return out;
+  }
+  function balTick(dt){
+    const ST = S.strain; if(!ST) return;
+    if(S.engagedGroups.size===0){ if(ST.n) ST.n = 0; return; }
+    const now = S.runTimer||0;
+    if(ST.n>0 && now - ST.last >= BAL_STRAIN_DECAY){ ST.n--; ST.last = now; spawnFloatingText(S.party.self.x, S.party.self.y-40, ST.n ? "STRAIN ×"+ST.n : "STRAIN EASES", "var(--moss)"); }
+  }
+  try{ if(typeof window!=="undefined") window.__bal = { bossHpMulFor, balAdjust, balTick, modifierCountForLevel:(l)=>modifierCountForLevel(l), MECH_FAIL }; }catch(_){} // test hook
   function damageMember(key, amount, srcName, sourceEnemy, isDot){
+    amount = balAdjust(key, amount, srcName, sourceEnemy, isDot); // balanceV1
     irnFeedback(key, amount, srcName); // ironReworkV1: Feedback echoes 40% to the linked partner
     const m = S.party[key];
     if(!m || !m.alive) return 0;
@@ -13596,6 +13661,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       wisp._slowT = 9999; wisp._slowMul = SPITEFUL_SLOW_MUL;
       group.enemies.push(wisp);
       pushLog("event", `${enemy.name} releases a Vengeful Wisp on death!`);
+    }
+    if(group.id==="boss" && !(S.arena && S.arena.raid)){ // balanceV1
+      const mains = group.enemies.filter(x=>FAMILY_BY_BOSS[x.kind]);
+      if(mains.length && mains.every(x=>!x.alive)) group.enemies.forEach(x=>{ if(x.alive){ x.alive = false; x.hp = 0; } });
     }
     if(livingEnemiesOf(group).length===0){
       group.cleared = true; group.engaged=false;
@@ -20917,7 +20986,7 @@ thrall(){return gs(14)+
         spawnActFx("blast", b.x, b.y, { rad: BURSTING_RADIUS }); // Round 123
         Object.entries(S.party).forEach(([key,m])=>{
           if(m.alive && dist(m.x,m.y,b.x,b.y) < BURSTING_RADIUS){
-            damageMember(key, scaledEnemyDmg(22,32), `${b.name}'s burst`);
+            damageMember(key, scaledEnemyDmg(11,16), `${b.name}'s burst`); // balanceV1: was 22-32
           }
         });
       }
@@ -26088,7 +26157,9 @@ thrall(){return gs(14)+
       }
     });
     out.sort((a,b)=> (a.now===b.now) ? a.secs-b.secs : (a.now?-1:1));
-    return out.slice(0, limit||2);
+    const _o = out.slice(0, limit||2);
+    if(S.strain && S.strain.n>0) _o.push({ id:"strain", verb:"STRAIN ×"+S.strain.n, color:"var(--blood)", now:false, secs:0, keep:true }); // balanceV1
+    return _o;
   }
   function updateBossBanner(){
     const el = document.getElementById("bossBanner");
@@ -33730,6 +33801,7 @@ thrall(){return gs(14)+
       tickTraps(dt); // Round 152
       tickForcedMoves(dt); // Round 152: after every AI/steering step so a shove always wins the frame
       tickPendingBursts(dt); // Round 126: was defined in Round 64 but never called, so bursts never resolved
+      balTick(dt); // balanceV1
       tickAfflicted(dt);
       tickIncorporeal(dt);
       tickStorming(dt);
@@ -33798,7 +33870,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build a75c819567) */
+<script>/* phone app: offline cache (build 16298e4cd9) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
