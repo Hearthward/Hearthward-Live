@@ -318,6 +318,7 @@
   .arBtn{ border-radius:999px; color:var(--text); }
   .arBtn:hover, .arSeg button:hover{ border-color:var(--accent-strong); color:var(--text); }
   .arSeg{ display:flex; align-items:center; }
+  .arSeg[hidden], .arRaidGuide[hidden]{ display:none !important; } /* raidHideV1 */
   .arSeg .arLbl{ font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); margin-right:8px; }
   .arSeg button{ border-radius:0; margin-left:-1px; }
   .arSeg .arLbl + button{ border-radius:999px 0 0 999px; margin-left:0; }
@@ -29232,6 +29233,7 @@ thrall(){return gs(14)+
     bucket[src] = (bucket[src]||0) + amt;
   }
   function arenaStart(keep, raidOpts, tutOpts){
+    if(raidOpts && !(TEST_TOOLS || raidUnlocked())) raidOpts = null; // raidHideV1: no raid fights without access
     const prev = keep && S.arena ? S.arena : null;
     S.arena = { tut: tutOpts ? { i:-1 } : null, multi: prev ? prev.multi : false, dmg: prev ? prev.dmg : "off", dmgT:0, uiT:0, m:{ first:null, dmg:{}, heal:{} },
       raid: prev && prev.raid ? prev.raid : (raidOpts ? { stage:raidOpts.stage||0, level:raidOpts.level||0, auto:true, fit:false, times:{}, wipes:{}, t:0, state:"fight" } : null) };
@@ -33796,7 +33798,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 686fabf01f) */
+<script>/* phone app: offline cache (build a75c819567) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
