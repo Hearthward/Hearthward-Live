@@ -4404,7 +4404,11 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         ctx.restore();
       }
     },
-    hazards(e, mech, st){ if(!st.casting) return []; const test = (x,y)=>tideLandsShort(e, mech, st, x, y); return [{ fn:test, esc:(m)=>tideSafeEsc(test, m) }]; },
+    hazards(e, mech, st){ if(!st.casting) return []; const test = (x,y)=>tideLandsShort(e, mech, st, x, y);
+      return [{ hold:true, fn:test, esc:(m)=>{ // tune3V1: first look along the line toward her, then anywhere nearby
+        const d = dist(m.x, m.y, e.x, e.y);
+        for(let t=20; t<d-35; t+=15){ const x = m.x+(e.x-m.x)/d*t, y = m.y+(e.y-m.y)/d*t; if(walkable(x, y) && !test(x, y)) return { x:x-m.x, y:y-m.y }; }
+        return tideSafeEsc(test, m); } }]; },
   };
   function tideSheltered(x, y, dir){ return segmentBlockedByPillar(x, y, x-dir.x*420, y-dir.y*420); }
   EMBER_MECH.breaker = {
@@ -4432,7 +4436,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     hazards(e, mech, st){
       if(!st.casting || !st.dir) return [];
       const dir = st.dir, test = (x,y)=>!tideSheltered(x, y, dir);
-      return [{ fn:test, esc:(m)=>{
+      return [{ hold:true, fn:test, esc:(m)=>{
         let best = null, bd = Infinity;
         PILLAR_DEFS.forEach(p=>{ if(p.shattered || p.blocksLOS===false || p.lava) return; const lx = p.x+dir.x*(p.r+16), ly = p.y+dir.y*(p.r+16); if(!walkable(lx, ly)) return; const dd = dist(m.x,m.y,lx,ly); if(dd<bd){ bd = dd; best = { x:lx-m.x, y:ly-m.y }; } });
         return best || { x:0, y:0 }; } }];
@@ -4712,6 +4716,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function thkHazards(e, k, hz){
     const em = emOf(e);
     if(em.ring) hz.push({ inv:true, x:em.ring.x, y:em.ring.y, radius:Math.max(30, em.ring.R - HAZARD_SAFE_MARGIN - 16) });
+    PILLAR_DEFS.forEach(t=>{ if(t.thicket) hz.push({ x:t.x, y:t.y, radius:t.r + 10 + HAZARD_SAFE_MARGIN }); }); // tune3V1
   }
   function thkHint(e, k){
     const me = S.party.self, em = emOf(e);
@@ -5110,12 +5115,14 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     draw(e, mech, st, progress){
       if(st.casting){ irnBeams(e, mech, { spin:{ ang:st.ang0 } }).forEach(b=>drawLineTelegraph(e.x, e.y, b.x2, b.y2, mech.width, progress, "var(--wall)")); }
     },
-    hazards(e, mech, st){
-      const out = [];
-      const add = (ang)=>irnBeams(e, mech, { spin:{ ang } }).forEach(b=>out.push({ line:true, x1:e.x, y1:e.y, x2:b.x2, y2:b.y2, radius:mech.width+HAZARD_SAFE_MARGIN }));
-      if(st.spin){ const sp = (e._phase||0)>0 ? mech.speed*1.25 : mech.speed; add(st.spin.ang); add(irnAng(st.spin.ang + sp*0.5)); }
-      else if(st.casting) add(st.ang0);
-      return out;
+    hazards(e, mech, st){ // tune3V1: will the beam reach you in the next 0.8 s? then keep ahead of it
+      if(!st.spin && !(st.casting && st.ang0!=null)) return [];
+      const sp = (e._phase||0)>0 ? mech.speed*1.25 : mech.speed, look = 0.8, margin = mech.width + HAZARD_SAFE_MARGIN;
+      const beams = ()=>{ const b0 = st.spin ? st.spin.ang : st.ang0, out = [b0]; if((e._phase||0)>0) out.push(irnAng(b0+180)); return out; };
+      const test = (x,y)=>{ const d = dist(x, y, e.x, e.y); if(d > mech.len + margin) return false; const a = angleOf(x-e.x, y-e.y), tol = Math.atan2(margin, Math.max(1, d))*180/Math.PI;
+        return beams().some(b=>{ const rel = ((a - b) % 360 + 360) % 360; return rel <= (st.spin ? sp*look : 0) + tol || rel >= 360 - tol; }); };
+      return [{ fn:test, esc:(m)=>{ const d = Math.max(50, dist(m.x, m.y, e.x, e.y)), a = angleOf(m.x-e.x, m.y-e.y);
+        const tgt = irnAng(a + 45)*Math.PI/180; return { x:e.x + Math.cos(tgt)*d - m.x, y:e.y + Math.sin(tgt)*d - m.y }; } }].concat(st.spin ? [{ x:e.x, y:e.y, radius:Math.max(50, mech.width*2 + 6) }] : []); // run ahead of the sweep (crossing it means getting hit); melee is inside the beam's hub, so step out while it spins
     },
   };
   function irnBeams(e, mech, st){
@@ -10975,7 +10982,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     });
     if(level>0 && !S.arena){ // balanceV1: bosses and elites live long enough for their mechanics to matter
       const M = bossHpMulFor(level);
-      S.boss.enemies.forEach(e=>{ if(FAMILY_BY_BOSS[e.kind]){ e.hp = Math.round(e.hp*M); e.maxHp = e.hp; } });
+      S.boss.enemies.forEach(e=>{ if(FAMILY_BY_BOSS[e.kind]){ e.hp = Math.round(e.hp*M*(BOSS_HP_TUNE[e.kind]||1)); e.maxHp = e.hp; } });
       S.packs.forEach(p=>p.enemies.forEach(e=>{ if(e.elite){ e.hp = Math.round(e.hp*ELITE_HP_MUL); e.maxHp = e.hp; } }));
     }
     S.strain = { n:0, last:-99, hitAt:{} };
@@ -12911,11 +12918,20 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     "Emberfall":[0.35], "Toll for One":[0.35], "Forward Peal":[0.35], "Anvil Strike":[0.35], "Cinderburst":[0.35], "Molten Lash":[0.35],
     "Tidal Surge":[0.35], "Dashed against the reef":[0.35], /* mpTideV1 */ "Breaker":[0.35], "Foretold Lances":[0.35], "Cone":[0.35], "Soak":[0.35], "Harpoon":[0.25,"x","self"], "Chain Arc":[0.20,"x","others"],
     "Tolling Wave":[0.25], "Snuffing Wail":[0.25], "Ripening":[0.25], "Double Toll":[0.25,"r"], "Crescendo":[0.25,"r"],
-    "Scorched Earth":[0.05,"z"], "Bilge Surge":[0.05,"z"], "Thorned Bloom":[0.05,"z"], "Choking Canopy":[0.05,"z"], "Corrosive Tide":[0.05,"z"],
+    "Scorched Earth":[0.05,"z"], "Bilge Surge":[0.05,"z"], "Thorned Bloom":[0.05,"z"], "Choking Canopy":[0.08,"z"], "Corrosive Tide":[0.08,"z"], /* tune1V1: was 5% */
     "Fourfold Gaze":[0.05,"z"], "Redraw":[0.05,"z"], "Pinned":[0.06,"z"], "Held Under":[0.06,"z"], "Grinding Gears":[0.06,"z"],
     "Grave Bell":[0.05,"rz"], "Endless Harmony":[0.05,"rz"], "Thorn thicket":[0.03,"rz"],
   };
   const BAL_ALIAS = { "Dashed against the reef":"Tidal Surge" }; // mpTideV1: damage name -> the mechanic it belongs to
+  const ZONE_FAIL_PER_SEC = 0.12; // tune3V1: a 2 s slip in any zone costs about as much as a missed blast
+  const ZONE_FAIL_IV = { "Scorched Earth":0.5, "Bilge Surge":0.5, "Thorned Bloom":0.5, "Choking Canopy":0.75, "Corrosive Tide":0.75,
+    "Fourfold Gaze":1, "Redraw":0.5, "Pinned":0.5, "Held Under":1, "Grinding Gears":0.5, "Thorn thicket":1 };
+  Object.keys(ZONE_FAIL_IV).forEach(n=>{ if(MECH_FAIL[n]) MECH_FAIL[n][0] = ZONE_FAIL_PER_SEC*ZONE_FAIL_IV[n]; });
+  function balTankExempt(src){ // tune2V1: Kessa takes these on purpose
+    if(src==="Cinderburst") return true;
+    if(src==="Emberfall") return !(S.soakZones && S.soakZones.length); // phase 2's shared circle is a real check for her too
+    return false;
+  }
   let _balNom = null;
   function balNominal(src){
     if(!_balNom){ _balNom = {};
@@ -12937,9 +12953,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       return amount;
     }
     const f = MECH_FAIL[src]; if(!f) return amount;
-    if((f[2]==="self" && key!=="self") || (f[2]==="others" && key==="self")) return amount; // Harpoon caught by an ally / Chain Arc's first strike: the intended outcome, not a failure
+    if((f[2]==="self" && key!=="self") || (f[2]==="others" && key==="self") || (key==="tank" && balTankExempt(src))) return amount; // Harpoon caught by an ally / Chain Arc's first strike: the intended outcome, not a failure
     const pct = f[0], mode = f[1]||"x", zone = mode.indexOf("z")>=0;
-    const target = pct * m.maxHp * (1 + BAL_STRAIN_DMG*ST.n);
+    const target = pct * m.maxHp * (1 + (S._simStrainDmg!=null ? S._simStrainDmg : BAL_STRAIN_DMG)*ST.n); // tune3V1: sim knob
     const nom = mode.indexOf("r")>=0 ? 0 : balNominal(src) * (S.keystoneDmgMul||1);
     const ratio = nom>0 ? amount/nom : 1;
     const out = nom>0 ? target*ratio : target;
@@ -12959,7 +12975,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(S.arena || typeof src!=="string") return;
     const f = MECH_FAIL[src]; if(!f) return;
     const m = S.party[key]; if(!m || !m.alive) return;
-    if((f[2]==="self" && key!=="self") || (f[2]==="others" && key==="self")) return;
+    if((f[2]==="self" && key!=="self") || (f[2]==="others" && key==="self") || (key==="tank" && balTankExempt(src))) return;
     const nom = (f[1]||"x").indexOf("r")>=0 ? 0 : balNominal(src) * (S.level>0 ? (S.keystoneDmgMul||1) : 1);
     if(nom>0 && amount/nom < 0.6) return; // the answer absorbed most of it: that's a pass
     const now = S.runTimer||0;
@@ -12972,7 +12988,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function mfPulse(key, col){ (S._mfFx || (S._mfFx = [])).push({ key, col, t:0, dur:0.7 }); }
   function mfVignette(){ try{ const v = document.getElementById("mfVig"); if(!v) return; v.classList.remove("on"); void v.offsetWidth; v.classList.add("on"); }catch(_){} }
   function mfFailedSince(names, t0){ return (S._mfFails||[]).some(r=>r.t >= t0 && names.indexOf(r.src)>=0); }
+  function balStrainEase(){ const ST = S.strain; if(!ST || !(ST.n>0)) return; ST.n--; ST.last = S.runTimer||0;
+    spawnFloatingText(S.party.self.x, S.party.self.y-40, ST.n ? "STRAIN ×"+ST.n : "STRAIN EASES", "var(--moss)"); if(S._simStrainLog) S._simStrainLog.push("EASE|-|0"); }
   function mfResult(e, name, ok){
+    if(ok) balStrainEase(); // tune3V1
     if(ok) Object.keys(S.party).forEach(k=>{ const m = S.party[k]; if(m && m.alive && !m.downed) mfPulse(k, MF_OK); });
     (S._mfRes || (S._mfRes = {}))[mfEid(e)+"|"+name] = { ok, t:S.runTimer||0, name };
     if(S._simMfLog) S._simMfLog.push(name+"|"+(ok?"ok":"fail"));
@@ -12981,7 +13000,16 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(m.kind==="groundPool") return 1.5; // the pass is stepping out in time; later ticks only pulse red
     return Math.min(10, (m.duration || m.dur || 0) + 2);
   }
+  const COMP_LATE_P = 0.10, COMP_LATE_F = [0.55, 0.85]; // tune3V1: a late companion starts moving this far into the wind-up
+  function compLate(m){ return (m._lateT||0) > 0; }
+  function compLateRoll(m0){
+    const p = S._simCompLate!=null ? S._simCompLate : COMP_LATE_P; if(!(Math.random() < p)) return;
+    const keys = ["tank","dps","dpsCaster"].filter(k=>S.party[k] && S.party[k].alive && k!==S._compLateLast); if(!keys.length) return;
+    const k = keys[Math.floor(Math.random()*keys.length)]; S._compLateLast = k; const wu = (m0 && m0.windup) || 2; S.party[k]._lateT = Math.max(0.5, wu*(COMP_LATE_F[0] + Math.random()*(COMP_LATE_F[1]-COMP_LATE_F[0])));
+    if(S._simLateLog) S._simLateLog.push(k);
+  }
   function mfTick(dt){
+    ["tank","dps","dpsCaster"].forEach(k=>{ const m = S.party[k]; if(m && m._lateT>0) m._lateT -= dt; });
     if(S.arena) return;
     const now = S.runTimer||0;
     if(S._mfFx) S._mfFx = S._mfFx.filter(fx=>(fx.t += dt) < fx.dur);
@@ -12991,7 +13019,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         const st = e.mech[m.id]; if(!st || !MECH_FAIL[m.name]) return;
         const W = S._mfWatch || (S._mfWatch = {}), wk = mfEid(e)+"|"+m.id; // kept outside st: some mechanics replace their state object
         const on = !!(st.casting || st.active); // some mechanics keep running after the wind-up (beams, floods, the Gaze)
-        if(on && W[wk]==null) W[wk] = now;
+        if(on && W[wk]==null){ W[wk] = now; compLateRoll(m); } // tune3V1
         else if(!on && W[wk]!=null){ (S._mfPend || (S._mfPend = [])).push({ e, name:m.name, t0:W[wk], at:now + mfTail(m) }); delete W[wk]; }
       });
     }));
@@ -13025,9 +13053,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     const ST = S.strain; if(!ST) return;
     if(S.engagedGroups.size===0){ if(ST.n) ST.n = 0; return; }
     const now = S.runTimer||0;
-    if(ST.n>0 && now - ST.last >= BAL_STRAIN_DECAY){ ST.n--; ST.last = now; spawnFloatingText(S.party.self.x, S.party.self.y-40, ST.n ? "STRAIN ×"+ST.n : "STRAIN EASES", "var(--moss)"); }
+    // tune3V1: no timed decay; see balStrainEase (called on every passed mechanic)
   }
-  try{ if(typeof window!=="undefined") window.__bal = { bossHpMulFor, balAdjust, balTick, mfNote, mfTick, mfFailedSince, modifierCountForLevel:(l)=>modifierCountForLevel(l), MECH_FAIL }; }catch(_){} // test hook
+  try{ if(typeof window!=="undefined") window.__bal = { bossHpMulFor, balAdjust, balTick, balStrainEase, mfNote, mfTick, mfFailedSince, modifierCountForLevel:(l)=>modifierCountForLevel(l), MECH_FAIL }; }catch(_){} // test hook
+  const BOSS_HP_TUNE = { verdantmaw:0.8 }; // tune1V1: per-boss health trims on top of bossHpMulFor
   function damageMember(key, amount, srcName, sourceEnemy, isDot){
     mfNote(key, amount, srcName); // mechFxV1
     amount = balAdjust(key, amount, srcName, sourceEnemy, isDot); // balanceV1
@@ -18703,7 +18732,12 @@ thrall(){return gs(14)+
     }
     return null;
   }
-  function engageMovement(dt){
+  function engageMovement(dt){ // tune3V1: roots hold through every companion move (flee, spread, tether... all set x/y directly)
+    const held = ["tank","dps","dpsCaster"].map(k=>{ const m = S.party[k]; return (m && m.alive && emIsRooted(m)) ? [m, m.x, m.y] : null; }).filter(Boolean);
+    engageMovementInner(dt);
+    held.forEach(([m, x, y])=>{ m.x = x; m.y = y; });
+  }
+  function engageMovementInner(dt){
     ["tank","dps","dpsCaster"].forEach(k=>{ if(S.party[k]) S.party[k]._normPos = false; });
     if(S.engagedGroups.size===0) return;
     const tank = S.party.tank, dps = S.party.dps, dpsCaster = S.party.dpsCaster;
@@ -18845,6 +18879,12 @@ thrall(){return gs(14)+
       const curAngle = angleOf(m.x-e.x, m.y-e.y);
       const targetAngle = quadrantSafeCenterAngle(st);
       const signedDiff = ((targetAngle - curAngle + 540) % 360) - 180;
+      if(Math.abs(signedDiff) > 30){ // tune3V1: far wedge: cut across close to her instead of walking the arc
+        const rr = Math.max(28 + bossReach(e), Math.min(r, 70)), ta = targetAngle*Math.PI/180, tx = e.x + Math.cos(ta)*rr, ty = e.y + Math.sin(ta)*rr;
+        const dd = dist(m.x, m.y, tx, ty) || 1, stp = Math.min(dd, HAZARD_FLEE_SPEED*dt);
+        tryMove(m, m.x + (tx-m.x)/dd*stp, m.y + (ty-m.y)/dd*stp);
+        return true;
+      }
       const maxStepDeg = (HAZARD_FLEE_SPEED / r) * (180/Math.PI) * dt;
       const step = Math.abs(signedDiff) <= maxStepDeg ? signedDiff : Math.sign(signedDiff)*maxStepDeg;
       const rad = (curAngle + step) * Math.PI/180;
@@ -19010,6 +19050,10 @@ thrall(){return gs(14)+
       }
       return true;
     }
+    function tryHoldSafe(m){ // tune3V1: a hold hazard is winding up and you're clear of it: stay put
+      if(!m.alive || !hazards.some(h=>h.hold)) return false;
+      return !hazards.some(h=>h.fn && h.fn(m.x, m.y));
+    }
     function tryFlee(m){
       if(!m.alive) return false;
       const push = hazardPushback(m, hazards);
@@ -19113,7 +19157,7 @@ thrall(){return gs(14)+
       return true;
     }
     S._bossLead = null;
-    if(tank.alive && !tryEvacuate(tank) && !tryFlashfire(tank, true) && !trySoakSeek(tank) && !trySoundwaveDodge(tank) && !tryFragmentDodge(tank) && !tryQuadrantDodge(tank) && !tryTetherClose(tank) && !trySpreadAvoid(tank) && !tryTidalBrace(tank) && !tryFlee(tank) && !tryPullFromHazard(tank) && (tank._normPos = true)){
+    if(tank.alive && (compLate(tank) || !tryEvacuate(tank) && !tryFlashfire(tank, true) && !trySoakSeek(tank) && !trySoundwaveDodge(tank) && !tryFragmentDodge(tank) && !tryQuadrantDodge(tank) && !tryTetherClose(tank) && !trySpreadAvoid(tank) && !tryTidalBrace(tank) && !tryHoldSafe(tank) && !tryFlee(tank) && !tryPullFromHazard(tank)) && (tank._normPos = true)){
       const focus = tankFocusFor(tank);
       if(!focus) raidIdleFollow(tank, -34, 8, dt, hazards);
       if(focus){
@@ -19159,7 +19203,7 @@ thrall(){return gs(14)+
     // under the 40-unit melee-attack range) whenever there's a tank to anchor
     // "behind" against, so he isn't standing in the boss's face for frontal
     // cleaves/cones. Falls back to the old fixed offset if the tank is down.
-    if(dps.alive && !tryEvacuate(dps) && !tryFlashfire(dps, true) && !trySoakSeek(dps) && !trySoundwaveDodge(dps) && !tryFragmentDodge(dps) && !tryQuadrantDodge(dps) && !tryTetherClose(dps) && !trySpreadAvoid(dps) && !tryTidalBrace(dps) && !tryShelterBehindPillar(dps) && !tryCatchTank(dps) && !tryFlee(dps) && (dps._normPos = true)){
+    if(dps.alive && (compLate(dps) || !tryEvacuate(dps) && !tryFlashfire(dps, true) && !trySoakSeek(dps) && !trySoundwaveDodge(dps) && !tryFragmentDodge(dps) && !tryQuadrantDodge(dps) && !tryTetherClose(dps) && !trySpreadAvoid(dps) && !tryTidalBrace(dps) && !tryShelterBehindPillar(dps) && !tryCatchTank(dps) && !tryHoldSafe(dps) && !tryFlee(dps)) && (dps._normPos = true)){
       const focus = priorityTargetFor(dps);
       if(!focus) raidIdleFollow(dps, 34, 8, dt, hazards);
       if(focus){
@@ -19173,7 +19217,7 @@ thrall(){return gs(14)+
     // target enemy — see CASTER_TANK_STANDOFF_MIN/MAX above. If Kessa's down,
     // fall back to standing off from her own focus enemy so she isn't stuck
     // orbiting a corpse.
-    if(dpsCaster.alive && !tryEvacuate(dpsCaster) && !tryFlashfire(dpsCaster, true) && !trySoakSeek(dpsCaster) && !trySoundwaveDodge(dpsCaster) && !tryFragmentDodge(dpsCaster) && !tryQuadrantDodge(dpsCaster) && !tryTetherClose(dpsCaster) && !trySpreadAvoid(dpsCaster) && !tryTidalBrace(dpsCaster) && !tryShelterBehindPillar(dpsCaster) && !tryCatchTank(dpsCaster) && !tryFlee(dpsCaster) && !tryRegainCasterLoS(dpsCaster) && !tryReachDistantFocus(dpsCaster) && (dpsCaster._normPos = true)){
+    if(dpsCaster.alive && (compLate(dpsCaster) || !tryEvacuate(dpsCaster) && !tryFlashfire(dpsCaster, true) && !trySoakSeek(dpsCaster) && !trySoundwaveDodge(dpsCaster) && !tryFragmentDodge(dpsCaster) && !tryQuadrantDodge(dpsCaster) && !tryTetherClose(dpsCaster) && !trySpreadAvoid(dpsCaster) && !tryTidalBrace(dpsCaster) && !tryShelterBehindPillar(dpsCaster) && !tryCatchTank(dpsCaster) && !tryHoldSafe(dpsCaster) && !tryFlee(dpsCaster) && !tryRegainCasterLoS(dpsCaster) && !tryReachDistantFocus(dpsCaster)) && (dpsCaster._normPos = true)){
       // Every destination below is clamped into the bounds of whichever room
       // currently holds the tank (or the focus enemy, with no tank up) before
       // Mira/Wren is sent toward it. Without this, a pure distance-from-tank
@@ -19362,7 +19406,7 @@ thrall(){return gs(14)+
     let fail = (S._mfFails||[]).slice(n0).some(r=>r.src===D.name);
     if(e.elite.id==="charge" && st.flash && st.flash._allies>0) fail = true;
     if(st.flash){ st.flash.res = fail ? "fail" : "ok"; st.flash.t = Math.max(st.flash.t, 0.45); st.flash.dur = st.flash.t; }
-    if(!fail){ mfPulse("self", MF_OK); }
+    if(!fail){ mfPulse("self", MF_OK); balStrainEase(); } // tune3V1
     else if(e.elite.id==="charge"){ eliteLineAlliesHit(st).forEach(k=>mfPulse(k, MF_BAD)); }
   }
   function eliteLineAlliesHit(st){ return (st.flash && st.flash._hit) || []; }
@@ -27312,7 +27356,7 @@ thrall(){return gs(14)+
     const bosses = BOSS.enemies.map(e=>({ name:e.name, kindId:e.kind, mechanics: (ENEMY_KINDS[e.kind].mechanics||[]) }))
       .filter(b=>b.mechanics.length);
     if(!bosses.length) return "";
-    const strainCard = `<div class="mechcard"><div class="mname">Strain<span class="mverb" style="color:${resolveColor("var(--blood)")}">DON'T STACK IT</span></div><div class="mtrigger">A failed boss or elite mechanic hits for a share of the victim's health (a big share for blasts, a smaller one each second you stand in a zone) and adds a stack of <b>Strain</b>. Each stack makes failed mechanics hit 40% harder and the boss's and elites' blows 5% harder (the boss bar shows STRAIN ×N).</div><div class="mcounter">One mistake is survivable; three in a row usually isn't. Go 15 seconds without failing one and a stack fades; it clears when the fight ends.</div></div>`; // textsV2
+    const strainCard = `<div class="mechcard"><div class="mname">Strain<span class="mverb" style="color:${resolveColor("var(--blood)")}">DON'T STACK IT</span></div><div class="mtrigger">A failed boss or elite mechanic hits for a share of the victim's health (a big share for blasts, a smaller one each second you stand in a zone) and adds a stack of <b>Strain</b>. Each stack makes failed mechanics hit 40% harder and the boss's and elites' blows 5% harder (the boss bar shows STRAIN ×N).</div><div class="mcounter">One mistake is survivable; three in a row usually isn't. Every mechanic the party passes cleanly takes a stack away; it clears when the fight ends.</div></div>`; // textsV2
     return `<div class="bossNameLine">Boss: <b>${bosses.map(b=>b.name).join(" &amp; ")}</b></div><details class="eliteDetails"><summary>Boss Mechanics</summary>` + strainCard + bosses.map(b=>`
       ${b.mechanics.map(m=>`
         <div class="mechcard">
@@ -34224,7 +34268,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build e1924e41d0) */
+<script>/* phone app: offline cache (build 5bd260aa83) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
