@@ -471,6 +471,12 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     padding:1px 7px; border-radius:999px; border:1px solid currentColor; white-space:nowrap;
   }
   .bossBanner .bbChip.now{ background: currentColor; }
+  .bossBanner .bbChip.mfRes{ background: currentColor; animation: mfChip 1.2s ease-out forwards; } /* mechFxV1 */
+  .bossBanner .bbChip.mfRes span{ color: var(--bg); font-weight:700; }
+  @keyframes mfChip{ 0%{ opacity:1; transform:scale(1.08); } 15%{ transform:scale(1); } 70%{ opacity:1; } 100%{ opacity:.35; } }
+  #mfVig{ position:fixed; inset:0; pointer-events:none; z-index:40; opacity:0; box-shadow: inset 0 0 70px 18px rgba(230,40,60,.55); }
+  #mfVig.on{ animation: mfVig .7s ease-out; }
+  @keyframes mfVig{ 0%{ opacity:1; } 100%{ opacity:0; } }
   .bossBanner .bbMyth{ color:#ff7a4a; letter-spacing:.12em; text-shadow:0 0 8px rgba(255,90,40,.8); animation: bbMythPulse 1.6s ease-in-out infinite; }
   @keyframes bbMythPulse{ 0%,100%{ opacity:.8 } 50%{ opacity:1; text-shadow:0 0 14px rgba(255,120,60,1) } }
   .bossBanner .bbChip.now span{ color: var(--bg); font-weight:700; }
@@ -2057,22 +2063,22 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       <label class="dungeonSelectLabel" id="dungeonPickerLabel" for="dungeonPicker">Descend into</label>
       <select class="dungeonSelect" id="dungeonPicker">
         <option value="procedural" data-desc="A new layout every descent: a random boss, a mix of hand-placed and randomly filled encounter rooms, and pack difficulty spread across rooms.">A Random Descent</option>
-        <option value="ashguard" data-desc="The Ashguard: raid-wide cinder bursts, branding coals, scorched earth. Break line of sight behind either of its two pillars.">The Ashguard's Hold</option>
-        <option value="cistern" data-desc="Murk, the Drowned Warden: an Undertow that pulls the party toward him, a pool under the tank that grows for every Silt Crawler left alive, and Crawlers spawning at the edges.">The Hollow Cistern</option>
-        <option value="forge" data-desc="Thane Brogar, the Forgebound: a fast raid-wide roar, quick branding embers, and a molten lash aimed at whoever is tanking him.">The Cinderfall Forge</option>
-        <option value="bramble" data-desc="The Thornmother: no pillars here. A bloom under a random ally, Bramblings spawning at the edges, and creeping rot that bursts on anyone standing close.">Bramble Hollow</option>
-        <option value="belfry" data-desc="The Iron Sentinel: a slow, heavy raid-wide peal, a wide sweeping lash, and a wandering crystal whose red aura burns until the Sentinel seals itself and the crystal turns blue.">The Shattered Belfry</option>
-        <option value="sanctum" data-desc="The Hollow Choir: Echo Fragments and a Tether that binds two players. Stay within 70 range or both take damage. No pillars.">The Fractured Sanctum</option>
-        <option value="riftbound" data-desc="The Riftbound Custodian: floods the boss floor on a cycle, forcing the party onto a raised platform, and puts a slowing mark on one player.">The Riftbound Archive</option>
-        <option value="widow" data-desc="The Wickfaded Widow: a raid-wide wail, a Sap that cuts one ally's healing and can't be cleansed, and a mana-draining siphon that spawns a risky motehive pickup only you can claim.">The Widow's Hollow</option>
-        <option value="ossric" data-desc="Thane Ossric, Bell of the Deep: no pillars here. A chain lash, a stacking tolling mark, and a slow expanding sound-wave ring. Dash through its gaps.">The Tolling Deep</option>
-        <option value="gravewell" data-desc="The Gravewell Knell: a Fragile mark that can't be cleansed, and three orbiting shards that periodically sweep together, hitting anyone between two of them and chaining a stacking debuff onto them.">The Gravewell Knell</option>
-        <option value="karrick" data-desc="Karrick the Hollowed Smith: fought in a horseshoe around an always-on lava pit. He periodically shoves whoever's tanking toward it; Rook/Vex or Mira/Wren dash in to catch her before she goes over.">The Ashen Horseshoe</option>
-        <option value="verdant" data-desc="The Verdant Maw: spores that burst on anyone standing close, and a canopy that periodically closes over the chamber, forcing the party into the glowing root hollow while the flickering one is a decoy. Root Lashers wait there.">The Sunken Grove</option>
-        <option value="ysolt" data-desc="Ysolt, the Unspooling Seer: four wedges radiate from her. Three burn while one is lit, and the lit one jumps every few seconds instead of sweeping, so you can't move early.">The Unspooling Sanctum</option>
-        <option value="brine" data-desc="The Brine Colossus: reef rocks jut up around her arena. Her Tidal Surge shoves the whole party straight back from where they stand, and landing against a rock or wall hurts.">The Brine Hollow</option>
-        <option value="kestin" data-desc="Kestin Emberhollow, the Last Ashguard: like the first pillar-flanked raid-wide cast, except each pillar cracks every time it shelters someone and eventually crumbles.">The Last Ember</option>
-        <option value="cartographer" data-desc="The Hollow Cartographer: no pillars, no fixed hazards. Every ~14s it redraws the chamber: three new fissures open in different spots than last time.">The Redrawn Vault</option>
+        <option value="ashguard" data-desc="The Ashguard: a Cinderburst you dodge behind one of three pillars, coals that drop burning patches unless cleansed, scorched earth under you, and a fixate Misdirection turns back. Phase 2: one pillar burns before each blast.">The Ashguard's Hold</option>
+        <option value="cistern" data-desc="Murk, the Drowned Warden: an Undertow that drags the party in, Bilge Surge pools that grow with every Silt Crawler alive, and Held Under, which Wax Ward breaks. Phase 2: a whirlpool the Undertow drags you toward.">The Hollow Cistern</option>
+        <option value="forge" data-desc="Thane Brogar, the Forgebound: a countdown roar on the whole party, molten embers to cleanse before they erupt, an Anvil Strike on Kessa that Wax Ward absorbs, and a lash that leaves slag. Phase 2: the lash can aim at you and every roar grows.">The Cinderfall Forge</option>
+        <option value="bramble" data-desc="The Thornmother: blooms that sprout Bramblings and harden into thorn thickets if their brood lives, Thornbind roots to cleanse, and a brood-fed heal you Purge. Phase 2: a ring of thorns closes in.">Bramble Hollow</option>
+        <option value="belfry" data-desc="The Iron Sentinel: no pillars. A Forward Peal that blasts its front half (get behind it), Grinding Gears sweeping a beam around the room, and Ironclad plating to Purge. Phase 2: two beams, turning faster.">The Shattered Belfry</option>
+        <option value="sanctum" data-desc="The Hollow Choir: Echo Fragments marching in to heal it, Feedback linking two of you (cleanse either end), and a Harmony that ends in a Crescendo unless you Purge it. Phase 2: Harmony never ends on its own.">The Fractured Sanctum</option>
+        <option value="riftbound" data-desc="The Riftbound Custodian: Corrosive Tides that flood the floor (climb to the gallery), Seal of Silence to cleanse, and Catalogue cells you open by stepping on their glyph. Phase 2: every other Tide floods the gallery instead.">The Riftbound Archive</option>
+        <option value="widow" data-desc="The Wickfaded Widow: a wail on the whole party that candlelight halves, Spiderlings that hunt you (Misdirect yourself), and a mana siphon with a risky motehive only you can claim. Phase 2: two candles go out per wail and a decoy motehive appears.">The Widow's Hollow</option>
+        <option value="ossric" data-desc="Thane Ossric, Bell of the Deep: no pillars. Toll for One (Wax Ward the marked ally), Grave Bells to break or Purge, and a slow sound-wave ring you dash through at its gaps. Phase 2: a second wave follows from where his bell lands.">The Tolling Deep</option>
+        <option value="gravewell" data-desc="The Gravewell Knell: a Keening Chorus that grows louder every second, and shards that sweep into an anchor crystal and leave humming splinters. Phase 2: each convergence sweeps twice.">The Gravewell Knell</option>
+        <option value="karrick" data-desc="Karrick the Hollowed Smith: fought around a lava pit. Heal Hollowing off fast, step out of the Bellows Draft, and Wax Ward Kessa to brace her against Forge Shoves. Phase 2: the pit grows; valves cool it back.">The Ashen Horseshoe</option>
+        <option value="verdant" data-desc="The Verdant Maw: Choking Canopies that send the party into the glowing root hollow (the flickering one is a trap), Ripening spores to Purge, and Devour, which swallows a damage dealer until the party hacks them free. Phase 2: half the hollow is thorns.">The Sunken Grove</option>
+        <option value="ysolt" data-desc="Ysolt, the Unspooling Seer: a Fourfold Gaze whose safe wedge jumps every few seconds, Fates Exchanged swapping two allies' health, numbered Foretold Lances, and Second Sight to Purge. Phase 2: the wedge jumps faster, with a ghost showing where.">The Unspooling Sanctum</option>
+        <option value="brine" data-desc="The Brine Colossus: Tidal Surges that shove the party back (don't hit a reef rock), Saltcrust to cleanse first, and Breaker waves you shelter from behind the rocks. Phase 2: the Surge rolls in from a random edge.">The Brine Hollow</option>
+        <option value="kestin" data-desc="Kestin Emberhollow, the Last Ashguard: Emberfall you block behind four pillars that crack and crumble, and a Pyre Banner to Purge. Phase 2: everyone stacks in a glowing circle to split Emberfall.">The Last Ember</option>
+        <option value="cartographer" data-desc="The Hollow Cartographer: no pillars. Redraw opens new fissures every ~14s, an Ink Wall blocks movement and sight, and Pinned allies need Wax Ward before their fissure opens. Phase 2: the fissures crawl toward the party.">The Redrawn Vault</option>
       </select>
       <p class="dungeonDesc" id="dungeonDesc"></p>
       <p class="dungeonDesc" id="proceduralRotationDesc" hidden></p>
@@ -2114,7 +2120,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   </div>
 </div>
 
-<div class="overlay" id="pauseOverlay" style="display:none;cursor:pointer"><!-- autoPauseV1 -->
+<div id="mfVig"></div><div class="overlay" id="pauseOverlay" style="display:none;cursor:pointer"><!-- autoPauseV1 -->
   <div class="card frame" style="max-width:380px;text-align:center">
     <h2>Paused</h2>
     <p>The fight paused while you were away.</p>
@@ -4388,6 +4394,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(st.dir) tideDrawFlow(e, st.dir, progress, "var(--brine)");
       else drawGroundTelegraph(e.x, e.y, 56, progress, "var(--brine)");
       const me = S.party.self, test = (x,y)=>tideLandsShort(e, mech, st, x, y);
+      if(MP_FAMILIES.tide) return; // mpTideV1: drawn by mpDraw
       if(me.alive && test(me.x, me.y)){ // where you'd hit, and the nearest spot that's clear
         const u = tideDir(e, st, me.x, me.y), land = pushLanding(me, u.x, u.y, mech.pushDistance), pb = VIEW.project(land.x, land.y), rr = 14*VIEW.scale;
         ctx.save(); ctx.strokeStyle = resolveColor("var(--blood)"); ctx.lineWidth = 3; ctx.globalAlpha = 0.9;
@@ -12902,12 +12909,13 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // hit keep reducing it), r = set directly (no nominal), z = zone tick (scale from nominal, failure counted once per 4 s).
   const MECH_FAIL = {
     "Emberfall":[0.35], "Toll for One":[0.35], "Forward Peal":[0.35], "Anvil Strike":[0.35], "Cinderburst":[0.35], "Molten Lash":[0.35],
-    "Tidal Surge":[0.35], "Breaker":[0.35], "Foretold Lances":[0.35], "Cone":[0.35], "Soak":[0.35], "Harpoon":[0.25,"x","self"], "Chain Arc":[0.20,"x","others"],
+    "Tidal Surge":[0.35], "Dashed against the reef":[0.35], /* mpTideV1 */ "Breaker":[0.35], "Foretold Lances":[0.35], "Cone":[0.35], "Soak":[0.35], "Harpoon":[0.25,"x","self"], "Chain Arc":[0.20,"x","others"],
     "Tolling Wave":[0.25], "Snuffing Wail":[0.25], "Ripening":[0.25], "Double Toll":[0.25,"r"], "Crescendo":[0.25,"r"],
     "Scorched Earth":[0.05,"z"], "Bilge Surge":[0.05,"z"], "Thorned Bloom":[0.05,"z"], "Choking Canopy":[0.05,"z"], "Corrosive Tide":[0.05,"z"],
-    "Fourfold Gaze":[0.05,"z"], "Redraw":[0.05,"z"], "Pinned":[0.06,"z"], "Held Under":[0.06,"z"], "Grinding Gears":[0.06,"z"], "Undertow":[0.05,"z"],
+    "Fourfold Gaze":[0.05,"z"], "Redraw":[0.05,"z"], "Pinned":[0.06,"z"], "Held Under":[0.06,"z"], "Grinding Gears":[0.06,"z"],
     "Grave Bell":[0.05,"rz"], "Endless Harmony":[0.05,"rz"], "Thorn thicket":[0.03,"rz"],
   };
+  const BAL_ALIAS = { "Dashed against the reef":"Tidal Surge" }; // mpTideV1: damage name -> the mechanic it belongs to
   let _balNom = null;
   function balNominal(src){
     if(!_balNom){ _balNom = {};
@@ -12916,7 +12924,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         (k.phases||[]).forEach(p=>(p.mechanics||[]).forEach(m=>all.push(m))); (kindMechs(k)||[]).forEach(m=>all.push(m));
         all.forEach(m=>{ const v = av(m.dmg) || av(m.slamDmg) || av(m.tickDmg); if(v && !_balNom[m.name]) _balNom[m.name] = v; }); });
       Object.values(ELITE_DEFS).forEach(D=>{ const v = av(D.dmg); if(v && !_balNom[D.name]) _balNom[D.name] = v; }); }
-    return _balNom[src] || 0;
+    return _balNom[src] || _balNom[BAL_ALIAS[src]] || 0;
   }
   function balIsBossOrElite(se){ return !!(se && (se.elite || FAMILY_BY_BOSS[se.kind])); }
   function balAdjust(key, amount, src, se, isDot){
@@ -12945,14 +12953,83 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     }
     return out;
   }
+  // ---- mechFxV1: did the party pass or fail each mechanic?
+  const MF_OK = "#7fe39a", MF_BAD = "#ff4d5e";
+  function mfNote(key, amount, src){
+    if(S.arena || typeof src!=="string") return;
+    const f = MECH_FAIL[src]; if(!f) return;
+    const m = S.party[key]; if(!m || !m.alive) return;
+    if((f[2]==="self" && key!=="self") || (f[2]==="others" && key==="self")) return;
+    const nom = (f[1]||"x").indexOf("r")>=0 ? 0 : balNominal(src) * (S.level>0 ? (S.keystoneDmgMul||1) : 1);
+    if(nom>0 && amount/nom < 0.6) return; // the answer absorbed most of it: that's a pass
+    const now = S.runTimer||0;
+    (S._mfFails || (S._mfFails = [])).push({ src: BAL_ALIAS[src] || src, key, t:now });
+    if(S._mfFails.length > 60) S._mfFails.splice(0, 30);
+    const last = (S._mfLastPulse || (S._mfLastPulse = {}))[key] || -99;
+    if(now - last > 0.9){ S._mfLastPulse[key] = now; mfPulse(key, MF_BAD); if(key==="self") mfVignette(); }
+  }
+  function mfEid(e){ return e._mfId || (e._mfId = (S._mfSeq = (S._mfSeq||0) + 1)); }
+  function mfPulse(key, col){ (S._mfFx || (S._mfFx = [])).push({ key, col, t:0, dur:0.7 }); }
+  function mfVignette(){ try{ const v = document.getElementById("mfVig"); if(!v) return; v.classList.remove("on"); void v.offsetWidth; v.classList.add("on"); }catch(_){} }
+  function mfFailedSince(names, t0){ return (S._mfFails||[]).some(r=>r.t >= t0 && names.indexOf(r.src)>=0); }
+  function mfResult(e, name, ok){
+    if(ok) Object.keys(S.party).forEach(k=>{ const m = S.party[k]; if(m && m.alive && !m.downed) mfPulse(k, MF_OK); });
+    (S._mfRes || (S._mfRes = {}))[mfEid(e)+"|"+name] = { ok, t:S.runTimer||0, name };
+    if(S._simMfLog) S._simMfLog.push(name+"|"+(ok?"ok":"fail"));
+  }
+  function mfTail(m){ // how long after the wind-up the mechanic can still hurt someone
+    if(m.kind==="groundPool") return 1.5; // the pass is stepping out in time; later ticks only pulse red
+    return Math.min(10, (m.duration || m.dur || 0) + 2);
+  }
+  function mfTick(dt){
+    if(S.arena) return;
+    const now = S.runTimer||0;
+    if(S._mfFx) S._mfFx = S._mfFx.filter(fx=>(fx.t += dt) < fx.dur);
+    (S.engagedGroups||[]).forEach(g=>livingEnemiesOf(g).forEach(e=>{
+      const k = ENEMY_KINDS[e.kind]; if(!k || !e.mech || !FAMILY_BY_BOSS[e.kind]) return;
+      (kindMechs(k)||[]).forEach(m=>{
+        const st = e.mech[m.id]; if(!st || !MECH_FAIL[m.name]) return;
+        const W = S._mfWatch || (S._mfWatch = {}), wk = mfEid(e)+"|"+m.id; // kept outside st: some mechanics replace their state object
+        const on = !!(st.casting || st.active); // some mechanics keep running after the wind-up (beams, floods, the Gaze)
+        if(on && W[wk]==null) W[wk] = now;
+        else if(!on && W[wk]!=null){ (S._mfPend || (S._mfPend = [])).push({ e, name:m.name, t0:W[wk], at:now + mfTail(m) }); delete W[wk]; }
+      });
+    }));
+    if(S._mfPend && S._mfPend.length){
+      S._mfPend = S._mfPend.filter(p=>{
+        if(now < p.at) return true;
+        if(p.e.alive) mfResult(p.e, p.name, !mfFailedSince([p.name], p.t0 - 0.05));
+        return false;
+      });
+    }
+  }
+  function mfChipFor(e, name){
+    const r = S._mfRes && S._mfRes[mfEid(e)+"|"+name]; if(!r) return null;
+    return ((S.runTimer||0) - r.t) < 1.2 ? r : null;
+  }
+  function mfDraw(){
+    if(!S._mfFx || !S._mfFx.length) return;
+    ctx.save();
+    S._mfFx.forEach(fx=>{
+      const m = S.party[fx.key]; if(!m) return;
+      const c = VIEW.project(m.x, m.y), f = fx.t/fx.dur, sc = Math.max(0.7, VIEW.scale);
+      const r = (12 + 16*f)*sc;
+      ctx.globalAlpha = 0.85*(1-f); ctx.beginPath(); ctx.ellipse(c.x, c.y+2, r, r*0.58, 0, 0, Math.PI*2);
+      ctx.lineWidth = 3*(1-f*0.5); ctx.strokeStyle = fx.col; ctx.stroke();
+      ctx.globalAlpha = 0.22*(1-f); ctx.fillStyle = fx.col; ctx.fill();
+    });
+    ctx.restore();
+  }
   function balTick(dt){
+    mfTick(dt); // mechFxV1
     const ST = S.strain; if(!ST) return;
     if(S.engagedGroups.size===0){ if(ST.n) ST.n = 0; return; }
     const now = S.runTimer||0;
     if(ST.n>0 && now - ST.last >= BAL_STRAIN_DECAY){ ST.n--; ST.last = now; spawnFloatingText(S.party.self.x, S.party.self.y-40, ST.n ? "STRAIN ×"+ST.n : "STRAIN EASES", "var(--moss)"); }
   }
-  try{ if(typeof window!=="undefined") window.__bal = { bossHpMulFor, balAdjust, balTick, modifierCountForLevel:(l)=>modifierCountForLevel(l), MECH_FAIL }; }catch(_){} // test hook
+  try{ if(typeof window!=="undefined") window.__bal = { bossHpMulFor, balAdjust, balTick, mfNote, mfTick, mfFailedSince, modifierCountForLevel:(l)=>modifierCountForLevel(l), MECH_FAIL }; }catch(_){} // test hook
   function damageMember(key, amount, srcName, sourceEnemy, isDot){
+    mfNote(key, amount, srcName); // mechFxV1
     amount = balAdjust(key, amount, srcName, sourceEnemy, isDot); // balanceV1
     irnFeedback(key, amount, srcName); // ironReworkV1: Feedback echoes 40% to the linked partner
     const m = S.party[key];
@@ -15549,7 +15626,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(insideKeys.length>0){
         const mitMul = Math.max(0.35, 1 - 0.12*(insideKeys.length-1));
         const share = Math.round(z.dmg*mitMul/insideKeys.length);
-        insideKeys.forEach(k=>damageMember(k, share, z.srcName||"the soak zone"));
+        insideKeys.forEach(k=>damageMember(k, share, z.srcName ? z.srcName+" (shared)" : "the soak zone")); // mechPredV1: a shared soak is a pass
         pushLog("event", `${z.srcName||"The zone"} resolves. ${insideKeys.length} ${insideKeys.length===1?"soaker":"soakers"} split it.`);
       } else {
         pushLog("event", `${z.srcName||"The zone"} resolves. Nobody soaked it!`);
@@ -19281,6 +19358,14 @@ thrall(){return gs(14)+
     pushLog("event", `${e.name} readies ${D.name}!`);
     spawnFloatingText(e.x, e.y-26, D.name.toUpperCase(), "var(--accent)");
   }
+  function mfElite(e, D, st, t0, n0){ // mechFxV1: Charge Line has no Strain, but raking an ally is still a fail
+    let fail = (S._mfFails||[]).slice(n0).some(r=>r.src===D.name);
+    if(e.elite.id==="charge" && st.flash && st.flash._allies>0) fail = true;
+    if(st.flash){ st.flash.res = fail ? "fail" : "ok"; st.flash.t = Math.max(st.flash.t, 0.45); st.flash.dur = st.flash.t; }
+    if(!fail){ mfPulse("self", MF_OK); }
+    else if(e.elite.id==="charge"){ eliteLineAlliesHit(st).forEach(k=>mfPulse(k, MF_BAD)); }
+  }
+  function eliteLineAlliesHit(st){ return (st.flash && st.flash._hit) || []; }
   function eliteResolve(e, D, st){
     const self = S.party.self, id = e.elite.id, o = eliteOrigin(e, st);
     if(id==="charge"){
@@ -19288,7 +19373,7 @@ thrall(){return gs(14)+
       const a = eliteAngle(e, st), x2 = o.x + Math.cos(a)*D.len, y2 = o.y + Math.sin(a)*D.len;
       const hit = allies.slice(); if(self.alive && segmentDistance(self.x,self.y,o.x,o.y,x2,y2) <= D.width) hit.push("self");
       hit.forEach(k=>damageMember(k, Math.round(scaledEnemyDmg(D.base[0], D.base[1])*mul), D.name, e));
-      st.flash = { kind:"line", x1:o.x, y1:o.y, x2, y2, t:0.35 };
+      st.flash = { kind:"line", x1:o.x, y1:o.y, x2, y2, t:0.35, _allies:n, _hit:allies.slice() };
       if(n) pushLog("event", `${D.name} rakes ${n} ally${n>1?"s":""} — x${mul} damage!`);
     } else if(id==="cone"){
       if(eliteInCone(e, st, D, self)) damageMember("self", Math.round(scaledEnemyDmg(D.dmg[0], D.dmg[1])), D.name, e);
@@ -19330,7 +19415,7 @@ thrall(){return gs(14)+
         }
         if(st.t >= D.wind){
           if(D.act){ st.phase = "act"; st.t = 0; st.tickT = 0; }
-          else { eliteResolve(e, D, st); st.phase = "idle"; st.cd = rand(ELITE_REPEAT[0], ELITE_REPEAT[1]); }
+          else { const _t0 = S.runTimer||0, _n0 = (S._mfFails||[]).length; eliteResolve(e, D, st); mfElite(e, D, st, _t0, _n0); st.phase = "idle"; st.cd = rand(ELITE_REPEAT[0], ELITE_REPEAT[1]); }
         }
       } else if(st.phase==="act"){
         st.tickT += dt;
@@ -19481,13 +19566,277 @@ thrall(){return gs(14)+
       ctx.restore();
     }));
   }
+  // ---- mechPredV1: will it hit you?
+  const MP_FAMILIES = { ember:1, tide:1, thicket:1, gloom:1, iron:1, arcane:1 }; // mpTideV1, mpThicketV1, mpGloomV1, mpIronV1, mpArcaneV1
+  const MP_GEAR_LOOK = 0.6; // seconds of beam sweep shown ahead while Grinding Gears spins
+  function mpGearAngles(e, m, st){ // [ang, sweepDeg] per beam: wind-up = the opening beam (no sweep yet)
+    if(st.spin){ const sp = ((e._phase||0)>0 ? m.speed*1.25 : m.speed), out = [[st.spin.ang, sp*MP_GEAR_LOOK]]; if((e._phase||0)>0) out.push([irnAng(st.spin.ang+180), sp*MP_GEAR_LOOK]); return out; }
+    if(st.casting && st.ang0!=null){ const out = [[st.ang0, 0]]; if((e._phase||0)>0) out.push([irnAng(st.ang0+180), 0]); return out; }
+    return [];
+  }
+  function mpGearHit(e, m, st, x, y){
+    const d = dist(x, y, e.x, e.y); if(d > m.len + m.width) return false;
+    const a = angleOf(x-e.x, y-e.y), tol = Math.atan2(m.width, Math.max(1, d))*180/Math.PI;
+    return mpGearAngles(e, m, st).some(([b, sw])=>{ const rel = ((a - b) % 360 + 360) % 360; return rel <= sw + tol || rel >= 360 - tol; });
+  }
+  // Expanding/closing ring with rotating gaps: will the gap be over this member when the edge reaches them?
+  // cx,cy centre; rs ring state {elapsed, baseAngle, gapCount, ringSpeed}; started = the ring is moving (else it hasn't erupted yet).
+  function mpRingContact(m, rs, cx, cy, x, y, started){
+    const sp = rs.ringSpeed || m.ringSpeed, d = dist(x, y, cx, cy), el = started ? (rs.elapsed||0) : 0;
+    const radius = m.inward ? m.maxRadius - el*sp : el*sp;
+    const togo = m.inward ? Math.max(0, radius - (d + m.edgeWidth/2)) : Math.max(0, (d - m.edgeWidth/2) - radius);
+    if(!m.inward && d - m.edgeWidth/2 > m.maxRadius) return null; // it fades before reaching you
+    return { el: el + togo/sp, d };
+  }
+  function mpRingSafe(m, rs, cx, cy, x, y, started){
+    const c = mpRingContact(m, rs, cx, cy, x, y, started); if(!c) return null;
+    const gaps = ringGapAngles(m, Object.assign({}, rs, { elapsed:c.el })), a = angleOf(x-cx, y-cy);
+    return { safe: gaps.some(g=>angleDiff(a, g) <= m.gapWidthDeg/2), gaps, d:c.d };
+  }
+  function mpShadeGaps(cx, cy, d, gaps, wDeg, col, p){
+    const C = VIEW.project(cx, cy), R0 = Math.max(4, d-16)*VIEW.scale, R1 = (d+16)*VIEW.scale;
+    ctx.save(); ctx.globalAlpha = 0.22 + 0.2*p; ctx.fillStyle = col;
+    gaps.forEach(g=>{ const a0 = (g - wDeg/2)*Math.PI/180, a1 = (g + wDeg/2)*Math.PI/180; ctx.beginPath(); ctx.arc(C.x, C.y, R1, a0, a1); ctx.arc(C.x, C.y, R0, a1, a0, true); ctx.closePath(); ctx.fill(); });
+    ctx.restore();
+  }
+  function mpZoneFlood(name){ return { // zoneFlood: everywhere but the safe room floods, through the wind-up and the flood itself
+    on:(e,m,st)=>!!st.casting || !!(S.zoneFlood && S.zoneFlood.mechId===m.id),
+    hit:(e,m,st,key)=>{ const id = (S.zoneFlood && S.zoneFlood.mechId===m.id) ? S.zoneFlood.safeRoomId : (st.safeId || m.safeRoomId), r = roomById(id), pm = S.party[key];
+      return !(r && inRoom(pm.x, pm.y, r)); },
+    shade:null,
+    prog:(e,m,st)=> st.casting ? mpProg(m, st) : 1,
+  }; }
+  function mpProg(m, st){ return Math.max(0, Math.min(1, (st.castT||0)/Math.max(0.01, m.windup||1))); }
+  // Visibility polygon from (ox,oy) out to range: for each ray, how far until test() says the point is sheltered.
+  function mpVisPoly(ox, oy, range, test, cacheObj, tag){
+    const key = tag+"|"+Math.round(ox)+"|"+Math.round(oy)+"|"+range+"|"+PILLAR_DEFS.map(p=>(p.shattered?"x":"o")+(p.blocksLOS===false?"n":"")).join("");
+    if(cacheObj._mpKey===key) return cacheObj._mpPoly;
+    const N = 160, pts = [];
+    for(let i=0;i<N;i++){
+      const a = i/N*Math.PI*2, c = Math.cos(a), sn = Math.sin(a);
+      let r = range;
+      if(test(ox+c*range, oy+sn*range)){ // the far end is sheltered: find where cover starts
+        let lo = 0, hi = range;
+        for(let k=0;k<9;k++){ const mid = (lo+hi)/2; if(test(ox+c*mid, oy+sn*mid)) hi = mid; else lo = mid; }
+        r = lo;
+      }
+      pts.push([ox+c*r, oy+sn*r]);
+    }
+    cacheObj._mpKey = key; cacheObj._mpPoly = pts;
+    return pts;
+  }
+  function mpPolyPath(pts){ pts.forEach((p,i)=>{ const q = VIEW.project(p[0], p[1]); if(i) ctx.lineTo(q.x,q.y); else ctx.moveTo(q.x,q.y); }); ctx.closePath(); }
+  // Sky casts blocked by pillars: shelters shaded pale blue; the open floor tinted pink only while you stand in it.
+  function mpShadeShelter(e, range, test, st, selfHit, p, tag){
+    const poly = mpVisPoly(e.x, e.y, range, test, st, tag), C = VIEW.project(e.x, e.y), R = range*VIEW.scale;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(C.x, C.y, R, 0, Math.PI*2); mpPolyPath(poly);
+    ctx.globalAlpha = 0.16 + 0.14*p; ctx.fillStyle = ELITE_GOOD; ctx.fill("evenodd");
+    if(selfHit){ ctx.beginPath(); mpPolyPath(poly); ctx.globalAlpha = 0.04 + 0.06*p; ctx.fillStyle = ELITE_BAD; ctx.fill(); }
+    ctx.restore();
+  }
+  function mpShadeCircle(x, y, r, col, p){ const C = VIEW.project(x, y); ctx.save(); ctx.beginPath(); ctx.arc(C.x, C.y, r*VIEW.scale, 0, Math.PI*2);
+    ctx.globalAlpha = 0.12 + 0.16*p; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 0.9; ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.setLineDash([8,6]); ctx.stroke(); ctx.restore(); }
+  function mpShadeLine(x1, y1, x2, y2, w, col, p){ const A = VIEW.project(x1, y1), B = VIEW.project(x2, y2); ctx.save();
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.lineCap = "butt"; ctx.lineWidth = w*2*VIEW.scale; ctx.strokeStyle = col; ctx.globalAlpha = 0.14 + 0.16*p; ctx.stroke(); ctx.restore(); }
+  function mpCinderTest(e){ return (x,y)=>!hasLineOfSight(e.x, e.y, x, y); }      // true = sheltered
+  function mpEmberTest(e){ return (x,y)=>!!blockingPillar(e.x, e.y, x, y); }
+  // name -> { on(e,m,st): is it winding up, hit(e,m,st,key): true/false/null (null = no call for this member), shade(...) }
+  const MECH_PREDICT = {
+    "Cinderburst": {
+      on:(e,m,st)=>!!st.casting,
+      hit:(e,m,st,key)=>{ if(key==="tank") return null; const pm = S.party[key]; // Kessa holds melee and takes it on purpose (Bulwark)
+        if(m.range && dist(pm.x,pm.y,e.x,e.y) > m.range) return false; return hasLineOfSight(e.x,e.y,pm.x,pm.y); },
+      shade:(e,m,st,selfHit,p)=>mpShadeShelter(e, m.range||260, mpCinderTest(e), st, selfHit, p, "cb"),
+    },
+    "Emberfall": {
+      on:(e,m,st)=>!!st.casting,
+      hit:(e,m,st,key)=>{ const pm = S.party[key];
+        if(st.zone) return dist(pm.x,pm.y,st.zone.x,st.zone.y) > st.zone.radius; // phase 2: stand together in the circle
+        if(key==="tank") return null;
+        if(m.range && dist(pm.x,pm.y,e.x,e.y) > m.range) return false; return !blockingPillar(e.x,e.y,pm.x,pm.y); },
+      shade:(e,m,st,selfHit,p)=>{ if(st.zone) mpShadeCircle(st.zone.x, st.zone.y, st.zone.radius, selfHit ? ELITE_BAD : ELITE_GOOD, p);
+        else mpShadeShelter(e, m.range||260, mpEmberTest(e), st, selfHit, p, "ef"); },
+    },
+    "Scorched Earth": {
+      on:(e,m,st)=>!!st.casting && typeof st.anchorX==="number",
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return dist(pm.x,pm.y,st.anchorX,st.anchorY) <= (st.radius||m.radius); },
+      shade:(e,m,st,selfHit,p)=>mpShadeCircle(st.anchorX, st.anchorY, st.radius||m.radius, selfHit ? ELITE_BAD : ELITE_GOOD, p),
+    },
+    "Molten Lash": {
+      on:(e,m,st)=>!!st.casting && typeof st.endX==="number",
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return segmentDistance(pm.x,pm.y,st.originX,st.originY,st.endX,st.endY) <= m.width; },
+      shade:(e,m,st,selfHit,p)=>mpShadeLine(st.originX, st.originY, st.endX, st.endY, m.width, selfHit ? ELITE_BAD : ELITE_GOOD, p),
+    },
+    "Bilge Surge": { // same ground pool as Scorched Earth
+      on:(e,m,st)=>!!st.casting && typeof st.anchorX==="number",
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return dist(pm.x,pm.y,st.anchorX,st.anchorY) <= (st.radius||m.radius); },
+      shade:(e,m,st,selfHit,p)=>mpShadeCircle(st.anchorX, st.anchorY, st.radius||m.radius, selfHit ? ELITE_BAD : ELITE_GOOD, p),
+    },
+    "Held Under": { // no wind-up: the held ally drowns until someone gives them Wax Ward
+      on:(e,m,st)=>!!emOf(e).held,
+      hit:(e,m,st,key)=>{ const h = emOf(e).held; return (h && h.key===key) ? !emHasWax(S.party[key]) : null; },
+      shade:(e,m,st)=>{ const h = emOf(e).held, pm = h && S.party[h.key]; if(pm && pm.alive) mpShadeCircle(pm.x, pm.y, 22, emHasWax(pm) ? ELITE_GOOD : ELITE_BAD, 1 - Math.max(0, h.t)/(m.dur||6)); },
+      noReticle:true, prog:(e,m,st)=>{ const h = emOf(e).held; return h ? 1 - Math.max(0, h.t)/(m.dur||6) : 0; },
+    },
+    "Tidal Surge": { // shoved straight away from her (or along the rolling edge in phase 2): landing short = dashed
+      on:(e,m,st)=>!!st.casting,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return tideLandsShort(e, m, st, pm.x, pm.y); },
+      shade:(e,m,st,selfHit,p)=>{
+        const me = S.party.self, u = tideDir(e, st, me.x, me.y), land = pushLanding(me, u.x, u.y, m.pushDistance);
+        const A = VIEW.project(me.x, me.y), B = VIEW.project(land.x, land.y), col = selfHit ? ELITE_BAD : ELITE_GOOD;
+        ctx.save(); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); eliteStroke(2, col, 0.85, [6,5]); ctx.restore();
+        mpShadeCircle(land.x, land.y, 16, col, p);
+        if(selfHit){ const sp = tideSafeSpot((x,y)=>tideLandsShort(e, m, st, x, y), me); if(sp) mpShadeCircle(sp.x, sp.y, 16, ELITE_GOOD, p); }
+      },
+    },
+    "Breaker": { // a wall of water from one edge: only the lee of a rock is safe
+      on:(e,m,st)=>!!st.casting && !!st.dir,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return !tideSheltered(pm.x, pm.y, st.dir); },
+      shade:(e,m,st,selfHit,p)=>{
+        const br = tideRoom(e); if(!br) return; const d = st.dir, A = VIEW.project(br.x, br.y), B = VIEW.project(br.x+br.w, br.y+br.h);
+        ctx.save(); ctx.beginPath(); ctx.rect(A.x, A.y, B.x-A.x, B.y-A.y); ctx.clip();
+        if(selfHit){ ctx.globalAlpha = 0.04 + 0.06*p; ctx.fillStyle = ELITE_BAD; ctx.fillRect(A.x, A.y, B.x-A.x, B.y-A.y); }
+        PILLAR_DEFS.forEach(q=>{ if(q.shattered || q.blocksLOS===false || q.lava || q.prop) return; const r = q.r || Math.max(q.w||0, q.h||0)/2; if(!r) return;
+          const nx = -d.y, ny = d.x, L = 420, pts = [[q.x+nx*r, q.y+ny*r], [q.x+nx*r+d.x*L, q.y+ny*r+d.y*L], [q.x-nx*r+d.x*L, q.y-ny*r+d.y*L], [q.x-nx*r, q.y-ny*r]];
+          ctx.beginPath(); mpPolyPath(pts); ctx.globalAlpha = 0.16 + 0.14*p; ctx.fillStyle = ELITE_GOOD; ctx.fill(); });
+        ctx.restore();
+      },
+    },
+    "Thorned Bloom": {
+      on:(e,m,st)=>!!st.casting && typeof st.anchorX==="number",
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return dist(pm.x,pm.y,st.anchorX,st.anchorY) <= (st.radius||m.radius); },
+      shade:(e,m,st,selfHit,p)=>mpShadeCircle(st.anchorX, st.anchorY, st.radius||m.radius, selfHit ? ELITE_BAD : ELITE_GOOD, p),
+    },
+    "Choking Canopy": mpZoneFlood("Choking Canopy"),
+    "Corrosive Tide": mpZoneFlood("Corrosive Tide"),
+    "Ripening": { // a boss buff: purge it or the whole party takes the spores
+      on:(e,m,st)=>!!emOf(e).ripe,
+      hit:()=>null, noReticle:true,
+      prog:(e,m,st)=>{ const r = emOf(e).ripe; return r ? 1 - r.t/r.tot : 0; },
+      shade:(e,m,st,selfHit,p)=>mpShadeCircle(e.x, e.y, 34 + bossReach(e), ELITE_BAD, p),
+    },
+    "Snuffing Wail": {
+      on:(e,m,st)=>!!st.casting,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return !glmInLight(e, pm.x, pm.y); },
+      shade:(e,m,st,selfHit,p)=>{ glmCandles(e).forEach(c=>{ if(c.lit) mpShadeCircle(c.x, c.y, c.r, ELITE_GOOD, p); }); },
+    },
+    "Toll for One": {
+      on:(e,m,st)=>!!st.casting && !!st.key,
+      hit:(e,m,st,key)=> key===st.key ? !emHasWax(S.party[key]) : null,
+      shade:(e,m,st,selfHit,p)=>{ const t = S.party[st.key]; if(t && t.alive) mpShadeCircle(t.x, t.y, 22, emHasWax(t) ? ELITE_GOOD : ELITE_BAD, p); },
+      noReticle:true, bracketSafe:true,
+    },
+    "Tolling Wave": {
+      on:(e,m,st)=>!!st.active || (!!st.casting && !!m.inward),
+      hit:(e,m,st,key)=>{ if(st.active && st.hitMembers && st.hitMembers[key]) return null; const pm = S.party[key];
+        const r = mpRingSafe(m, st, e.x, e.y, pm.x, pm.y, !!st.active); return r ? !r.safe : null; },
+      prog:(e,m,st)=> st.active ? Math.min(1, (st.elapsed||0)*(st.ringSpeed||m.ringSpeed)/m.maxRadius) : mpProg(m, st),
+      shade:(e,m,st,selfHit,p)=>{ const me = S.party.self; if(st.active && st.hitMembers && st.hitMembers.self) return;
+        const r = mpRingSafe(m, st, e.x, e.y, me.x, me.y, !!st.active); if(r) mpShadeGaps(e.x, e.y, r.d, r.gaps, m.gapWidthDeg, ELITE_GOOD, p); },
+    },
+    "Grave Bells": { // bells ring the whole party every 3s until broken or Purged
+      on:(e,m,st)=>(e._group ? e._group.enemies : []).some(b=>b._bell && b.alive),
+      hit:()=>null, noReticle:true, prog:()=>1,
+      shade:(e,m,st,selfHit,p)=>{ (e._group ? e._group.enemies : []).forEach(b=>{ if(b._bell && b.alive) mpShadeCircle(b.x, b.y, 28, ELITE_BAD, 1 - Math.max(0, b._ringT||0)/3); }); },
+    },
+    "Forward Peal": {
+      on:(e,m,st)=>!!st.casting && st.face!=null,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return angleDiff(angleOf(pm.x-e.x, pm.y-e.y), st.face) <= 90; },
+      shade:(e,m,st,selfHit,p)=>{ const C = VIEW.project(e.x, e.y), R = 300*VIEW.scale, a = st.face*Math.PI/180;
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.arc(C.x, C.y, R, a+Math.PI/2, a+Math.PI*1.5); ctx.closePath(); ctx.globalAlpha = 0.12 + 0.14*p; ctx.fillStyle = ELITE_GOOD; ctx.fill();
+        if(selfHit){ ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.arc(C.x, C.y, R, a-Math.PI/2, a+Math.PI/2); ctx.closePath(); ctx.globalAlpha = 0.06 + 0.08*p; ctx.fillStyle = ELITE_BAD; ctx.fill(); }
+        ctx.restore(); },
+    },
+    "Grinding Gears": {
+      on:(e,m,st)=>!!st.spin || (!!st.casting && st.ang0!=null),
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return mpGearHit(e, m, st, pm.x, pm.y); },
+      prog:(e,m,st)=> st.spin ? 1 : mpProg(m, st),
+      shade:(e,m,st,selfHit,p)=>{ const C = VIEW.project(e.x, e.y), R = m.len*VIEW.scale, col = selfHit ? ELITE_BAD : ELITE_GOOD;
+        ctx.save(); mpGearAngles(e, m, st).forEach(([b, sw])=>{ const a0 = b*Math.PI/180, a1 = (b+Math.max(sw, 0.01))*Math.PI/180, w = Math.atan2(m.width, 120);
+          ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.arc(C.x, C.y, R, a0 - (sw ? 0 : w), a1 + (sw ? 0 : w)); ctx.closePath(); ctx.globalAlpha = 0.14 + 0.12*p; ctx.fillStyle = col; ctx.fill(); });
+        ctx.restore(); },
+    },
+    "Harmony": { // Purge it, or Crescendo hits everyone when it runs out (phase 2: it pulses until Purged)
+      on:(e,m,st)=>(e.buffs||[]).some(b=>b.id==="harmony"),
+      hit:()=>null, noReticle:true,
+      prog:(e,m,st)=>{ const b = (e.buffs||[]).find(x=>x.id==="harmony"); return (b && (e._phase||0)===0 && m.dur) ? Math.max(0, Math.min(1, 1 - b.remaining/m.dur)) : 1; },
+      shade:(e,m,st,selfHit,p)=>mpShadeCircle(e.x, e.y, 34 + bossReach(e), ELITE_BAD, p),
+    },
+    "Fourfold Gaze": {
+      on:(e,m,st)=>!!st.active,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; if(dist(pm.x,pm.y,e.x,e.y) > m.radius) return false; return quadrantAngleIndex(m, st, angleOf(pm.x-e.x, pm.y-e.y)) !== st.safeQuadrant; },
+      prog:(e,m,st)=> 1 - Math.min(1, (st.rotateT||0)/((st.rotInt||m.rotateInterval)||1)),
+      shade:(e,m,st,selfHit,p)=>{ const C = VIEW.project(e.x, e.y), R = m.radius*VIEW.scale, a0 = (st.offsetDeg + st.safeQuadrant*90)*Math.PI/180;
+        ctx.save(); ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.arc(C.x, C.y, R, a0, a0 + Math.PI/2); ctx.closePath(); ctx.globalAlpha = 0.16; ctx.fillStyle = ELITE_GOOD; ctx.fill(); ctx.restore(); },
+    },
+    "Foretold Lances": {
+      on:(e,m,st)=>!!st.casting && !!st.lines,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return st.lines.some(L=>!L.fired && segmentDistance(pm.x, pm.y, L.x1, L.y1, L.x2, L.y2) <= m.width); },
+      shade:(e,m,st,selfHit,p)=>{ const me = S.party.self; st.lines.forEach(L=>{ if(L.fired) return;
+        const on = segmentDistance(me.x, me.y, L.x1, L.y1, L.x2, L.y2) <= m.width; mpShadeLine(L.x1, L.y1, L.x2, L.y2, m.width, on ? ELITE_BAD : ELITE_GOOD, Math.min(1, st.castT/L.at)); }); },
+    },
+    "Redraw": {
+      on:(e,m,st)=>!!st.casting && !!(st.pending && st.pending.length),
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return st.pending.some(q=>dist(pm.x, pm.y, q.x, q.y) <= m.radius); },
+      shade:(e,m,st,selfHit,p)=>{ const me = S.party.self; st.pending.forEach(q=>mpShadeCircle(q.x, q.y, m.radius, dist(me.x, me.y, q.x, q.y) <= m.radius ? ELITE_BAD : ELITE_GOOD, p)); },
+    },
+    "Pinned": { // Wax Ward frees the pinned ally; the fissure opens where they were pinned
+      on:(e,m,st)=>!!st.casting && st.px!=null,
+      hit:(e,m,st,key)=>{ const pm = S.party[key]; return dist(pm.x, pm.y, st.px, st.py) <= m.radius; },
+      shade:(e,m,st,selfHit,p)=>{ const anyIn = Object.keys(S.party).some(k=>{ const pm = S.party[k]; return pm.alive && dist(pm.x, pm.y, st.px, st.py) <= m.radius; });
+        mpShadeCircle(st.px, st.py, m.radius, anyIn ? ELITE_BAD : ELITE_GOOD, p); },
+    },
+    "Anvil Strike": { // the answer is Wax Ward on Kessa, not where you stand
+      on:(e,m,st)=>!!st.casting,
+      hit:(e,m,st,key)=> key==="tank" ? !emHasWax(S.party.tank) : null,
+      shade:(e,m,st)=>{ const t = S.party.tank; if(t && t.alive) mpShadeCircle(t.x, t.y, 24, emHasWax(t) ? ELITE_GOOD : ELITE_BAD, mpProg(m, st)); },
+      noReticle:true, bracketSafe:true,
+    },
+  };
+  function mpDraw(){
+    const self = S.party.self; if(!self || !self.alive || S.arena) return;
+    if(MP_FAMILIES.gloom) (S.engagedGroups||[]).forEach(g=>livingEnemiesOf(g).forEach(e=>{ // mpGloomV1: Double Toll
+      if(e.kind!=="ossric") return; const em = emOf(e), ec = em.echo, wm = ec && (kindMechs(ENEMY_KINDS[e.kind])||[]).find(m=>m.id==="soundwavering"); if(!ec || !wm) return;
+      const started = ec.t >= 0, rs = Object.assign({}, ec.st, { elapsed: started ? ec.t : 0 });
+      const res = {}; Object.keys(S.party).forEach(k=>{ const pm = S.party[k]; if(!pm.alive || pm.downed || ec.hit[k]) return;
+        const r = mpRingSafe(wm, rs, ec.x, ec.y, pm.x, pm.y, true);
+        res[k] = r; });
+      const p = started ? Math.min(1, ec.t*rs.ringSpeed/wm.maxRadius) : 0;
+      if(res.self){ mpShadeGaps(ec.x, ec.y, res.self.d, res.self.gaps, wm.gapWidthDeg, ELITE_GOOD, p); }
+      ctx.save(); Object.keys(res).forEach(k=>{ const r = res[k]; if(!r) return; if(k==="self") eliteReticle(self, p, r.safe ? ELITE_GOOD : ELITE_BAD); else if(!r.safe) eliteBracket(S.party[k], ELITE_BAD); }); ctx.restore();
+    }));
+    if(MP_FAMILIES.thicket) PILLAR_DEFS.forEach(t=>{ if(!t.thicket) return; const d = dist(self.x, self.y, t.x, t.y), R = t.r + 10;
+      if(d > R + 50) return; const near = d <= R; ctx.save(); const C = VIEW.project(t.x, t.y); ctx.beginPath(); ctx.arc(C.x, C.y, R*VIEW.scale, 0, Math.PI*2);
+      ctx.globalAlpha = near ? 0.22 : 0.10; ctx.fillStyle = ELITE_BAD; ctx.fill(); ctx.globalAlpha = near ? 0.95 : 0.6; ctx.lineWidth = 2; ctx.strokeStyle = ELITE_BAD; ctx.setLineDash([6,5]); ctx.stroke(); ctx.restore(); });
+    (S.engagedGroups||[]).forEach(g=>livingEnemiesOf(g).forEach(e=>{
+      const k = ENEMY_KINDS[e.kind]; if(!k || !e.mech || !MP_FAMILIES[FAMILY_BY_BOSS[e.kind]]) return;
+      (kindMechs(k)||[]).forEach(m=>{
+        const P = MECH_PREDICT[m.name], st = e.mech[m.id]; if(!P || !st || !P.on(e,m,st)) return;
+        const p = P.prog ? P.prog(e,m,st) : mpProg(m, st), res = {};
+        Object.keys(S.party).forEach(key=>{ const pm = S.party[key]; if(pm && pm.alive && !pm.downed) res[key] = P.hit(e,m,st,key); });
+        const selfHit = res.self===true;
+        if(P.shade) P.shade(e, m, st, selfHit, p);
+        ctx.save();
+        Object.keys(res).forEach(key=>{ if(key==="self") return;
+          if(res[key]===true) eliteBracket(S.party[key], ELITE_BAD);
+          else if(res[key]===false && P.bracketSafe) eliteBracket(S.party[key], ELITE_GOOD); });
+        if(!P.noReticle && res.self!=null) eliteReticle(self, p, selfHit ? ELITE_BAD : ELITE_GOOD);
+        ctx.restore();
+      });
+    }));
+  }
+  try{ if(typeof window!=="undefined") window.__mp = { MECH_PREDICT, MP_FAMILIES }; }catch(_){}
   function drawRforElite(e){ const k = ENEMY_KINDS[e.kind]; return (k ? k.r : 12)*spriteZoomMul(); }
   function drawEliteFlash(e, st, D){
-    const f = st.flash, a = Math.max(0, f.t/0.35); ctx.save(); ctx.globalAlpha = a;
+    const f = st.flash, a = Math.max(0, f.t/(f.dur||0.35)), col = f.res==="fail" ? MF_BAD : f.res==="ok" ? MF_OK : "#fff1cf"; ctx.save(); ctx.globalAlpha = a; // mechFxV1: tinted by outcome
     if(f.kind==="line" || f.kind==="chain"){
-      const A = VIEW.project(f.x1,f.y1), B = VIEW.project(f.x2,f.y2); ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); eliteStroke(5, "#fff1cf", a);
-      (f.hops||[]).forEach(h=>{ const C = VIEW.project(h.x,h.y); ctx.beginPath(); ctx.moveTo(B.x,B.y); ctx.lineTo(C.x,C.y); eliteStroke(3, "#fff1cf", a); });
-    } else if(f.kind==="ring"){ const C = VIEW.project(f.x,f.y); ctx.beginPath(); ctx.arc(C.x,C.y,D.radius*VIEW.scale*(1.1-a*0.1),0,Math.PI*2); eliteStroke(4, "#fff1cf", a); }
+      const A = VIEW.project(f.x1,f.y1), B = VIEW.project(f.x2,f.y2); ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); eliteStroke(5, col, a);
+      (f.hops||[]).forEach(h=>{ const C = VIEW.project(h.x,h.y); ctx.beginPath(); ctx.moveTo(B.x,B.y); ctx.lineTo(C.x,C.y); eliteStroke(3, col, a); });
+    } else if(f.kind==="ring"){ const C = VIEW.project(f.x,f.y), R = D.radius*VIEW.scale*(1.1-a*0.1); ctx.beginPath(); ctx.arc(C.x,C.y,R,0,Math.PI*2); ctx.fillStyle = col; ctx.globalAlpha = 0.18*a; ctx.fill(); ctx.globalAlpha = a; eliteStroke(4, col, a); }
+    else if(f.kind==="cone" && st.locked){ const o = eliteOrigin(e, st), an = eliteAngle(e, st), O = VIEW.project(o.x,o.y), R = D.len*VIEW.scale;
+      ctx.beginPath(); ctx.moveTo(O.x,O.y); ctx.arc(O.x, O.y, R, an-D.half, an+D.half); ctx.closePath(); ctx.fillStyle = col; ctx.globalAlpha = 0.22*a; ctx.fill(); ctx.globalAlpha = a; eliteStroke(3, col, a); }
     ctx.restore();
   }
 
@@ -23055,6 +23404,7 @@ thrall(){return gs(14)+
     { const brace = activeTidalBrace(); if(brace) drawTidalWarning(brace.e, brace.mech, brace.st); }
     drawEliteTelegraphs(); // Round 148
     emberDrawWorld(); // emberReworkV1
+    mfDraw(); // mechFxV1
 
     allActiveGroups().forEach(g=>{
       if(g.engaged) return;
@@ -23179,6 +23529,7 @@ thrall(){return gs(14)+
 
     // live ground-pool damage zones (already ignited, persist a few seconds)
     S.groundPools.forEach(pool=>drawGroundPool(pool));
+    mpDraw(); // mechPredV1: after every boss telegraph and ground pool, so the shading sits on top
     drawRaidFx();
     drawTethers();
     drawWard();
@@ -26150,6 +26501,8 @@ thrall(){return gs(14)+
     (kindMechs(kind)||[]).forEach(m=>{
       const st = e.mech[m.id]; if(!st) return;
       const v = mechVerb(m);
+      const _mr = mfChipFor(e, m.name); // mechFxV1
+      if(_mr && !st.casting){ out.push({ id:m.id, name:m.name, verb:m.name.toUpperCase(), color:_mr.ok ? MF_OK : MF_BAD, now:true, secs:-1, mf:_mr.ok ? "ok" : "fail" }); return; }
       if(st.casting && m.windup>0){
         out.push({ id:m.id, name:m.name, verb:v.verb, color:v.color, now:true, secs:Math.max(0, m.windup-st.castT) });
       } else if(!st.casting){
@@ -26157,7 +26510,7 @@ thrall(){return gs(14)+
       }
     });
     out.sort((a,b)=> (a.now===b.now) ? a.secs-b.secs : (a.now?-1:1));
-    const _o = out.slice(0, limit||2);
+    const _o = out.slice(0, (limit||2) + (out.some(c=>c.mf) ? 1 : 0));
     if(S.strain && S.strain.n>0) _o.push({ id:"strain", verb:"STRAIN ×"+S.strain.n, color:"var(--blood)", now:false, secs:0, keep:true }); // balanceV1
     return _o;
   }
@@ -26189,14 +26542,14 @@ thrall(){return gs(14)+
     const ph = boss._phase||0;
     const wd = boss._ward;
     const wardKey = wd ? "|W"+wd.progressText : (boss._wardSealed ? "|WB" : "");
-    const key = boss.name + (mythName||"") + wardKey + "|p" + ph + (boss._phaseBeat>0?"B":"") + "|" + chips.map(c=>c.id+":"+c.verb+":"+(c.now?"N":"")+Math.ceil(c.secs)).join(",");
+    const key = boss.name + (mythName||"") + wardKey + "|p" + ph + (boss._phaseBeat>0?"B":"") + "|" + chips.map(c=>c.id+":"+c.verb+":"+(c.now?"N":"")+(c.mf||"")+Math.ceil(c.secs)).join(",");
     if(el._key!==key){
       el._key = key;
       const notches = (kind.phases||[]).map(p=>`<div class="bbNotch" style="left:${Math.round(p.at*100)}%"></div>`).join("");
       el.innerHTML = `<div class="bbName">${boss.name}${mythName ? ` · <span class="bbMyth">${mythName}</span>` : ph>0?` · PHASE ${ph+1}`:""}</div>
         <div class="bbBar"><div class="bbFill"></div>${notches}</div>
         <div class="bbNext">${boss._desp?`<div class="bbChip now" style="color:${resolveColor("var(--blood)")}"><span>DESPERATION</span></div>`:""}${(!wd && boss._wardSealed) ? `<div class="bbChip now" style="color:${resolveColor(boss._gateFall?"var(--accent)":"var(--blood)")}"><span>${boss._gateFall?"FALLEN · STEAL HIS EMBERS":"SEALED · IMMUNE"}</span></div>` : wd ? `<div class="bbChip now" style="color:${resolveColor("var(--blood)")}"><span>SEALED · IMMUNE · ${wd.def.breaker.kind==="plates"?wd.def.breaker.noun:wd.def.breaker.kind==="crystal"?"crystal":"adds"} ${wd.progressText||""}</span></div>` : chips.map(c=>c.now
-          ? `<div class="bbChip now" style="color:${resolveColor(c.color)}"><span>${c.verb} NOW</span></div>`
+          ? (c.mf ? `<div class="bbChip mfRes" style="color:${resolveColor(c.color)}"><span>${c.verb}</span></div>` : `<div class="bbChip now" style="color:${resolveColor(c.color)}"><span>${c.verb} NOW</span></div>`)
           : c.keep ? `<div class="bbChip" style="color:${resolveColor(c.color)}">${c.verb}</div>` : `<div class="bbChip" style="color:${resolveColor(c.color)}">${c.verb} ${Math.ceil(c.secs)}s</div>`).join("")}</div>`;
     }
     const pct = Math.max(0, Math.min(100, Math.round(boss.hp/boss.maxHp*200)/2));
@@ -26959,7 +27312,8 @@ thrall(){return gs(14)+
     const bosses = BOSS.enemies.map(e=>({ name:e.name, kindId:e.kind, mechanics: (ENEMY_KINDS[e.kind].mechanics||[]) }))
       .filter(b=>b.mechanics.length);
     if(!bosses.length) return "";
-    return `<div class="bossNameLine">Boss: <b>${bosses.map(b=>b.name).join(" &amp; ")}</b></div><details class="eliteDetails"><summary>Boss Mechanics</summary>` + bosses.map(b=>`
+    const strainCard = `<div class="mechcard"><div class="mname">Strain<span class="mverb" style="color:${resolveColor("var(--blood)")}">DON'T STACK IT</span></div><div class="mtrigger">A failed boss or elite mechanic hits for a share of the victim's health (a big share for blasts, a smaller one each second you stand in a zone) and adds a stack of <b>Strain</b>. Each stack makes failed mechanics hit 40% harder and the boss's and elites' blows 5% harder (the boss bar shows STRAIN ×N).</div><div class="mcounter">One mistake is survivable; three in a row usually isn't. Go 15 seconds without failing one and a stack fades; it clears when the fight ends.</div></div>`; // textsV2
+    return `<div class="bossNameLine">Boss: <b>${bosses.map(b=>b.name).join(" &amp; ")}</b></div><details class="eliteDetails"><summary>Boss Mechanics</summary>` + strainCard + bosses.map(b=>`
       ${b.mechanics.map(m=>`
         <div class="mechcard">
           <div class="mname">${m.name}<span class="mverb" style="color:${resolveColor(mechVerb(m).color)}">${mechVerb(m).verb}</span></div>
@@ -26990,7 +27344,7 @@ thrall(){return gs(14)+
     const cards = ELITE_IDS.map(id=>{ const D = ELITE_DEFS[id], G = ELITE_GUIDE[id];
       return `<div class="mechcard"><div class="mname">${eliteIconHTML(id)}${D.title} — ${D.name}<span class="mverb" style="color:${resolveColor("var(--accent-strong)")}">${G.verb}</span></div><div class="mtrigger">${G.trigger}</div><div class="mcounter">${G.counter}</div></div>`; }).join("");
     return `<details class="eliteDetails"><summary>Elite Mechanics</summary>
-      <div class="mechcard"><div class="mtrigger">Some fights include an <b>elite</b>: an ordinary mob with trash-sized health and damage, marked by a coloured ring at its feet, a small symbol above its head (shown beside each mechanic below), and a title in its name (Charging, Binding, Sweeping, Rallying, Harpooning, Arcing, Siphoning). Each carries one mechanic that is <b>aimed at you, the healer</b>. Allies can't dodge, so you solve it with your position. It first fires a few seconds into the fight, then again every 15–20 seconds for as long as the fight lasts. Some packs are two elites.<br><br>The telegraph recolours live: <b style="color:#5fb3d6">cyan</b> = you're doing the right thing, <b style="color:#d62f7f">magenta</b> = you're not. Solid bright = about to land. Elites carry no extra loot, but they count toward forces like any pack member.</div></div>
+      <div class="mechcard"><div class="mtrigger">Some fights include an <b>elite</b>: an ordinary mob with trash-sized damage but four times the health, marked by a coloured ring at its feet, a small symbol above its head (shown beside each mechanic below), and a title in its name (Charging, Binding, Sweeping, Rallying, Harpooning, Arcing, Siphoning). Each carries one mechanic that is <b>aimed at you, the healer</b>. Allies can't dodge, so you solve it with your position. It first fires a few seconds into the fight, then again every 8–10 seconds for as long as the fight lasts. Failing it builds Strain, just like a boss mechanic. Some packs are two elites.<br><br>The telegraph recolours live: <b style="color:#5fb3d6">cyan</b> = you're doing the right thing, <b style="color:#d62f7f">magenta</b> = you're not. Solid bright = about to land. Elites carry no extra loot, but they count toward forces like any pack member.</div></div>
       ${cards}
       </details>
       ${miniGuideHTML()}`;
@@ -33870,7 +34224,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 16298e4cd9) */
+<script>/* phone app: offline cache (build e1924e41d0) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
