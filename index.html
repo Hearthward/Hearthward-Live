@@ -17645,6 +17645,7 @@ return OUT;
   })(typeof window!=='undefined'?window:globalThis);
   const HR_RIG = (typeof window!=="undefined" && window.HealerRig) || (typeof globalThis!=="undefined" && globalThis.HealerRig) || null;
   const HR_LOOP = 7.5, HR_IDLE_N = 45, HR_WALK_N = 16, HR_CAST_N = 12, HR_REL_N = 18, HR_ATK_N = 8, HR_HIT_N = 6, HR_DEATH_N = 16, HR_LAN_N = 2; // lantern: 2 bins each side of rest
+  const HR_SIZE = 0.46; // rig units -> pixels at r=14: matches the old art's figure height (hood top to feet)
   const HR_BUDGET = 6e6; // stored pixels (about 24 MB) before the least recently used frames are dropped
   const HR_SPRITES = new Map(); let hrPixels = 0, hrFail = false;
   function hrState(m){
@@ -17734,7 +17735,7 @@ return OUT;
     if(!HR_RIG || hrFail || typeof document==="undefined") return false;
     try{
       const h = hrState(m), p = hrPose(m, h), v = Math.max(0, Math.min(1, h.view));
-      const s = r/14*0.8, tf = ctx.getTransform(), dev = Math.hypot(tf.a, tf.b) || 1, px = hrPxBucket(s*dev);
+      const s = r/14*HR_SIZE, tf = ctx.getTransform(), dev = Math.hypot(tf.a, tf.b) || 1, px = hrPxBucket(s*dev);
       const [k0, st] = hrSnap(h, p, v), key = k0 + "|p" + px.toFixed(3) + "|" + (skin ? skin.id : "-");
       if(px !== hrLastPx){ hrLastPx = px; hrWarm(px, skin); }
       const spr = hrGet(key, st, px, skin), k = s*dev/px; // stored pixels -> screen pixels
@@ -34705,7 +34706,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 73f753d4e0) */
+<script>/* phone app: offline cache (build 0ee60f0d2c) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
