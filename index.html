@@ -2509,7 +2509,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     // fall off staggered rather than all at once, same as every other
     // debuff.
     resonance:    { name:"Resonance",     tickDmg:4, interval:1, ticks:6, maxStacks:5,
-                    desc:"Stacks while you stand in a crystal crush zone, faster with more allies in it. Move to the green safe zone." },
+                    desc:"Stacks while you stand in a crystal crush zone, faster with more allies in it. Move to the clear arc opposite the anchor crystal." },
     emberbrand:   { name:"Emberbrand",    tickDmg:7, interval:1, ticks:4,
                     desc:"A smith's mark. Cleanse it, or ride it out." },
     sporerot:     { name:"Sporerot",      tickDmg:3, interval:1, ticks:6, spread:{ radius:40, dmg:18 },
@@ -2595,7 +2595,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
                  counter:"Don't be in a long cast when it lands. Step back out afterwards." },
                { id:"mimiccoins", name:"Coin Burst", kind:"expandingRing", every:21, windup:1.5, ringSpeed:75, maxRadius:240, edgeWidth:16, gapCount:2, gapWidthDeg:55, gapRotationDeg:50, dmg:[36,50],
                  trigger:"Every ~21s, after a 1.5s wind-up, the Mimic sends out a ring of cursed coins.",
-                 counter:"Dash through one of the two green gaps in the red ring as it reaches you." },
+                 counter:"Dash through one of the two gaps (marked by glowing posts) as the ring reaches you." },
                { id:"mimicleeches", name:"Gold Leeches", kind:"addWave", every:25, addKind:"add", addNames:["Gold Leech","Gold Leech"], spawnPoints:[{dx:-55,dy:30},{dx:55,dy:30}],
                  trigger:"Every ~25s, two Gold Leeches spawn from the hoard. Each one left alive heals the Mimic.",
                  counter:"Kill the leeches quickly, then go back to the Mimic. Below half health it does everything ~30% more often." },
@@ -2924,7 +2924,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
                { id:"soundwavering", name:"Tolling Wave", kind:"expandingRing", every:20, windup:1.5,
                  ringSpeed:70, maxRadius:260, edgeWidth:16, gapCount:2, gapWidthDeg:55, gapRotationDeg:50, dmg:[50,68],
                  trigger:"Every ~20s, a 1.5s wind-up before a wave of sound expands outward from Ossric. It is too fast to outrun and doesn't stop at the walls.",
-                 counter:"Watch for the two green gaps in the red ring (and the on-screen hint when one's about to reach you) and dash sideways into one as the wave's edge nears your distance from him. Kessa, Rook/Vex, and Mira/Wren all do this on their own. Standing anywhere else on the ring when it reaches you takes a heavy hit." },
+                 counter:"Watch for the two gaps in the ring, each marked by a pair of glowing posts (and the on-screen hint when one's about to reach you) and dash sideways into one as the wave's edge nears your distance from him. Kessa, Rook/Vex, and Mira/Wren all do this on their own. Standing anywhere else on the ring when it reaches you takes a heavy hit." },
              ] },
     gravewellchoir: { hp:1050, dmg:[20,30], atkEvery:1.7, r:23, color:"var(--dirge)", label:"The Gravewell Knell",
              excludeFromCompletion:true,
@@ -2947,7 +2947,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
                { id:"shardconverge", name:"Converging Shards", kind:"converging", every:21, windup:2,
                  convergeDuration:4.2, orbitRadius:120, bandWidth:60, debuff:"resonance", tickInterval:0.4,
                  trigger:"Every ~21s, a warning chime rings before three Resonant Crystals orbiting the choir begin sweeping together; the two purple ones crash into the blue one.",
-                 counter:"Two purple crystals sweep in from either side into the blue anchor crystal. The red striped zones they sweep through stack Resonance, and it chains to anyone else sharing that zone with you. Stand in the green SAFE zone opposite the anchor (or outside the ring). Kessa, Rook/Vex, and Mira/Wren reposition on their own." },
+                 counter:"Two purple crystals sweep in from either side into the blue anchor crystal. The glowing bronze bands they sweep through stack Resonance, and it chains to anyone else sharing that band with you. Stand in the clear arc opposite the anchor (or outside the ring). Kessa, Rook/Vex, and Mira/Wren reposition on their own." },
              ] },
     karrick: { hp:1100, dmg:[21,31], atkEvery:1.7, r:24, color:"var(--slag)", label:"Karrick the Hollowed Smith",
              excludeFromCompletion:true,
@@ -3238,7 +3238,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
                { id:"dirgetoll", name:"Converging Dirge", kind:"converging", every:20, windup:2,
                  convergeDuration:4.5, orbitRadius:95, bandWidth:50, debuff:"resonance", tickInterval:0.4,
                  trigger:"Every ~20s, a chime rings before three shards circling the Keeper sweep together toward one of their own. Faster below half health.",
-                 counter:"Two crystals slam into the anchor crystal — stay out of the red crush zones and stand in the green safe zone opposite it. Your allies reposition on their own." },
+                 counter:"Two crystals slam into the anchor crystal — stay out of the glowing bands and stand in the clear arc opposite it. Your allies reposition on their own." },
                { id:"keepermark", name:"Dirge Mark", kind:"debuffApply", every:12, debuff:"dirgeMark",
                  trigger:"Every ~12s, a dirge mark is placed on a random party member.",
                  counter:"Cleanse it or heal through it." },
@@ -5046,7 +5046,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       { id:"soundwavering", name:"Tolling Wave", kind:"expandingRing", every:20, first:10, windup:1.5,
         ringSpeed:70, maxRadius:260, edgeWidth:16, gapCount:2, gapWidthDeg:55, gapRotationDeg:50, dmg:[50,68], ramp:0.12,
         trigger:"Every ~20s, a 1.5s wind-up before a wave of sound expands outward from Ossric. Each person it hits adds Dissonance: +12% on the next wave, up to 3.",
-        counter:"Dash sideways into one of the green gaps as the edge nears your distance from him. Companions do this on their own. A clean wave clears a Dissonance stack." },
+        counter:"Dash sideways into one of the gaps (between the glowing posts) as the edge nears your distance from him. Companions do this on their own. A clean wave clears a Dissonance stack." },
     ];
     K.ember = true; K.emberTick = "gloom"; K.arcane = "gloom"; K.gloom = "knell";
     K.phases = [ { at:0.5, tint:"#7f9cff", everyMul:{}, note:"<b>Counterpoint.</b> Each convergence now sweeps twice: the anchor jumps to the opposite side and the shards sweep again 3s later, flipping the safe zone." } ];
@@ -5057,7 +5057,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       { id:"shardconverge", name:"Converging Shards", kind:"converging", every:21, first:8, windup:2,
         convergeDuration:4.2, orbitRadius:120, bandWidth:60, debuff:"resonance", tickInterval:0.4,
         trigger:"Every ~21s, a chime before two purple crystals sweep in from either side into the blue anchor crystal. When they crash, the anchor shatters into three splinters that hum at the room's edges for 10s, stacking Resonance on anyone in them.",
-        counter:"Stand in the green SAFE zone opposite the anchor (or outside the ring), then stay out of the splinters. Companions reposition on their own." },
+        counter:"Stand in the clear arc opposite the anchor (or outside the ring), then stay out of the splinters. Companions reposition on their own." },
     ];
   })();
   if(typeof window!=="undefined" && window.__ember) Object.assign(window.__ember, { glmCandles, glmInLight });
@@ -24849,7 +24849,7 @@ thrall(){return gs(14)+
       const selfAngle = angleOf(S.party.self.x-ring.e.x, S.party.self.y-ring.e.y);
       const safe = ringGapAngles(ring.mech, ring.st).some(g => angleDiff(selfAngle,g) <= ring.mech.gapWidthDeg/2);
       if(!safe){
-        setHint("🔔 Dash through a green gap in the red wave!");
+        setHint("🔔 Dash through a gap between the glowing posts!");
         return;
       }
     }
@@ -24865,7 +24865,7 @@ thrall(){return gs(14)+
         const selfAngle = angleOf(S.party.self.x-conv.e.x, S.party.self.y-conv.e.y);
         const caught = angleBetweenShort(selfAngle, A, angleB) || angleBetweenShort(selfAngle, angleC, A);
         if(caught){
-          setHint("🎐 Leave the red crush zone. Get to the green SAFE zone!");
+          setHint("🎐 Get out of the glowing band, into the clear arc opposite the anchor!");
           return;
         }
       }
@@ -25371,6 +25371,7 @@ thrall(){return gs(14)+
     (S.pursuers||[]).forEach(drawPursuer);
     if(S.prisonButton) drawPrisonButton(S.prisonButton);
     { const ring = activeSoundwaveRing(); if(ring) drawSoundwaveRing(ring.e, ring.mech, ring.st); }
+    try{ if(typeof window!=="undefined" && window.__ringTest) window.__ringTest(drawSoundwaveRing, drawRingForming); }catch(_){} // ringV2: harness hook
     { const conv = activeConvergence(); if(conv) drawShardConvergence(conv.e, conv.mech, conv.st); }
     { const gaze = activeQuadrantGaze(); if(gaze) drawQuadrantGaze(gaze.e, gaze.mech, gaze.st); }
     { const brace = activeTidalBrace(); if(brace) drawTidalWarning(brace.e, brace.mech, brace.st); }
@@ -25433,7 +25434,7 @@ thrall(){return gs(14)+
             // — the ring's actual expansion (with its rotating gaps) only
             // starts rendering once st.active flips true; see the dedicated
             // drawSoundwaveRing pass in drawScene.
-            if(mech.inward && st.baseAngle!=null) drawSoundwaveRing(e, mech, st, true); else drawGroundTelegraph(e.x, e.y, 40, progress, kind.color);
+            if(mech.inward && st.baseAngle!=null) drawSoundwaveRing(e, mech, st, true, progress); else drawRingForming(e, mech, progress); // ringV2
           } else if(mech.kind==="converging"){
             // Same growing-circle wind-up language as every other telegraph
             // — the shards' actual sweep (with its two closing gaps) only
@@ -26536,53 +26537,137 @@ thrall(){return gs(14)+
   // language as the evacuation beacon, but shaped as arcs on the hazard
   // itself rather than a separate marker, since the gaps only make sense
   // relative to the ring they're punched into.
-  function drawSoundwaveRing(e, mech, st, preview){
-    const radius = mech.inward ? mech.maxRadius - st.elapsed*(st.ringSpeed || mech.ringSpeed) : st.elapsed * (st.ringSpeed || mech.ringSpeed);
-    if(!mech.inward && radius > mech.maxRadius + mech.edgeWidth) return;
-    const pa = preview ? 0.4 : 1, inw = mech.inward ? -1 : 1;
-    const p = VIEW.project(e.x, e.y);
-    const sc = VIEW.scale;
-    const rPx = radius * sc;
-    if(rPx <= 0) return;
-    const toRad = d => d*Math.PI/180;
-    const gaps = ringGapAngles(mech, st).map(g=>((g%360)+360)%360).sort((a,b)=>a-b);
-    const half = mech.gapWidthDeg/2;
-    const hw = (mech.edgeWidth/2)*sc;          // half-thickness of the damaging band
-    const rIn = Math.max(0, rPx-hw), rOut = rPx+hw;
-    const now = (S.tPrev||0)/1000, pulse = .5+.5*Math.sin(now*8);
-    const bloodC = resolveColor("var(--blood)"), mossC = resolveColor("var(--moss)");
-    const band = (a0, a1) => {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, rOut, toRad(a0), toRad(a1));
-      ctx.arc(p.x, p.y, rIn, toRad(a1), toRad(a0), true);
-      ctx.closePath();
-    };
-    // damaging wall: solid red band everywhere except the gaps
-    for(let i=0;i<gaps.length;i++){
-      const s0 = gaps[i]+half;
-      const s1 = gaps[(i+1)%gaps.length] - half + (i===gaps.length-1 ? 360 : 0);
-      if(s1 <= s0) continue;
-      band(s0, s1);
-      ctx.globalAlpha = (.55+.2*pulse)*pa; ctx.fillStyle = bloodC; ctx.fill();
-      ctx.globalAlpha = .95*pa; ctx.strokeStyle = "#ffd9d0"; ctx.lineWidth = 1.5; ctx.stroke();
+  // ---- ringV2: themed wall-of-force rings ----
+  // core = the band's colour, lead = its leading edge, trail = its trailing edge, floor = the mark it leaves, fx = moving texture
+  const RING_THEMES = {
+    bell:  { core:"196,150,82",  lead:"255,236,186", trail:"70,48,30",  floor:"70,52,34",  post:"255,214,140", fx:"ripple" },
+    water: { core:"28,116,132",  lead:"206,240,228", trail:"10,44,56",  floor:"20,64,76",  post:"170,228,214", fx:"foam" }, // deep sea teal: pale blue is reserved for the "go here" shading
+    flame: { core:"255,112,36",  lead:"255,238,170", trail:"110,26,8",  floor:"52,20,8",   post:"255,206,120", fx:"ember" },
+    ash:   { core:"118,106,102", lead:"255,158,96",  trail:"40,34,32",  floor:"36,32,30",  post:"255,180,130", fx:"cinder" },
+    heat:  { core:"255,196,116", lead:"255,255,242", trail:"190,80,34", floor:"80,34,16",  post:"255,240,200", fx:"shimmer" },
+    ink:   { core:"72,50,112",   lead:"214,184,255", trail:"16,10,28",  floor:"14,10,22",  post:"214,190,255", fx:"drip" },
+    coins: { core:"222,172,60",  lead:"255,244,176", trail:"104,74,26", floor:"60,44,18",  post:"255,226,140", fx:"coin" },
+    rune:  { core:"116,96,222",  lead:"224,214,255", trail:"44,34,96",  floor:"50,40,104", post:"200,190,255", fx:"glyph" },
+    iron:  { core:"168,174,180", lead:"255,240,204", trail:"56,58,64",  floor:"40,40,44",  post:"255,226,170", fx:"spark" },
+    thorn: { core:"92,142,60",   lead:"222,242,172", trail:"36,56,26",  floor:"30,44,22",  post:"214,240,160", fx:"leaf" },
+  };
+  const RING_THEME_BY_MECH = { soundwavering:"bell", cantortoll:"water", glyphring:"rune", mimiccoins:"coins", uhring:"ink", kmring:"flame", asring:"ash", bdring:"heat" };
+  const RING_THEME_BY_FAMILY = { gloom:"bell", tide:"water", ember:"flame", arcane:"rune", iron:"iron", thicket:"thorn" };
+  function ringTheme(e, mech){ return RING_THEMES[RING_THEME_BY_MECH[mech.id] || RING_THEME_BY_FAMILY[FAMILY_BY_BOSS[e.kind]] || "bell"]; }
+  function _ringRand(n){ const x = Math.sin(n*127.1+311.7)*43758.5453; return x - Math.floor(x); }
+  // walk the wall's solid arcs (everything outside the gaps); cb(a0, a1) in degrees
+  function ringSolidArcs(gaps, half, cb){
+    for(let i=0;i<gaps.length;i++){ const s0 = gaps[i]+half, s1 = gaps[(i+1)%gaps.length] - half + (i===gaps.length-1 ? 360 : 0); if(s1 > s0) cb(s0, s1); }
+  }
+  // the moving texture: particles riding the leading edge of each solid arc
+  function ringFx(T, fx, px, py, rLead, dir, sc, a0, a1, now, alpha){
+    const toRad = d=>d*Math.PI/180;
+    ctx.save(); ctx.globalCompositeOperation = (fx==="drip"||fx==="cinder") ? "source-over" : "lighter";
+    // fixed slots around the circle (so particles don't jump as the gaps turn); a slot draws only while it's on solid wall
+    for(let k=0;k<40;k++){
+      const seed = k*13+1, deg = k*9 + _ringRand(seed)*6, rel = ((deg - a0) % 360 + 360) % 360; if(rel > a1 - a0) continue;
+      const ang = toRad(deg), life = (now*(.9+_ringRand(seed+3)*.6) + _ringRand(seed+9)) % 1;
+      const ca = Math.cos(ang), sa = Math.sin(ang), x0 = px + ca*rLead, y0 = py + sa*rLead;
+      if(fx==="ember"||fx==="spark"){ // sparks lift off the front edge
+        const ox = ca*dir*life*10*sc, oy = sa*dir*life*10*sc - life*14*sc;
+        ctx.fillStyle = `rgba(${T.lead},${alpha*(1-life)})`; ctx.beginPath(); ctx.arc(x0+ox, y0+oy, (1.6-life)*sc*1.2, 0, Math.PI*2); ctx.fill();
+      } else if(fx==="foam"){ // short white crests sliding along the front
+        const d = toRad(6*life); ctx.strokeStyle = `rgba(${T.lead},${alpha*.9*(1-Math.abs(life-.5)*1.6)})`; ctx.lineWidth = 2*sc;
+        ctx.beginPath(); ctx.arc(px, py, rLead + dir*2*sc, ang+d, ang+d+toRad(5)); ctx.stroke();
+      } else if(fx==="ripple"){ // thin bell-ring arcs shed ahead of the wall
+        ctx.strokeStyle = `rgba(${T.lead},${alpha*.7*(1-life)})`; ctx.lineWidth = 1.2*sc;
+        ctx.beginPath(); ctx.arc(px, py, rLead + dir*life*14*sc, ang-toRad(4), ang+toRad(4)); ctx.stroke();
+      } else if(fx==="cinder"){ // grey ash flakes drifting up, a few still glowing
+        const oy = -life*12*sc, ox = Math.sin(life*6+k)*3*sc; ctx.fillStyle = k%3 ? `rgba(90,80,76,${alpha*(1-life)})` : `rgba(${T.lead},${alpha*(1-life)})`;
+        ctx.fillRect(x0+ox, y0+oy, 2*sc, 2*sc);
+      } else if(fx==="shimmer"){ // heat haze strokes across the band
+        ctx.strokeStyle = `rgba(255,255,240,${alpha*.45*(1-life)})`; ctx.lineWidth = 1*sc; const L = 7*sc;
+        ctx.beginPath(); ctx.moveTo(x0 - sa*L*.5, y0 + ca*L*.5 - life*6*sc); ctx.quadraticCurveTo(x0 + ca*2*sc, y0 + sa*2*sc - life*6*sc, x0 + sa*L*.5, y0 - ca*L*.5 - life*6*sc); ctx.stroke();
+      } else if(fx==="drip"){ // ink drips left behind the wall
+        const back = -dir*life*12*sc; ctx.fillStyle = `rgba(${T.trail},${alpha*.9*(1-life*.6)})`; ctx.beginPath(); ctx.ellipse(x0+ca*back, y0+sa*back + life*3*sc, 1.8*sc, (2.2+life*2)*sc, 0, 0, Math.PI*2); ctx.fill();
+      } else if(fx==="coin"){ // coins spinning along the front
+        const w = Math.abs(Math.cos(now*9+k))*2.4*sc+.4; ctx.fillStyle = `rgba(${T.lead},${alpha})`; ctx.beginPath(); ctx.ellipse(x0, y0 - Math.sin(life*Math.PI)*6*sc, w, 2.4*sc, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = `rgba(${T.trail},${alpha})`; ctx.lineWidth = .8; ctx.stroke();
+      } else if(fx==="glyph"){ // runes riding the band
+        ctx.save(); ctx.translate(x0, y0); ctx.rotate(ang+now); ctx.strokeStyle = `rgba(${T.lead},${alpha*(.5+.5*Math.sin(now*4+k))})`; ctx.lineWidth = 1.1*sc; const g = 3*sc;
+        ctx.beginPath(); if(k%3===0){ ctx.moveTo(-g,g); ctx.lineTo(0,-g); ctx.lineTo(g,g); ctx.closePath(); } else if(k%3===1){ ctx.arc(0,0,g*.8,0,Math.PI*2); ctx.moveTo(-g,0); ctx.lineTo(g,0); } else { ctx.moveTo(-g,-g); ctx.lineTo(g,g); ctx.moveTo(g,-g); ctx.lineTo(-g,g); } ctx.stroke(); ctx.restore();
+      } else if(fx==="leaf"){ // leaves and thorns tumbling off the front
+        ctx.save(); ctx.translate(x0 + ca*dir*life*8*sc, y0 + sa*dir*life*8*sc - life*8*sc); ctx.rotate(now*3+k); ctx.fillStyle = `rgba(${T.lead},${alpha*(1-life)})`;
+        ctx.beginPath(); ctx.ellipse(0,0,2.6*sc,1.1*sc,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+      }
     }
-    // gaps: open green lanes (wider than the wall) with outward chevrons, no gold line
+    ctx.restore();
+  }
+  // a gate post at angle a: a short glowing pillar standing on the ring
+  function ringPost(T, px, py, r, a, sc, alpha, h){
+    const ca = Math.cos(a), sa = Math.sin(a), x = px + ca*r, y = py + sa*r, H = (h||14)*sc, W = 2.6*sc;
+    ctx.save(); ctx.globalAlpha = alpha;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 12*sc); g.addColorStop(0, `rgba(${T.post},.55)`); g.addColorStop(1, `rgba(${T.post},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, 12*sc, 6*sc, 0, 0, Math.PI*2); ctx.fill();
+    const lg = ctx.createLinearGradient(x, y, x, y-H); lg.addColorStop(0, `rgba(${T.core},.95)`); lg.addColorStop(1, `rgba(${T.lead},.95)`);
+    ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(x-W, y); ctx.lineTo(x-W*.7, y-H); ctx.lineTo(x+W*.7, y-H); ctx.lineTo(x+W, y); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(20,14,12,.8)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.globalCompositeOperation = "lighter"; const cg = ctx.createRadialGradient(x, y-H, 0, x, y-H, 6*sc); cg.addColorStop(0, `rgba(${T.lead},.95)`); cg.addColorStop(1, `rgba(${T.lead},0)`);
+    ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(x, y-H, 6*sc, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  // form = 0..1 while the ring is forming (wind-up); omitted once it's moving
+  function drawSoundwaveRing(e, mech, st, preview, form){
+    const sp = st.ringSpeed || mech.ringSpeed, radius = mech.inward ? mech.maxRadius - st.elapsed*sp : st.elapsed*sp;
+    if(!mech.inward && radius > mech.maxRadius + mech.edgeWidth) return;
+    const T = ringTheme(e, mech), p = VIEW.project(e.x, e.y), sc = VIEW.scale, rPx = radius*sc;
+    if(rPx <= 0) return;
+    const toRad = d=>d*Math.PI/180, now = (S.tPrev||0)/1000;
+    const fk = preview ? Math.max(0, Math.min(1, form==null ? .6 : form)) : 1;           // how formed the wall is
+    const fadeOut = mech.inward ? Math.min(1, rPx/(30*sc)) : Math.min(1, Math.max(0, (mech.maxRadius + mech.edgeWidth - radius)/(40)));
+    const A = fk*fadeOut;
+    const gaps = ringGapAngles(mech, st).map(g=>((g%360)+360)%360).sort((a,b)=>a-b), half = mech.gapWidthDeg/2;
+    const hw = (mech.edgeWidth/2)*sc, rIn = Math.max(0, rPx-hw), rOut = rPx+hw;
+    const dir = mech.inward ? -1 : 1, rLead = mech.inward ? rIn : rOut, rTrail = mech.inward ? rOut : rIn;
+    const arcPath = (r0, r1, a0, a1)=>{ ctx.beginPath(); ctx.arc(p.x, p.y, r1, toRad(a0), toRad(a1)); ctx.arc(p.x, p.y, Math.max(0, r0), toRad(a1), toRad(a0), true); ctx.closePath(); };
+    ctx.save();
+    // 1) the mark on the floor where the wall has just passed (about 0.8s of travel), solid arcs only
+    if(!preview){ const trailLen = Math.min(sp*0.8, 70)*sc, t0 = mech.inward ? rOut : Math.max(0, rIn-trailLen), t1 = mech.inward ? rOut+trailLen : rIn;
+      const g = ctx.createRadialGradient(p.x, p.y, Math.max(0, t0), p.x, p.y, Math.max(1, t1));
+      const near = `rgba(${T.floor},${.45*A})`, far = `rgba(${T.floor},0)`;
+      if(mech.inward){ g.addColorStop(0, near); g.addColorStop(1, far); } else { g.addColorStop(0, far); g.addColorStop(1, near); }
+      ctx.fillStyle = g; ringSolidArcs(gaps, half, (a0, a1)=>{ arcPath(t0, t1, a0, a1); ctx.fill(); }); }
+    // 2) soft outer glow
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(${T.core},${.22*A})`; ctx.lineWidth = hw*2 + 14*sc;
+    ringSolidArcs(gaps, half, (a0, a1)=>{ ctx.beginPath(); ctx.arc(p.x, p.y, rPx, toRad(a0), toRad(a1)); ctx.stroke(); });
+    ctx.globalCompositeOperation = "source-over";
+    // 3) the band: trailing edge dark -> core -> leading edge bright; it stands up out of the floor while forming
+    const bg = ctx.createRadialGradient(p.x, p.y, Math.max(0, rIn), p.x, p.y, Math.max(1, rOut));
+    const stops = [[0, `rgba(${T.trail},${.75*A})`], [.55, `rgba(${T.core},${.92*A})`], [.86, `rgba(${T.lead},${.95*A})`], [1, `rgba(${T.lead},${.6*A})`]];
+    (mech.inward ? stops.map(([o,c])=>[1-o,c]).reverse() : stops).forEach(([o,c])=>bg.addColorStop(o,c));
+    ctx.fillStyle = bg;
+    ringSolidArcs(gaps, half, (a0, a1)=>{ arcPath(rIn, rOut, a0, a1); ctx.fill(); ctx.strokeStyle = "rgba(20,14,12,.55)"; ctx.lineWidth = 1; ctx.stroke(); });
+    // the leading edge line, the brightest thing on screen
+    ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = `rgba(${T.lead},${.95*A})`; ctx.lineWidth = 2*sc;
+    ringSolidArcs(gaps, half, (a0, a1)=>{ ctx.beginPath(); ctx.arc(p.x, p.y, rLead, toRad(a0), toRad(a1)); ctx.stroke(); });
+    ctx.globalCompositeOperation = "source-over";
+    // 4) moving texture
+    if(A > 0.05) ringSolidArcs(gaps, half, (a0, a1)=>ringFx(T, T.fx, p.x, p.y, rLead, dir, sc, a0, a1, now, A));
+    // 5) gates: a post at each edge of every gap, clean floor between (a faint warm wash marks the opening)
     gaps.forEach(g=>{
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, rOut+10*sc, toRad(g-half), toRad(g+half));
-      ctx.arc(p.x, p.y, Math.max(0,rIn-10*sc), toRad(g+half), toRad(g-half), true);
-      ctx.closePath();
-      ctx.globalAlpha = (.28+.12*pulse)*(preview?1.4:1); ctx.fillStyle = mossC; ctx.fill();
-      const ga = toRad(g), nx = Math.cos(ga)*inw, ny = Math.sin(ga)*inw, tx = -ny, ty = nx;
-      const cx = p.x+nx*inw*rPx, cy = p.y+ny*inw*rPx, c = 7*sc;
-      ctx.strokeStyle = "#d9f7d0"; ctx.lineWidth = 2.5; ctx.globalAlpha = .85;
-      ctx.beginPath();
-      ctx.moveTo(cx-nx*c-tx*c, cy-ny*c-ty*c); ctx.lineTo(cx+nx*c, cy+ny*c); ctx.lineTo(cx-nx*c+tx*c, cy-ny*c+ty*c);
-      ctx.stroke();
-      ctx.restore();
+      ctx.save(); arcPath(rIn - 6*sc, rOut + 6*sc, g-half, g+half); ctx.fillStyle = `rgba(255,244,220,${.07*A})`; ctx.fill(); ctx.restore();
+      const rise = preview ? fk : 1;
+      ringPost(T, p.x, p.y, rPx, toRad(g-half), sc, A, 14*rise); ringPost(T, p.x, p.y, rPx, toRad(g+half), sc, A, 14*rise);
     });
+    ctx.restore();
     ctx.globalAlpha = 1;
+  }
+  // wind-up for rings that grow out of the boss: the theme's colour gathers into a tight spinning ring at its feet
+  function drawRingForming(e, mech, progress){
+    const T = ringTheme(e, mech), p = VIEW.project(e.x, e.y), sc = VIEW.scale, now = (S.tPrev||0)/1000, k = Math.max(0, Math.min(1, progress));
+    const R = (18 + 22*(1-k))*sc;
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for(let i=0;i<14;i++){ const a = i*Math.PI*2/14 + now*(2+k*4), r = R + (1-k)*30*sc*_ringRand(i);
+      ctx.fillStyle = `rgba(${T.lead},${.35+.6*k})`; ctx.beginPath(); ctx.arc(p.x+Math.cos(a)*r, p.y+Math.sin(a)*r, (1.2+1.2*k)*sc, 0, Math.PI*2); ctx.fill(); }
+    ctx.strokeStyle = `rgba(${T.core},${.3+.6*k})`; ctx.lineWidth = (2+4*k)*sc; ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = `rgba(${T.lead},${.5*k})`; ctx.lineWidth = 1.2*sc; ctx.beginPath(); ctx.arc(p.x, p.y, R, -Math.PI/2, -Math.PI/2 + Math.PI*2*k); ctx.stroke();
+    ctx.restore();
   }
 
   // The Gravewell Knell's Converging Shards, mid-sweep: the same dashed-
@@ -26617,63 +26702,24 @@ thrall(){return gs(14)+
       ctx.arc(p.x, p.y, rIn, toRad(a1), toRad(a0), true);
       ctx.closePath();
     };
-    // ---- safe zone: soft green, no hard line (so it never reads as a wall)
-    {
-      const s0 = angleB, s1 = angleC + (angleC<=angleB ? 360 : 0);
-      ctx.save();
-      sector(s0, s1);
-      ctx.fillStyle = mossC; ctx.globalAlpha = (.30 + .12*pulse)*fade; ctx.fill();
-      ctx.restore();
-      if(s1-s0 > 40){
-        const mid = toRad((s0+s1)/2);
-        const lp = { x:p.x+Math.cos(mid)*rMid, y:p.y+Math.sin(mid)*rMid };
-        ctx.save();
-        ctx.globalAlpha = (.55+.3*pulse)*fade;
-        ctx.font = `700 ${Math.round(12*sc)}px system-ui,sans-serif`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.55)";
-        ctx.strokeText("SAFE", lp.x, lp.y);
-        ctx.fillStyle = "#d9f7d0"; ctx.fillText("SAFE", lp.x, lp.y);
-        ctx.restore();
-      }
-    }
-    // ---- crush zones: red, striped, solid bright edge, chevrons
+    // ---- ringV2: the safe arc is clean floor with only a faint warm wash
+    { const s0 = angleB, s1 = angleC + (angleC<=angleB ? 360 : 0); ctx.save(); sector(s0, s1); ctx.fillStyle = "rgba(255,244,220,1)"; ctx.globalAlpha = .06*fade; ctx.fill(); ctx.restore(); }
+    // ---- ringV2: closing arcs as a crystal band: dark edges, bright core, energy streaming toward the anchor
+    const SH = RING_THEMES[RING_THEME_BY_FAMILY[FAMILY_BY_BOSS[e.kind]]||"bell"] || RING_THEMES.bell; // the family theme (Gravewell: bronze)
     const crush = (from, to, dirSign) => {
       if(Math.abs(to-from) < .5) return;
-      const lo = Math.min(from,to), hi = Math.max(from,to);
+      const lo = Math.min(from,to), hi = Math.max(from,to), live = preview==null;
       ctx.save();
-      sector(lo, hi);
-      ctx.fillStyle = bloodC; ctx.globalAlpha = (preview!=null ? .12 : .26+.12*pulse)*fade; ctx.fill();
-      if(preview==null){
-        ctx.clip();
-        ctx.globalAlpha = .28; ctx.strokeStyle = bloodC; ctx.lineWidth = 3*sc;
-        const off = (now*40)%22;
-        for(let k=-rOut*2; k<rOut*2; k+=22){
-          ctx.beginPath();
-          ctx.moveTo(p.x+k+off-rOut, p.y-rOut); ctx.lineTo(p.x+k+off+rOut, p.y+rOut);
-          ctx.stroke();
-        }
-      }
+      const g = ctx.createRadialGradient(p.x, p.y, Math.max(0, rIn), p.x, p.y, Math.max(1, rOut));
+      const al = (live ? 1 : .35)*fade;
+      g.addColorStop(0, `rgba(${SH.trail},${.5*al})`); g.addColorStop(.5, `rgba(${SH.core},${.62*al})`); g.addColorStop(1, `rgba(${SH.trail},${.5*al})`);
+      sector(lo, hi); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(20,14,22,.6)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = `rgba(${SH.core},${.12*al})`; ctx.lineWidth = (rOut-rIn) + 10*sc; ctx.beginPath(); ctx.arc(p.x, p.y, rMid, toRad(lo), toRad(hi)); ctx.stroke();
+      ctx.strokeStyle = `rgba(${SH.lead},${.85*al})`; ctx.lineWidth = 1.6*sc; ctx.beginPath(); ctx.arc(p.x, p.y, rMid, toRad(lo), toRad(hi)); ctx.stroke();
+      if(live){ const span = hi-lo, n = Math.max(1, Math.floor(span/14));
+        for(let k=0;k<n;k++){ const f = ((k + (now*1.8)%1)/n), ang = dirSign>0 ? lo + f*span : hi - f*span;
+          for(const rr of [rMid-(rOut-rIn)*.28, rMid+(rOut-rIn)*.28]){ ctx.strokeStyle = `rgba(${SH.lead},${.8*Math.sin(f*Math.PI)})`; ctx.lineWidth = 1.4*sc; ctx.beginPath(); ctx.arc(p.x, p.y, rr, toRad(ang), toRad(ang+dirSign*6), dirSign<0); ctx.stroke(); } } }
       ctx.restore();
-      ctx.save();
-      sector(lo, hi);
-      ctx.strokeStyle = bloodC; ctx.lineWidth = 2.5; ctx.globalAlpha = (preview!=null ? .35 : .9)*fade;
-      ctx.stroke();
-      ctx.restore();
-      if(preview==null){
-        // chevrons marching toward the anchor
-        const span = hi-lo, n = Math.max(1, Math.floor(span/22));
-        for(let k=0;k<n;k++){
-          let f = ((k + (now*1.6)%1)/n);
-          const ang = toRad(dirSign>0 ? lo + f*span : hi - f*span);
-          const cx = p.x+Math.cos(ang)*rMid, cy = p.y+Math.sin(ang)*rMid;
-          const tx = -Math.sin(ang)*dirSign, ty = Math.cos(ang)*dirSign;
-          const nx = Math.cos(ang), ny = Math.sin(ang), c = 7*sc;
-          ctx.beginPath();
-          ctx.moveTo(cx-tx*c-nx*c, cy-ty*c-ny*c); ctx.lineTo(cx+tx*c, cy+ty*c); ctx.lineTo(cx-tx*c+nx*c, cy-ty*c+ny*c);
-          ctx.strokeStyle = "#ffd9d0"; ctx.lineWidth = 2.5; ctx.globalAlpha = .75; ctx.stroke();
-        }
-      }
     };
     crush(A, A + 120*(1-t), -1);   // between anchor and B (chevrons flow toward the anchor)
     crush(A - 120*(1-t), A, 1);    // between C and anchor
@@ -36195,7 +36241,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 28e593bd0a) */
+<script>/* phone app: offline cache (build ab2ad46d8c) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
