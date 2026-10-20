@@ -18204,12 +18204,13 @@ return OUT;
     scarf:'#4a5a1a', scarfL:'#5a6a1e', venom:'#9acd32', venomL:'#c9e84a', blade:'#dfe4ea', bladeD:'#b8c0c8', wrap:'#403d46'
   };
   const IW = 2*Math.PI/7.5;
+  const hexRgb=h=>{ const n=parseInt(h.slice(1),16); return ((n>>16)&255)+','+((n>>8)&255)+','+(n&255); };
   const rad = d=>d*Math.PI/180, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
   const ease = t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2, easeOut=t=>1-Math.pow(1-t,3);
   const grad=(ctx,x0,y0,x1,y1,cL,c,cD)=>{ const g=ctx.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,cL); g.addColorStop(.5,c); g.addColorStop(1,cD); return g; };
   const ink=(ctx,P,lw)=>{ ctx.lineJoin='round'; ctx.lineCap='round'; ctx.strokeStyle=P.ol; ctx.lineWidth=lw; ctx.stroke(); };
   const glowAt=(ctx,x,y,r,rgb,a)=>{ if(!(r>0) || !(a>0)) return; ctx.save(); ctx.globalCompositeOperation='lighter'; const g=ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,`rgba(${rgb},${a})`); g.addColorStop(1,`rgba(${rgb},0)`); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore(); };
-  const VG='154,205,50';
+  let VG='154,205,50', VL2='201,232,74'; // glow colour follows the palette (so a recolour recolours the venom glow too)
   function chain(x,y,a1,l1,a2,l2){ const k=[x+Math.sin(rad(a1))*l1, y+Math.cos(rad(a1))*l1]; return [k,[k[0]+Math.sin(rad(a1+a2))*l2, k[1]+Math.cos(rad(a1+a2))*l2]]; }
   function tube(ctx,[a,b,c],w0,w1,fill,P,lw){
     const n=(p,q)=>{ const dx=q[0]-p[0], dy=q[1]-p[1], L=Math.hypot(dx,dy)||1; return [-dy/L, dx/L]; };
@@ -18234,11 +18235,11 @@ return OUT;
     ctx.beginPath(); ctx.arc(0,0,rx-1,a0,a1,a1<a0); ctx.strokeStyle=`rgba(${VG},${.95*k})`; ctx.lineWidth=1.8; ctx.stroke(); ctx.restore(); }
   function droplets(ctx,c,k,spread,dir,t,n){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter';
     for(let i=0;i<(n||14);i++){ const a=rad(dir)+(i/((n||14)-1)-.5)*rad(spread), r=6+k*(18+ (i*7%11)), x=c[0]+Math.cos(a)*r, y=c[1]+Math.sin(a)*r+k*k*6;
-      ctx.fillStyle=`rgba(${i%3?VG:'201,232,74'},${.9*(1-k*.6)})`; ctx.beginPath(); ctx.arc(x,y,1.3+(i%3)*.4,0,Math.PI*2); ctx.fill(); }
+      ctx.fillStyle=`rgba(${i%3?VG:VL2},${.9*(1-k*.6)})`; ctx.beginPath(); ctx.arc(x,y,1.3+(i%3)*.4,0,Math.PI*2); ctx.fill(); }
     glowAt(ctx,c[0],c[1],16,VG,.35*(1-k)); ctx.restore(); }
   function biteMark(ctx,c,k){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.translate(c[0],c[1]);
     for(const s of [-1,1]){ ctx.beginPath(); ctx.moveTo(s*5,-5); ctx.quadraticCurveTo(s*2.2,0,s*.8,5); ctx.strokeStyle=`rgba(${VG},${k})`; ctx.lineWidth=2; ctx.stroke(); }
-    ctx.beginPath(); ctx.arc(0,0,8+4*(1-k),0,Math.PI*2); ctx.strokeStyle=`rgba(201,232,74,${.6*k})`; ctx.lineWidth=1.2; ctx.stroke(); ctx.restore(); }
+    ctx.beginPath(); ctx.arc(0,0,8+4*(1-k),0,Math.PI*2); ctx.strokeStyle=`rgba(${VL2},${.6*k})`; ctx.lineWidth=1.2; ctx.stroke(); ctx.restore(); }
   function bloomFx(ctx,k,t){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter';
     for(let i=0;i<6;i++){ const a=i*Math.PI/3+.3, R=14+16*easeOut(k), x=Math.cos(a)*R, y=-34+Math.sin(a)*R*.7, pr=3+4*k;
       for(let j=0;j<5;j++){ const b=j*Math.PI*2/5+t*2; ctx.fillStyle=`rgba(${VG},${.7*(1-k*.5)})`; ctx.beginPath(); ctx.ellipse(x+Math.cos(b)*pr*.7,y+Math.sin(b)*pr*.7,pr*.6,pr*.35,b,0,Math.PI*2); ctx.fill(); }
@@ -18307,7 +18308,7 @@ return OUT;
     ctx.beginPath(); ctx.moveTo(-.4,-12.4); ctx.quadraticCurveTo(8.6,-15.6,10.2,-7); ctx.strokeStyle=P.clothLL; ctx.lineWidth=1.1; ctx.stroke();
   }
   function drawSide(ctx, x, y, s, st, palOverride){
-    const P = Object.assign({}, PAL, palOverride||{}), q = pose(st), t = st.t||0;
+    const P = Object.assign({}, PAL, palOverride||{}); VG=hexRgb(P.venom); VL2=hexRgb(P.venomL); const q = pose(st), t = st.t||0;
     const lw = Math.max(1.3, 1.0/s), face = st.faceK!=null ? st.faceK : (st.face||1), lan = st.lantern||{a:0};
     ctx.save(); ctx.translate(x,y); ctx.scale(s*face, s);
     if(q.drop>0){ ctx.save(); ctx.translate(15,-1); ctx.rotate(rad(lerp(180,100,q.drop))); ctx.globalAlpha=Math.min(1,q.drop*3); fang(ctx,P,lw,[0,0],0,t,false); ctx.restore(); }
@@ -18368,7 +18369,7 @@ return OUT;
     ctx.beginPath(); ctx.moveTo(-6.4,-7); ctx.quadraticCurveTo(-6.6,-14.8,0,-15.2); ctx.strokeStyle=P.clothLL; ctx.lineWidth=1.1; ctx.stroke();
   }
   function drawFront(ctx, x, y, s, st, palOverride){
-    const P = Object.assign({}, PAL, palOverride||{}), q = pose(Object.assign({}, st, {speed:0, phase:0, combat:0, pose: st.pose==='walk'?'idle':st.pose})), t = st.t||0;
+    const P = Object.assign({}, PAL, palOverride||{}); VG=hexRgb(P.venom); VL2=hexRgb(P.venomL); const q = pose(Object.assign({}, st, {speed:0, phase:0, combat:0, pose: st.pose==='walk'?'idle':st.pose})), t = st.t||0;
     const lw = Math.max(1.3, 1.0/s), side = (st.staffSide||1) < 0 ? -1 : 1, lan = st.lantern||{a:0};
     const dth = st.pose==='death' ? (st.deathT||0) : 0, kneel = ease(clamp(dth/.5,0,1)), slump = ease(clamp((dth-.3)/.6,0,1));
     ctx.save(); ctx.translate(x,y); ctx.scale(s*side, s);
@@ -18735,7 +18736,8 @@ return OUT;
     ol:'#241a17', robe:'#3a2f5a', robeL:'#4a3a72', robeLL:'#6a5aa0', robeD:'#2a2143', robeDD:'#1c1428', vio:'#8a55e0', vioL:'#a67cf0', vioLL:'#c39bff',
     bone:'#cfc4d8', boneL:'#eee8f4', boneD:'#b8aecb', boneM:'#c9c0d6', wisp:'#e8dcff', wispL:'#f6eeff', wood:'#3a2a22', woodL:'#4a3a2c', glove:'#2a2143'
   };
-  const IW = 2*Math.PI/7.5, VG='166,124,240', VL='195,155,255';
+  const IW = 2*Math.PI/7.5; let VG='166,124,240', VL='195,155,255', VV='138,85,224', VW='232,220,255', VWL='246,238,255'; // glow colours follow the palette
+  const hexRgb=h=>{ const n=parseInt(h.slice(1),16); return ((n>>16)&255)+','+((n>>8)&255)+','+(n&255); };
   const rad = d=>d*Math.PI/180, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
   const ease = t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2, easeOut=t=>1-Math.pow(1-t,3);
   const grad=(ctx,x0,y0,x1,y1,cL,c,cD)=>{ const g=ctx.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,cL); g.addColorStop(.5,c); g.addColorStop(1,cD); return g; };
@@ -18754,14 +18756,14 @@ return OUT;
     ctx.strokeStyle=`rgba(${VL},${.9*k})`; ctx.lineWidth=1.1; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
     ctx.setLineDash([1.6,1.6]); ctx.beginPath(); ctx.arc(0,0,r*.78,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
     ctx.beginPath(); for(let i=0;i<3;i++){ const a=i*Math.PI*2/3-Math.PI/2; ctx[i?'lineTo':'moveTo'](Math.cos(a)*r*.7,Math.sin(a)*r*.7); } ctx.closePath(); ctx.stroke();
-    ctx.fillStyle=`rgba(246,238,255,${k})`; ctx.beginPath(); ctx.arc(0,0,r*.14,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=`rgba(${VWL},${k})`; ctx.beginPath(); ctx.arc(0,0,r*.14,0,Math.PI*2); ctx.fill();
     ctx.restore(); glowAt(ctx,x,y,r*1.8,VG,.4*k); }
   function wisps(ctx,x,y,k,t,n,R){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter';
     for(let i=0;i<(n||4);i++){ const u=((t*.9)+i/(n||4))%1, a=i*2.1+t*1.3, r=(R||4)*(.4+u), px=x+Math.cos(a)*r, py=y-u*8+Math.sin(a)*r*.4;
-      ctx.fillStyle=`rgba(232,220,255,${.8*k*Math.sin(u*Math.PI)})`; ctx.beginPath(); ctx.arc(px,py,.9+.5*(1-u),0,Math.PI*2); ctx.fill(); } ctx.restore(); }
+      ctx.fillStyle=`rgba(${VW},${.8*k*Math.sin(u*Math.PI)})`; ctx.beginPath(); ctx.arc(px,py,.9+.5*(1-u),0,Math.PI*2); ctx.fill(); } ctx.restore(); }
   function bolt(ctx,x0,y0,x1,y1,k,w,t){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
     ctx.strokeStyle=`rgba(${VG},${.55*k})`; ctx.lineWidth=w*2.4; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-    ctx.strokeStyle=`rgba(246,238,255,${.95*k})`; ctx.lineWidth=w*.7; ctx.beginPath(); ctx.moveTo(x0,y0);
+    ctx.strokeStyle=`rgba(${VWL},${.95*k})`; ctx.lineWidth=w*.7; ctx.beginPath(); ctx.moveTo(x0,y0);
     const n=6; for(let i=1;i<=n;i++){ const u=i/n; ctx.lineTo(lerp(x0,x1,u), lerp(y0,y1,u)+Math.sin(u*9+t*20)*w*.8*(1-u*.3)); } ctx.stroke(); ctx.restore(); glowAt(ctx,x1,y1,w*4,VL,.7*k); }
   // small skull: used on the staff head and for Mark of Doom
   function skull(ctx,P,lw,x,y,r,eyeK,col){ ctx.save(); ctx.translate(x,y);
@@ -18799,30 +18801,30 @@ return OUT;
   function talisman(ctx,P,lw,x,y,sw,k){ ctx.save(); ctx.translate(x,y); ctx.rotate(rad(sw));
     ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,2); ctx.strokeStyle=P.ol; ctx.lineWidth=.7; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(-1.1,2); ctx.lineTo(1.1,2); ctx.lineTo(1.2,8.4); ctx.lineTo(0,9.6); ctx.lineTo(-1.2,8.4); ctx.closePath(); ctx.fillStyle=P.boneD; ctx.fill(); ink(ctx,P,lw*.45);
-    ctx.beginPath(); ctx.moveTo(-.5,3.4); ctx.lineTo(.5,4.6); ctx.lineTo(-.5,5.8); ctx.lineTo(.5,7); ctx.strokeStyle=`rgba(138,85,224,${.8+.2*k})`; ctx.lineWidth=.6; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-.5,3.4); ctx.lineTo(.5,4.6); ctx.lineTo(-.5,5.8); ctx.lineTo(.5,7); ctx.strokeStyle=`rgba(${VV},${.8+.2*k})`; ctx.lineWidth=.6; ctx.stroke();
     ctx.restore(); if(k>0.05) glowAt(ctx,x,y+6,4,VG,.35*k); }
   // low violet mist curling round the hem
   function hemMist(ctx,t,k,w){ ctx.save(); ctx.globalCompositeOperation='lighter';
     for(let i=0;i<7;i++){ const u=(t*.13+i/7)%1, x=lerp(-w,w,(i*0.37+u*.6)%1), y=-1-Math.sin(u*Math.PI)*3, r=3+2*Math.sin(i+t);
-      ctx.fillStyle=`rgba(138,85,224,${.16*k*Math.sin(u*Math.PI)})`; ctx.beginPath(); ctx.ellipse(x,y,r*1.6,r*.6,0,0,Math.PI*2); ctx.fill(); } ctx.restore(); }
+      ctx.fillStyle=`rgba(${VV},${.16*k*Math.sin(u*Math.PI)})`; ctx.beginPath(); ctx.ellipse(x,y,r*1.6,r*.6,0,0,Math.PI*2); ctx.fill(); } ctx.restore(); }
   function blightRing(ctx,k,t){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter';
     const R=10+46*easeOut(k); ctx.save(); ctx.scale(1,.38); ctx.strokeStyle=`rgba(${VG},${.9*(1-k)})`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
     ctx.strokeStyle=`rgba(${VL},${.6*(1-k)})`; ctx.lineWidth=1.2; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.arc(0,0,R*.8,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
     for(let i=0;i<10;i++){ const a=i*Math.PI/5+t*.6, r=R*.92, x=Math.cos(a)*r, y=Math.sin(a)*r*.38-(1-k)*0-k*8;
-      ctx.fillStyle=`rgba(232,220,255,${.85*(1-k)})`; ctx.beginPath(); ctx.arc(x,y,1.3,0,Math.PI*2); ctx.fill(); }
+      ctx.fillStyle=`rgba(${VW},${.85*(1-k)})`; ctx.beginPath(); ctx.arc(x,y,1.3,0,Math.PI*2); ctx.fill(); }
     ctx.restore(); glowAt(ctx,0,-26,34,VG,.35*(1-k)); }
   // a ghostly hand the size of a body, reaching then clenching (Withering Grasp)
   function ghostHand(ctx,x,y,k,clench){ if(!(k>0.02)) return; ctx.save(); ctx.translate(x,y); ctx.globalCompositeOperation='lighter';
     ctx.fillStyle=`rgba(${VG},${.28*k})`; ctx.strokeStyle=`rgba(${VL},${.9*k})`; ctx.lineWidth=1.1;
     ctx.beginPath(); ctx.ellipse(0,4,6,7,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
     for(let i=0;i<4;i++){ const a=rad(-60+i*30), L=12*(1-.55*clench), bx=Math.sin(a)*5, by=-Math.cos(a)*5+2; const tx=bx+Math.sin(a)*L, ty=by-Math.cos(a)*L, cx=bx+Math.sin(a+rad(60*clench))*L*.7, cy=by-Math.cos(a+rad(60*clench))*L*.7;
-      ctx.beginPath(); ctx.moveTo(bx,by); ctx.quadraticCurveTo(cx,cy,lerp(tx,cx,clench),lerp(ty,cy+4,clench)); ctx.lineWidth=2.6; ctx.strokeStyle=`rgba(${VG},${.5*k})`; ctx.stroke(); ctx.lineWidth=1; ctx.strokeStyle=`rgba(246,238,255,${.8*k})`; ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(bx,by); ctx.quadraticCurveTo(cx,cy,lerp(tx,cx,clench),lerp(ty,cy+4,clench)); ctx.lineWidth=2.6; ctx.strokeStyle=`rgba(${VG},${.5*k})`; ctx.stroke(); ctx.lineWidth=1; ctx.strokeStyle=`rgba(${VWL},${.8*k})`; ctx.stroke(); }
     ctx.restore(); glowAt(ctx,x,y,16,VG,.4*k); }
   function clawMarks(ctx,x,y,k){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.lineCap='round';
     for(let i=0;i<3;i++){ const ox=i*3.4-3.4; ctx.strokeStyle=`rgba(${VL},${.95*k})`; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(x+ox+4,y-8); ctx.quadraticCurveTo(x+ox-1,y,x+ox+2,y+8); ctx.stroke(); }
     ctx.restore(); glowAt(ctx,x,y,12,VG,.5*k); }
   function soulWisp(ctx,x0,y0,x1,y1,k,t){ if(!(k>0.02)) return; ctx.save(); ctx.globalCompositeOperation='lighter';
-    for(let i=0;i<12;i++){ const u=i/11, px=lerp(x0,x1,u)+Math.sin(u*10+t*14)*2.2, py=lerp(y0,y1,u)+Math.cos(u*8+t*11)*1.6; ctx.fillStyle=`rgba(232,220,255,${.85*k*(1-u*.4)})`; ctx.beginPath(); ctx.arc(px,py,1.6*(1-u*.5),0,Math.PI*2); ctx.fill(); }
+    for(let i=0;i<12;i++){ const u=i/11, px=lerp(x0,x1,u)+Math.sin(u*10+t*14)*2.2, py=lerp(y0,y1,u)+Math.cos(u*8+t*11)*1.6; ctx.fillStyle=`rgba(${VW},${.85*k*(1-u*.4)})`; ctx.beginPath(); ctx.arc(px,py,1.6*(1-u*.5),0,Math.PI*2); ctx.fill(); }
     ctx.restore(); glowAt(ctx,x1,y1,9,VL,.6*k); }
   
   function pose(st){
@@ -18907,7 +18909,7 @@ return OUT;
     for(let i=1;i<pts.length;i++){ const k=1-i/pts.length; ctx.strokeStyle=`rgba(${150+80*k|0},${110+100*k|0},255,${.7*k})`; ctx.lineWidth=.6+3*k; ctx.beginPath(); ctx.moveTo(pts[i-1][0],pts[i-1][1]); ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke(); }
     ctx.restore(); }
   function drawSide(ctx, x, y, s, st, palOverride){
-    const P = Object.assign({}, PAL, palOverride||{}), q = pose(st), t = st.t||0;
+    const P = Object.assign({}, PAL, palOverride||{}); VG=hexRgb(P.vioL); VL=hexRgb(P.vioLL); VV=hexRgb(P.vio); VW=hexRgb(P.wisp); VWL=hexRgb(P.wispL); const q = pose(st), t = st.t||0;
     const lw = Math.max(1.3, 1.0/s), face = st.faceK!=null ? st.faceK : (st.face||1), lan = st.lantern||{a:0};
     ctx.save(); ctx.translate(x,y); ctx.scale(s*face, s);
     if(q.drop>0){ ctx.save(); ctx.translate(-10,-1); ctx.rotate(rad(lerp(-10,-84,q.drop))); ctx.translate(0,-18); staff(ctx,P,lw,[0,0],0,t,0); ctx.restore(); }
@@ -18994,7 +18996,7 @@ return OUT;
     ctx.beginPath(); ctx.moveTo(-6.8,2.6); ctx.quadraticCurveTo(-8,-9,-5,-13.4); ctx.quadraticCurveTo(0,-16.4,5,-13.4); ctx.quadraticCurveTo(8,-9,6.8,2.6); ctx.strokeStyle=P.vio; ctx.lineWidth=1.1; ctx.stroke();
   }
   function drawFront(ctx, x, y, s, st, palOverride){
-    const P = Object.assign({}, PAL, palOverride||{}), q = pose(Object.assign({}, st, {speed:0, phase:0, combat:0, pose: st.pose==='walk'?'idle':st.pose})), t = st.t||0;
+    const P = Object.assign({}, PAL, palOverride||{}); VG=hexRgb(P.vioL); VL=hexRgb(P.vioLL); VV=hexRgb(P.vio); VW=hexRgb(P.wisp); VWL=hexRgb(P.wispL); const q = pose(Object.assign({}, st, {speed:0, phase:0, combat:0, pose: st.pose==='walk'?'idle':st.pose})), t = st.t||0;
     const lw = Math.max(1.3, 1.0/s), side = (st.staffSide||1) < 0 ? -1 : 1, lan = st.lantern||{a:0};
     const dth = st.pose==='death' ? (st.deathT||0) : 0, kneel = ease(clamp(dth/.5,0,1)), slump = ease(clamp((dth-.3)/.6,0,1));
     ctx.save(); ctx.translate(x,y); ctx.scale(s*side, s);
@@ -19025,7 +19027,7 @@ return OUT;
       hdR=[lerp(lerp(14,17,up),23,dn), lerp(lerp(-1,-10,up),2,dn)]; elR=[lerp(lerp(15,17,up),19,dn), lerp(lerp(-8,-14,up),-6,dn)]; }
     if(q.hit>0){ hdL=[-17,-3]; elL=[-16,-9]; sx0=-17; sy0=-3; sA=-14; hdR=[17,-4]; elR=[16,-10]; }
     if(dth>0){ hdL=[-14,3]; elL=[-13,-5]; hdR=[13,3]; elR=[13,-5]; }
-    if(slump<=0){ const foot = staff(ctx,P,lw,[hdL[0],hdL[1]+slide],sA,t,q.skullEye); if(nd>0.02){ const fx=hdL[0]-Math.sin(rad(sA))*-18, fy=hdL[1]+slide+18; glowAt(ctx,fx,fy,14,VL,.8*nd); ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.strokeStyle=`rgba(246,238,255,${nd})`; ctx.lineWidth=1.1; for(let i=0;i<7;i++){ const a=Math.PI+i*Math.PI/6; ctx.beginPath(); ctx.moveTo(fx+Math.cos(a)*3,fy+Math.sin(a)*1.4); ctx.lineTo(fx+Math.cos(a)*(7+5*(1-nd)),fy+Math.sin(a)*(3+3*(1-nd))); ctx.stroke(); } ctx.restore(); } }
+    if(slump<=0){ const foot = staff(ctx,P,lw,[hdL[0],hdL[1]+slide],sA,t,q.skullEye); if(nd>0.02){ const fx=hdL[0]-Math.sin(rad(sA))*-18, fy=hdL[1]+slide+18; glowAt(ctx,fx,fy,14,VL,.8*nd); ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.strokeStyle=`rgba(${VWL},${nd})`; ctx.lineWidth=1.1; for(let i=0;i<7;i++){ const a=Math.PI+i*Math.PI/6; ctx.beginPath(); ctx.moveTo(fx+Math.cos(a)*3,fy+Math.sin(a)*1.4); ctx.lineTo(fx+Math.cos(a)*(7+5*(1-nd)),fy+Math.sin(a)*(3+3*(1-nd))); ctx.stroke(); } ctx.restore(); } }
     tube(ctx,[shL,elL,hdL],3.5,2.9,P.robeD,P,lw); ctx.beginPath(); ctx.arc(hdL[0],hdL[1],2.4,0,Math.PI*2); ctx.fillStyle=P.glove; ctx.fill(); ink(ctx,P,lw*.8);
     // bodice, lacing, sash
     ctx.beginPath(); ctx.moveTo(-10,1); ctx.quadraticCurveTo(-11.6,-10,-9.6,-18); ctx.quadraticCurveTo(0,-21,9.6,-18); ctx.quadraticCurveTo(11.6,-10,10,1); ctx.closePath(); ctx.fillStyle=grad(ctx,-11,-20,11,1,P.robeL,P.robe,P.robeD); ctx.fill(); ink(ctx,P,lw);
@@ -19243,7 +19245,7 @@ return OUT;
       if(crWarmQ.length) setTimeout(step, 30); };
     setTimeout(step, 30);
   }
-  try{ if(typeof window!=="undefined") window.__hr = { CR_SPRITES, CR_CHARS, crState, crSnap, HR_SPRITES:CR_SPRITES, get pixels(){ return crPixels; }, get failed(){ return crFail; } }; }catch(_){}
+  try{ if(typeof window!=="undefined") window.__hr = { get crThumb(){ return typeof crThumb!=="undefined" ? crThumb : null; }, CR_SPRITES, CR_CHARS, crState, crSnap, HR_SPRITES:CR_SPRITES, get pixels(){ return crPixels; }, get failed(){ return crFail; } }; }catch(_){}
   function tryPartyArtDraw(m, key, cx, gy, r, alpha){
     if(CR_CHARS[key] && crDraw(m, key, cx, gy, r, alpha, skinForRoster(key))) return true; // healerRigV1 / tankRigV1
     if(!partyArtReady(key)) return false;
@@ -30245,8 +30247,16 @@ thrall(){return gs(14)+
     });
     wrap.scrollTop = keepScroll;
   }
+  const _crThumbs = {};
+  function crThumb(key, skin){ const C = CR_CHARS[key]; if(!C || !C.rig || typeof document==="undefined") return "";
+    const ck = key+"|"+(skin?skin.id:"-"); if(_crThumbs[ck]) return _crThumbs[ck];
+    try{ const cv = document.createElement("canvas"); cv.width = 240; cv.height = 200; const c2 = cv.getContext("2d");
+      const st = { pose:"idle", view:1, t:0.6, faceK:1, staffSide:1, lantern:{a:0,v:0}, speed:0, phase:0, combat:0 };
+      C.rig.draw(c2, 120, 190, 1.86, st, crPal(C, skin));
+      return (_crThumbs[ck] = `<img alt="" src="${cv.toDataURL("image/png")}">`); }catch(_){ return ""; } }
   function skinThumb(role, skin){ // a small idle image of the character, in that skin (or plain)
-    const key = ROSTER_ROLE_KEY[role]; if(!PARTY_ART_DEFS[key]) return "";
+    const key = ROSTER_ROLE_KEY[role]; { const ct = crThumb(key, skin); if(ct) return ct; } // healerRigV1: the redrawn art
+    if(!PARTY_ART_DEFS[key]) return "";
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -8 140 116" width="120" height="100">${PARTY_ART_DEFS[key]("idle")}</svg>`;
     if(skin) svg = recolorSvg(svg, skin.map);
     return `<img alt="" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}">`;
@@ -36185,7 +36195,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 58e0a04744) */
+<script>/* phone app: offline cache (build 28e593bd0a) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
