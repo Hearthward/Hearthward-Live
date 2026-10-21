@@ -12602,7 +12602,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(!t || !t.alive) return;
     amount = Math.round(flat ? amount : amount * healPowerMul() * (S._reachMul ? reachMulFor(targetKey) : 1));
     t.shields = t.shields || [];
-    t.shields.push({ amount, orig: amount, remaining: dur, dur, source: sourceId || null, name });
+    t.shields.push({ amount, orig: amount, remaining: dur, dur, source: sourceId || null, name, fam: flat ? "plate" : "wax" }); // compFxV1
     recomputeShieldTotals(t);
     pushLog("heal", `${name} wards ${displayName(t)} (${amount} absorb).`);
   }
@@ -15881,18 +15881,17 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- lasting marks on the party, watched every frame
   function sfxWatch(){
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key]; if(!m) return;
-      const sh = m.alive ? (m.shield||0) : 0; if((m._sfxSh||0) > 0 && sh <= 0 && m.alive) sfxSpawn({ k:"crack", at:key, dur:0.6 }); m._sfxSh = sh; });
+      const f = m._sfxFam || (m._sfxFam = { wax:0, plate:0, waxM:0, plateM:0, waxF:1, plateF:1 }); let w = 0, p = 0;
+      if(m.alive) (m.shields||[]).forEach(x=>{ const a = Math.max(0, x.amount||0); if(x.fam==="plate") p += a; else w += a; });
+      if(f.wax > 0 && w <= 0 && m.alive) sfxSpawn({ k:"crack", at:key, dur:0.6 });
+      if(f.plate > 0 && p <= 0 && m.alive) sfxSpawn({ k:"c_plates", at:key, dur:0.55, top:true });
+      f.waxM = w > 0 ? Math.max(f.wax > 0 ? f.waxM : 0, w) : 0; f.plateM = p > 0 ? Math.max(f.plate > 0 ? f.plateM : 0, p) : 0; // the biggest it has been since it went up
+      f.wax = w; f.plate = p; f.waxF = w > 0 ? w/f.waxM : 0; f.plateF = p > 0 ? p/f.plateM : 0; });
   }
   function sfxDrawLasting(){
     const now = (S.tPrev||0)/1000, r = sfxR();
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key]; if(!m || !m.alive) return; const b = sfxAt(m, 1.35);
-      if((m.shield||0) > 0){ // Wax Ward: a translucent amber shell, a highlight sliding over it
-        const R = r*1.7; ctx.save();
-        const g = ctx.createRadialGradient(b.x - R*.3, b.y - R*.35, R*.1, b.x, b.y, R); g.addColorStop(0, `rgba(${SC},.20)`); g.addColorStop(.7, `rgba(${SW},.12)`); g.addColorStop(1, `rgba(${SW},.38)`);
-        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.86, R, 0, 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = `rgba(${SW},.75)`; ctx.lineWidth = 1.4; ctx.stroke();
-        ctx.strokeStyle = `rgba(255,250,235,.55)`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.7, R*.86, 0, Math.PI*1.05 + Math.sin(now*1.2)*.2, Math.PI*1.4 + Math.sin(now*1.2)*.2); ctx.stroke();
-        ctx.restore(); }
+      // compFxV1: shields are drawn in the pass above the characters (cfxShells)
       if((m._hots||[]).some(h=>h.name==="Hearthlight" && h.ticksLeft>0)){ // Hearthlight: warm embers drifting up from the feet
         ctx.save(); ctx.globalCompositeOperation = "lighter";
         for(let i=0;i<4;i++){ const u = ((now*.7) + i/4 + (key.length*.13)) % 1, x = b.fx + Math.sin(i*2.3 + now*2)*r*.6, y = b.fy - u*r*2.2;
@@ -15903,10 +15902,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- drawing each effect
   function sfxDraw(){
     if(!SFX.length && !S.party) return;
-    sfxDrawLasting();
+    if(!_sfxTop) sfxDrawLasting();
     const r = sfxR(), now = (S.tPrev||0)/1000;
     ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
-    SFX.forEach(f=>{ const t = f.t - (f.delay||0); if(t < 0) return; const u = Math.min(1, t/f.dur);
+    SFX.forEach(f=>{ if(!f.both && !!f.top !== _sfxTop) return; const t = f.t - (f.delay||0); if(t < 0) return; const u = Math.min(1, t/f.dur);
       if(f.k==="ribbon" || f.k==="comet" || f.k==="dart" || f.k==="glob"){
         const tm = S.party[f.to]; const a = sfxLantern(), b = tm && sfxAt(tm, 1.35); if(!a || !b) return;
         const TRV = f.k==="dart" ? .35 : f.k==="comet" ? .45 : .42, tu = Math.min(1, u/TRV), lift = Math.min(60, Math.hypot(b.x-a.x, b.y-a.y)*.35) + r;
@@ -15997,6 +15996,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         for(let i=0;i<10;i++){ const a2 = i*Math.PI/5, x = b.x + Math.cos(a2)*R*.85*(1 + e2*.3), y = b.y + Math.sin(a2)*R*(1 + e2*.2) + e2*e2*r*2.5;
           ctx.fillStyle = `rgba(${SW},${.9*(1-u)})`; ctx.beginPath(); ctx.moveTo(x, y - r*.15); ctx.lineTo(x + r*.12, y + r*.08); ctx.lineTo(x - r*.1, y + r*.1); ctx.closePath(); ctx.fill(); }
         ctx.restore();
+      } else if(CFX_DRAW[f.k]){ CFX_DRAW[f.k](f, u, r, now); // compFxV1
       } else if(f.k==="impact"){ // an enemy blow landing on a party member: a spark thrown from the side it came from
         const tm = S.party[f.at], b = tm && sfxAt(tm, 1.3); if(!b) return; const e2 = sfxEase(u), ang = f.ang;
         ctx.save(); ctx.globalCompositeOperation = "lighter"; const cx2 = b.x - Math.cos(ang)*r*.5, cy2 = b.y - Math.sin(ang)*r*.5*.6;
@@ -16008,6 +16008,138 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     ctx.restore();
   }
   try{ if(typeof window!=="undefined") window.__sfx = { SFX, spellFxCast, sfxSpawn }; }catch(_){}
+  // ---- compFxV1: companion spell signatures ----
+  const CFK_G = "255,212,120", CFK_C = "255,246,214", CFK_S = "214,222,232";
+  let _sfxTop = false;
+  function sfxDrawTop(){ try{ cfxShells(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
+  function cfxShells(){ const now = (S.tPrev||0)/1000, r = sfxR();
+    Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key], fs = m && m._sfxFam; if(!m || !m.alive || !fs || !(fs.wax > 0 || fs.plate > 0)) return; const b = sfxAt(m, 1.35);
+      if(fs.wax > 0) cfxWaxShell(b, r, now, fs.waxF, key); if(fs.plate > 0) cfxPlateShell(b, r, now, fs.plateF); }); }
+  const CFX_PASS = { rally:"top", slam:"top", gward:"top", bulwark:"both" };
+  function cfxCast(id, o){ try{ o = o || {}; o.k = "c_" + id; o.dur = o.dur || CFX_DUR[id] || 0.6; const ps = CFX_PASS[id]; if(ps==="top") o.top = true; else if(ps==="both") o.both = true; sfxSpawn(o); }catch(_){} }
+  const CFX_DUR = { rally:0.75, slam:0.6, gward:0.8, bulwark:0.9 };
+  function cfxFace(m){ return m && m._hr ? (m._hr.faceK || m._hr.face || 1) : 1; }
+  // a small kite shield (Kessa's crest) centred at x,y
+  function cfxKite(x, y, s, a, fill){
+    ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s*.72, y - s*.55); ctx.quadraticCurveTo(x + s*.66, y + s*.45, x, y + s*1.05);
+    ctx.quadraticCurveTo(x - s*.66, y + s*.45, x - s*.72, y - s*.55); ctx.closePath();
+    if(fill){ ctx.fillStyle = `rgba(${CFK_G},${.85*a})`; ctx.fill(); }
+    ctx.strokeStyle = `rgba(${CFK_C},${a})`; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = `rgba(255,150,60,${.9*a})`; ctx.beginPath(); ctx.moveTo(x, y - s*.45); ctx.quadraticCurveTo(x + s*.28, y, x, y + s*.4); ctx.quadraticCurveTo(x - s*.28, y, x, y - s*.45); ctx.fill();
+  }
+  const CFX_DRAW = {
+    // Rally: three short sound arcs leave Kessa, and each enemy flashes a gold chevron as its attention snaps to her
+    c_rally(f, u, r, now){
+      const tk = S.party.tank, a = tk && sfxAt(tk, 2.0); if(!a) return; const fc = cfxFace(tk);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for(let i=0;i<3;i++){ const v = (u*1.6 - i*.18); if(v<=0 || v>=1) continue; const R = r*(.8 + 3.2*v);
+        ctx.strokeStyle = `rgba(${CFK_G},${.95*(1-v)})`; ctx.lineWidth = 3.2*(1-v) + .8; ctx.beginPath(); ctx.ellipse(a.x, a.y, R, R*.8, 0, -1.05, 1.05); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(a.x, a.y, R, R*.8, 0, Math.PI - 1.05, Math.PI + 1.05); ctx.stroke(); }
+      const v = Math.max(0, (u - .25)/.75);
+      if(v > 0) (f.es||[]).forEach((e,i)=>{ if(!e || !e.alive) return; const b = sfxAt(e, 2.3), al = Math.sin(Math.min(1, v*1.3)*Math.PI), lift = (1-sfxEase(Math.min(1, v*2)))*r*.6;
+        ctx.strokeStyle = `rgba(${CFK_G},${al})`; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(b.x - r*.38, b.y - lift - r*.2); ctx.lineTo(b.x, b.y - lift + r*.18); ctx.lineTo(b.x + r*.38, b.y - lift - r*.2); ctx.stroke();
+        sfxGlow(b.x, b.y - lift, r*.7, CFK_G, .45*al); });
+      ctx.restore();
+    },
+    // Provoking Slam: a shield-bash flare on the target, then a gold chain hauls back toward Kessa and vanishes into her
+    c_slam(f, u, r, now){
+      const tk = S.party.tank, e = f.e, a = tk && sfxAt(tk, 1.3), b = e && sfxAt(e, 1.3); if(!a || !b) return;
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const fl = Math.min(1, u/.35), fa = 1 - fl;
+      if(fa > 0){ sfxGlow(b.x, b.y, r*(1 + 1.2*sfxEase(fl)), CFK_G, .75*fa);
+        for(let i=0;i<8;i++){ const g = i*Math.PI/4 + .4, d = r*(.3 + 1.5*sfxEase(fl)); ctx.strokeStyle = `rgba(${i%2?CFK_C:CFK_G},${fa})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(b.x + Math.cos(g)*d*.45, b.y + Math.sin(g)*d*.45*.7); ctx.lineTo(b.x + Math.cos(g)*d, b.y + Math.sin(g)*d*.7); ctx.stroke(); } }
+      const pull = Math.max(0, (u - .15)/.85);
+      if(pull > 0 && pull < 1){ // a chain of interlocking links from the enemy to Kessa; the far end reels in
+        const D = Math.hypot(a.x - b.x, a.y - b.y), ang = Math.atan2(a.y - b.y, a.x - b.x), step = r*.34, N = Math.max(3, Math.floor(D/step));
+        const tail = sfxEase(pull), al = 1 - Math.max(0, (pull - .55)/.45), sag = r*.8*(1 - tail);
+        ctx.globalCompositeOperation = "source-over";
+        for(let i=0;i<N;i++){ const k0 = i/N; if(k0 < tail) continue; const x = b.x + (a.x - b.x)*k0, y = b.y + (a.y - b.y)*k0 + Math.sin(k0*Math.PI)*sag;
+          ctx.save(); ctx.translate(x, y); ctx.rotate(ang); const flat = i%2===0;
+          ctx.strokeStyle = `rgba(70,50,20,${.8*al})`; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.ellipse(0, 0, r*.24, flat ? r*.13 : r*.035, 0, 0, Math.PI*2); ctx.stroke();
+          ctx.strokeStyle = `rgba(${flat?CFK_G:CFK_C},${al})`; ctx.lineWidth = 1.8; ctx.stroke(); ctx.restore(); }
+        ctx.globalCompositeOperation = "lighter"; const hx = b.x + (a.x - b.x)*tail, hy = b.y + (a.y - b.y)*tail + Math.sin(tail*Math.PI)*sag; sfxGlow(hx, hy, r*.7, CFK_G, .6*al);
+      }
+      ctx.restore();
+    },
+    // Guardian's Ward: her crest is flung to the ally and opens into a ring; the shell the ward makes is the lasting mark
+    c_gward(f, u, r, now){
+      const tk = S.party.tank, tm = S.party[f.to], a = tk && sfxAt(tk, 1.6), b = tm && sfxAt(tm, 1.35); if(!a || !b) return;
+      const TRV = .45, tu = Math.min(1, u/TRV), lift = Math.min(55, Math.hypot(b.x-a.x, b.y-a.y)*.3) + r;
+      ctx.save();
+      if(u < TRV){ const h = sfxArc(a, b, sfxEase(tu), lift); ctx.globalCompositeOperation = "lighter";
+        for(let i=1;i<6;i++){ const q = sfxArc(a, b, Math.max(0, sfxEase(tu) - i*.05), lift); ctx.fillStyle = `rgba(${CFK_G},${.6*(1-i/6)})`; ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(1, r*.2*(1-i/6)), 0, Math.PI*2); ctx.fill(); }
+        sfxGlow(h.x, h.y, r*1.3, CFK_G, .75); ctx.globalCompositeOperation = "source-over";
+        ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(Math.sin(tu*Math.PI*2)*.5); cfxKite(0, 0, r*.62, 1, true); ctx.restore();
+      } else { const v = (u - TRV)/(1 - TRV), e2 = sfxEase(v); ctx.globalCompositeOperation = "lighter";
+        sfxGlow(b.x, b.y, r*1.8, CFK_G, .55*(1-v));
+        ctx.strokeStyle = `rgba(${CFK_G},${.9*(1-v)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(b.x, b.y, r*1.5*(.4+.6*e2)*.86, r*1.5*(.4+.6*e2), 0, 0, Math.PI*2); ctx.stroke();
+        ctx.globalCompositeOperation = "source-over"; cfxKite(b.x, b.y - r*(.2 + .6*e2), r*.6*(1 + .25*e2), 1 - v, true);
+      }
+      ctx.restore();
+    },
+    // Bulwark Stance: activation only. Her shield strikes the ground, a gold ring runs out across the party and a dome
+    // flashes over each of them for a moment. The 6s buff itself is a pip on every party row.
+    c_bulwark(f, u, r, now){
+      const tk = S.party.tank, c = tk && sfxAt(tk, 0); if(!c) return; const sc2 = VIEW.scale;
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const run = Math.min(1, u/.55), R = (24 + 110*sfxEase(run))*sc2, ra = 1 - run;
+      if(ra > 0 && !_sfxTop){ ctx.strokeStyle = `rgba(${CFK_G},${.85*ra})`; ctx.lineWidth = 2.4*ra + .6; ctx.beginPath(); ctx.ellipse(c.fx, c.fy, R, R*.6, 0, 0, Math.PI*2); ctx.stroke();
+        for(let i=0;i<16;i++){ const g = i*Math.PI/8; ctx.beginPath(); ctx.moveTo(c.fx + Math.cos(g)*R, c.fy + Math.sin(g)*R*.6); ctx.lineTo(c.fx + Math.cos(g)*(R - 7*sc2), c.fy + Math.sin(g)*(R - 7*sc2)*.6); ctx.stroke(); } }
+      if(u < .3 && !_sfxTop) sfxGlow(c.fx, c.fy - r*.4, r*2.2, CFK_C, .7*(1 - u/.3));
+      if(_sfxTop) Object.keys(S.party).forEach(k=>{ const m = S.party[k]; if(!m || !m.alive) return; const d = dist(m.x, m.y, tk.x, tk.y)*sc2, at = Math.min(.55, (d/(110*sc2))*.55), v = (u - at)/(1 - at); if(v <= 0 || v >= 1) return;
+        const b = sfxAt(m, 0), H = r*2.7, W = r*1.35, rise = sfxEase(Math.min(1, v*2.2)), al = 1 - Math.max(0, (v - .35)/.65);
+        const g = ctx.createLinearGradient(b.fx, b.fy, b.fx, b.fy - H*rise); g.addColorStop(0, `rgba(${CFK_G},${.30*al})`); g.addColorStop(1, `rgba(${CFK_C},${.06*al})`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.fx, b.fy, W, H*rise, 0, Math.PI, Math.PI*2); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = `rgba(${CFK_G},${.85*al})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(b.fx, b.fy, W, H*rise, 0, Math.PI, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(b.fx, b.fy, W, W*.4, 0, 0, Math.PI*2); ctx.stroke(); });
+      ctx.restore();
+    },
+  };
+
+  // ---- compFxV1 shields. Wax (the healer's, her items' and talents'): a soft amber shell, wax pooling and dripping at
+  // its lower rim, thinning and cracking as it is spent. Plate (Kessa's): a faceted gold barrier with her crest on top;
+  // facets drop away as it is spent. Both sit close to the body and stay translucent so nothing underneath is hidden.
+  function cfxWaxShell(b, r, now, F, key){
+    const R = r*1.7, k = .45 + .55*F, ph = (key.length*.37);
+    ctx.save();
+    const g = ctx.createRadialGradient(b.x - R*.3, b.y - R*.4, R*.1, b.x, b.y, R); g.addColorStop(0, `rgba(${SC},${.03*k})`); g.addColorStop(.72, `rgba(${SW},${.05*k})`); g.addColorStop(1, `rgba(${SW},${.32*k})`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.86, R, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = `rgba(${SW},${.7*k})`; ctx.lineWidth = 1.3; ctx.stroke();
+    // wax pooled along the lower rim, thicker the fuller the ward
+    ctx.strokeStyle = `rgba(${SW},${.85*k})`; ctx.lineWidth = 1.5 + 2.4*F; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.86, R, 0, Math.PI*.18, Math.PI*.82); ctx.stroke();
+    // three drips that slowly lengthen, fall and re-form
+    for(let i=0;i<3;i++){ const a = Math.PI*(.32 + i*.18), u = ((now*.35) + i*.37 + ph) % 1, x = b.x + Math.cos(a)*R*.86, y0 = b.y + Math.sin(a)*R;
+      const L = r*(.12 + .38*Math.min(1, u/.8))*(.6 + .4*F), fall = u > .8 ? (u - .8)/.2 : 0;
+      ctx.fillStyle = `rgba(${SW},${.85*k*(1 - fall)})`; ctx.beginPath(); ctx.ellipse(x, y0 + L*.5 + fall*r*.9, r*.07, L*.5, 0, 0, Math.PI*2); ctx.fill(); }
+    // the highlight sliding over it
+    ctx.strokeStyle = `rgba(255,250,235,${.5*k})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.7, R*.86, 0, Math.PI*1.05 + Math.sin(now*1.2)*.2, Math.PI*1.4 + Math.sin(now*1.2)*.2); ctx.stroke();
+    // spent: hairline cracks creep in below half
+    if(F < .5){ const c = (.5 - F)/.5; ctx.strokeStyle = `rgba(255,248,230,${.75*c})`; ctx.lineWidth = 1;
+      for(let i=0;i<3;i++){ const a = -1.9 + i*1.5; ctx.beginPath(); ctx.moveTo(b.x + Math.cos(a)*R*.86, b.y + Math.sin(a)*R); ctx.lineTo(b.x + Math.cos(a+.15)*R*.86*(1-.35*c), b.y + Math.sin(a+.15)*R*(1-.35*c)); ctx.lineTo(b.x + Math.cos(a-.1)*R*.86*(1-.6*c), b.y + Math.sin(a-.1)*R*(1-.6*c)); ctx.stroke(); } }
+    ctx.restore();
+  }
+  function cfxPlateShell(b, r, now, F){
+    const R = r*1.95, N = 10, on = Math.max(1, Math.ceil(N*F - 1e-6)), k = .5 + .5*F, glint = (now*.5) % 1;
+    ctx.save();
+    const P = i=>{ const a = -Math.PI/2 + i*Math.PI*2/N; return { x: b.x + Math.cos(a)*R*.82, y: b.y + Math.sin(a)*R }; };
+    for(let i=0;i<N;i++){ // facets lost from the bottom up (the crest and top facets go last) as the ward is spent
+      const order = [0,9,1,8,2,7,3,6,4,5].indexOf(i); if(order >= on) continue; const p0 = P(i), p1 = P(i+1), mx = (p0.x+p1.x)/2, my = (p0.y+p1.y)/2;
+      ctx.fillStyle = `rgba(${CFK_G},${.10*k})`; ctx.beginPath(); ctx.moveTo(b.x + (p0.x-b.x)*.86, b.y + (p0.y-b.y)*.86); ctx.lineTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(b.x + (p1.x-b.x)*.86, b.y + (p1.y-b.y)*.86); ctx.closePath(); ctx.fill();
+      const gl = Math.max(0, 1 - Math.abs(((i/N) - glint + 1) % 1 - .5)*6);
+      ctx.strokeStyle = `rgba(${gl>0?CFK_C:CFK_G},${(.6 + .4*gl)*k})`; ctx.lineWidth = 1.5 + gl; ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+      ctx.fillStyle = `rgba(${CFK_C},${.8*k})`; ctx.beginPath(); ctx.arc(p0.x, p0.y, Math.max(1, r*.07), 0, Math.PI*2); ctx.fill(); }
+    const top = P(0); cfxKite(top.x, top.y - r*.05, r*.26, .9*k, true); // her crest on top
+    ctx.restore();
+  }
+  CFX_DRAW.c_plates = function(f, u, r, now){ // Kessa's ward breaking: the facets spring off and fall
+    const tm = S.party[f.at], b = tm && sfxAt(tm, 1.35); if(!b) return; const R = r*1.95, e2 = sfxEase(u);
+    ctx.save(); for(let i=0;i<10;i++){ const a = -Math.PI/2 + (i+.5)*Math.PI/5, x = b.x + Math.cos(a)*R*.82*(1 + .4*e2), y = b.y + Math.sin(a)*R*(1 + .2*e2) + e2*e2*r*2.2;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI/2 + e2*3*(i%2?1:-1)); ctx.fillStyle = `rgba(${CFK_G},${.9*(1-u)})`; ctx.strokeStyle = `rgba(${CFK_C},${1-u})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.rect(-r*.26, -r*.07, r*.52, r*.14); ctx.fill(); ctx.stroke(); ctx.restore(); }
+    ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, R*.9, CFK_G, .4*(1-u)); ctx.restore();
+  };
+  try{ if(typeof window!=="undefined") window.__cfx = { cfxCast, CFX_DRAW }; }catch(_){}
+
 
   // ---- Round 122: hero action effects (world-space, cosmetic only) ----
   // Restyles the beams/slashes/bursts that heroes spawn (enemy beams keep the
@@ -23732,7 +23864,7 @@ thrall(){return gs(14)+
     tank.ccds.bulwark = cd*(tank.cdrMul||1); // ticks at Cooldown Speed, so this keeps it a real-time cooldown
     onTankBulwark(tank, ab);
     const f = bwFight(); f.uses++; f[why] = (f[why]||0)+1;
-    pushLog("event", `${tank.label} plants her shield: Bulwark Stance!`);
+    pushLog("event", `${tank.label} plants her shield: Bulwark Stance!`); cfxCast("bulwark"); // compFxV1
   }
   // A tagged boss mechanic is starting its telegraph.
   function bulwarkMoment(label){
@@ -23792,7 +23924,7 @@ thrall(){return gs(14)+
       if(hasTalent("tank","rallyingWard")){ const rw = Math.round(tankBaseHp()*0.02); Object.values(S.party).forEach(m3=>{ if(m3.alive){ const b = m3.hp; m3.hp = clamp(m3.hp+rw, 0, m3.maxHp); if(S.arena) arenaRec("heal","tank","Rallying Ward",m3.hp-b); } }); } // flat: Kessa's own HP only
       if(hasTalent("tank","rallyingGuard")){ const lk = lowestHpAllyKey([]); if(lk) shield(lk, Math.round(tankBaseHp()*0.05), 6, "Rallying Guard", null, true); }
       if(rankOf("tank","rally")>=5) S._rallyDmgT = 4; // Rousing Shout
-      pushLog("event", `${tank.label} bellows ${ab.name}, rallying every enemy's attention!`);
+      pushLog("event", `${tank.label} bellows ${ab.name}, rallying every enemy's attention!`); cfxCast("rally", { es: allLiving.slice(0, 12) }); // compFxV1
     }
 
     // Round 57: "allow kessa to use Bulwark Stance during trash mob combat
@@ -23837,11 +23969,11 @@ thrall(){return gs(14)+
         // whatever the affixes above already computed.
         const gwDur = ab.shieldDur + (hasTalent("tank","bolsteringWard") ? 2 : 0);
         if(hasTalent("tank","bolsteringWard")) shieldAmt = Math.round(shieldAmt*1.4);
-        shield(lowestKey, shieldAmt, gwDur, ab.name, aggressive ? "aggressiveguard" : null, true);
+        shield(lowestKey, shieldAmt, gwDur, ab.name, aggressive ? "aggressiveguard" : null, true); cfxCast("gward", { to: lowestKey }); // compFxV1
         // Guardian's Vigil (Sentinel, tier 4): a second ward at 40% size on the next-lowest party member (Kessa included).
         if(hasTalent("tank","guardiansVigil")){
           const secondKey = lowestHpAllyKey([lowestKey]); // Kessa can take the second ward
-          if(secondKey) shield(secondKey, Math.round(shieldAmt*0.4), gwDur, ab.name, aggressive ? "aggressiveguard" : null, true);
+          if(secondKey){ shield(secondKey, Math.round(shieldAmt*0.4), gwDur, ab.name, aggressive ? "aggressiveguard" : null, true); if(secondKey!=="tank") cfxCast("gward", { to: secondKey, delay: 0.12 }); } // compFxV1
         }
       }
     }
@@ -23886,7 +24018,7 @@ thrall(){return gs(14)+
         if(offTarget.alive && hasAffix("tank","markedForVengeance")) offTarget.atkTimer = (offTarget.atkTimer||0) + (isBossEnemy(offTarget) ? 0.3 : 1); // Staggering Slam
         // Provoking Momentum (affix): every Slam takes 1s off Bulwark Stance's cooldown.
         if(hasAffix("tank","provokingMomentum")) tank.ccds.bulwark = Math.max(0,(tank.ccds.bulwark||0) - 1*(tank.cdrMul||1));
-        pushLog("event", `${tank.label} slams ${offTarget.name} with ${ab.name}, hauling its attention back!`);
+        pushLog("event", `${tank.label} slams ${offTarget.name} with ${ab.name}, hauling its attention back!`); cfxCast("slam", { e: offTarget }); // compFxV1
         if(offTarget.hp<=0 && hasAffix("tank","bastionsCall")) tank.ccds.provokingslam = 0;
         if(offTarget.hp<=0) killEnemy(offTarget, offTarget._group);
       }
@@ -25710,6 +25842,7 @@ thrall(){return gs(14)+
     sprites.push({ wx:S.party.self.x, wy:S.party.self.y, draw:()=>drawUnitSprite(S.party.self, resolveColor("var(--accent)"), "H") });
     sprites.sort((a,b)=>(a.wy-b.wy) || (a.wx-b.wx)); // top-down: whoever stands further down the screen draws in front
     sprites.forEach(s=>s.draw());
+    try{ sfxDrawTop(); }catch(_){} // compFxV1
     drawBeacons(); // oct10UiV1: above props and units, so objects never hide the beacon
     if(S.arena && S.arena.tut) tutDrawWorld(); // tutorialV1
     { const _r = S.arena && S.arena.raid, _sc = _r && RAID_STAGES[_r.stage] && RAID_SCRIPTS[RAID_STAGES[_r.stage].kind]; if(_sc && _sc.top && _r.k) _sc.top(_r); if(_r) drawRaidShow(); } // raid effects that sit on top of the bodies
@@ -29420,11 +29553,7 @@ thrall(){return gs(14)+
       ctx.beginPath(); ctx.arc(p.x, by, r+6, 0, Math.PI*2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    if(m.mitigateT>0){
-      ctx.strokeStyle = resolveColor("var(--moss)");
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(p.x, by, r+9, 0, Math.PI*2); ctx.stroke();
-    }
+    // compFxV1: Bulwark's lasting green ring removed (the pip on each party row shows it)
     // Round 35 clarity pass: downed and imprisoned both leave m.alive false,
     // same as a real death, so they'd otherwise render as the same faded
     // nothing a permanent death does — no way to tell "needs a rescue" from
@@ -30884,9 +31013,9 @@ thrall(){return gs(14)+
       buffs.push({ name: hasLiveKindlingWard ? "Kindling Ward" : "Warded", remaining:m.shieldT, kind:"shield",
                    glyph: hasLiveKindlingWard ? SHIELD_SOURCE_GLYPHS.kindlingward : GENERIC_SHIELD_GLYPH, desc });
     }
-    if(key==="tank" && (m.mitigateT||0)>0){
-      const pct = Math.round((COMPANION_ABILITIES.tank.bulwark.partyRed + (hasTalent("tank","unyielding") ? 0.20 : 0))*100);
-      buffs.push({ name:"Bulwark Stance", remaining:m.mitigateT, kind:"mitigation", glyph:MITIGATION_GLYPH, desc:`Damage taken reduced ${pct}%.` });
+    if(m.alive && S.party.tank && (S.party.tank.mitigateT||0)>0){ // compFxV1: every row, with that member's own reduction
+      const pct = Math.round((COMPANION_ABILITIES.tank.bulwark.partyRed + (hasTalent("tank","unyielding") ? (key==="tank" ? 0.20 : 0.10) : 0) + ((key!=="tank" && hasTalent("tank","sharedBulwark")) ? 0.15 : 0))*100);
+      buffs.push({ name:"Bulwark Stance", remaining:S.party.tank.mitigateT, kind:"mitigation", glyph:MITIGATION_GLYPH, desc:`Kessa's Bulwark Stance: damage taken reduced ${pct}%.` });
     }
     // Round 56: Cleansing Rite's own ticking window (see applyCleansingRite/
     // cleanseOneDebuff) had no ongoing visual at all — only a one-off
@@ -36405,7 +36534,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 3da0269f6a) */
+<script>/* phone app: offline cache (build 97c59d2e61) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
