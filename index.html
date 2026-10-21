@@ -16014,7 +16014,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- compFxV1: companion spell signatures ----
   const CFK_G = "255,212,120", CFK_C = "255,246,214", CFK_S = "214,222,232";
   let _sfxTop = false;
-  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
+  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); cfxDoomMark(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
   function cfxShells(){ const now = (S.tPrev||0)/1000, r = sfxR();
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key], fs = m && m._sfxFam; if(!m || !m.alive || !fs || !(fs.wax > 0 || fs.plate > 0)) return; const b = sfxAt(m, 1.35);
       if(fs.wax > 0) cfxWaxShell(b, r, now, fs.waxF, key); if(fs.plate > 0) cfxPlateShell(b, r, now, fs.plateF); }); }
@@ -16385,6 +16385,82 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     ctx.strokeStyle = `rgba(${CFK_G},${al})`; ctx.lineWidth = 2; ctx.stroke();
     const ex = b.x - side*r*.2 + Math.cos(a1)*R, ey = b.y + r*.1 + Math.sin(a1)*R; ctx.globalCompositeOperation = "lighter"; sfxGlow(ex, ey, r*.4, CFK_C, .8*al); ctx.restore();
   };
+
+  // ---- compFxV1 Wren: her violet and ghost-white (the rig's glow colours), a deep bruise-purple edge
+  const WR_V = "166,124,240", WR_L = "195,155,255", WR_W = "232,220,255", WR_D = "45,24,70";
+  Object.assign(CFX_DUR, { wnova:0.6, rend:0.7, grasp:0.75, doom:0.55, doompop:0.65, wbolt:0.3 });
+  Object.assign(CFX_PASS, { wnova:"both", rend:"top", grasp:"top", doom:"top", doompop:"top", wbolt:"top" });
+  function wrStaffFoot(){ const m = S.party.dpsCaster, c = m && sfxAt(m, 0); if(!c) return null; return { x: c.fx - cfxFace(m)*sfxR()*.95, y: c.fy }; } // where Blight Nova's staff strikes, at her side
+  function cfxWisp(x, y, r, v, al, n){ // curse motes curling up off a body
+    const e2 = sfxEase(v); ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x, y, r*(.6 + .6*e2), WR_V, .55*al*(1 - v));
+    for(let i=0;i<(n||5);i++){ const a = i*2.4, d = r*(.2 + .5*e2), px = x + Math.cos(a)*d + Math.sin(v*6 + i)*r*.15, py = y - e2*r*(1 + (i%3)*.35) + Math.sin(a)*d*.4;
+      ctx.fillStyle = `rgba(${i%2?WR_W:WR_L},${al*(1 - v)})`; ctx.beginPath(); ctx.arc(px, py, Math.max(1, r*.11*(1 - v*.5)), 0, Math.PI*2); ctx.fill(); } ctx.restore();
+  }
+  function cfxSkull(x, y, s, al){ // a small skull sigil
+    ctx.save(); ctx.fillStyle = `rgba(${WR_W},${al})`; ctx.strokeStyle = `rgba(${WR_D},${al})`; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(x, y - s*.15, s*.62, Math.PI*.85, Math.PI*2.15); ctx.lineTo(x + s*.36, y + s*.42); ctx.lineTo(x - s*.36, y + s*.42); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `rgba(${WR_D},${al})`; ctx.beginPath(); ctx.ellipse(x - s*.24, y - s*.1, s*.15, s*.18, 0, 0, Math.PI*2); ctx.ellipse(x + s*.24, y - s*.1, s*.15, s*.18, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = `rgba(${WR_V},${al})`; ctx.beginPath(); ctx.arc(x - s*.24, y - s*.08, s*.06, 0, Math.PI*2); ctx.arc(x + s*.24, y - s*.08, s*.06, 0, Math.PI*2); ctx.fill(); ctx.restore();
+  }
+  // Mark of Doom while it counts down: a small skull over the marked enemy, a violet ring around it emptying to the detonation
+  function cfxDoomMark(){ const m = S.party.dpsCaster; if(!m || m._markOfDoomTarget==null || S.casterSpec!=="dot") return; const e = m._markOfDoomTarget; if(!e || !e.alive) return;
+    const r = sfxR(), b = sfxAt(e, 2.95), y = b.y - r*.4, tot = m._doomTot || 3, left = Math.max(0, Math.min(1, (m._markOfDoomT||0)/tot)), urgent = left < .34 ? .5 + .5*Math.sin((S.tPrev||0)/60) : 0;
+    ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = `rgba(${WR_D},.75)`; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.arc(b.x, y, r*.62, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = `rgba(${WR_L},.95)`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(b.x, y, r*.62, -Math.PI/2, -Math.PI/2 + Math.PI*2*left); ctx.stroke();
+    cfxSkull(b.x, y, r*.42*(1 + .12*urgent), 1); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, y, r*.8, WR_V, .25 + .3*urgent); ctx.restore(); }
+  Object.assign(CFX_DRAW, {
+    // Blight Nova: where her staff strikes the ground, a ring of violet blight rolls out a short way; each enemy it curses breathes out a wisp
+    c_wnova(f, u, r, now){
+      const c = wrStaffFoot(); if(!c) return;
+      if(!_sfxTop){ const v = Math.min(1, u/.55), R = r*(.6 + 3.6*sfxEase(v)), al = 1 - v; if(al <= 0) return;
+        ctx.save(); const g = ctx.createRadialGradient(c.x, c.y, Math.max(0, R*.6), c.x, c.y, R); g.addColorStop(0, `rgba(${WR_V},0)`); g.addColorStop(.8, `rgba(${WR_V},${.5*al})`); g.addColorStop(1, `rgba(${WR_W},${.75*al})`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c.x, c.y, R, R*.6, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = `rgba(${WR_D},${.8*al})`; ctx.lineWidth = 4.4; ctx.beginPath(); ctx.ellipse(c.x, c.y, R, R*.6, 0, 0, Math.PI*2); ctx.stroke(); ctx.strokeStyle = `rgba(${WR_W},${al})`; ctx.lineWidth = 2.2; ctx.stroke();
+        if(v < .3){ ctx.globalCompositeOperation = "lighter"; sfxGlow(c.x, c.y - r*.2, r*1.4, WR_L, .8*(1 - v/.3)); } ctx.restore(); return; }
+      (f.es||[]).forEach((e,i)=>{ const v = (u - .15 - (i%4)*.03)/.6; if(!e || v <= 0 || v >= 1) return; const b = sfxAt(e, 1.35); cfxWisp(b.x, b.y, r*1.1, v, 1, 6); });
+    },
+    // Soul Rend: three ghostly tears open on the target, and a wisp of its soul is torn out and drawn back to her
+    c_rend(f, u, r, now){
+      const e = f.e, b = e && sfxAt(e, 1.35), m = S.party.dpsCaster, a = m && sfxAt(m, 1.6); if(!b || !a) return; ctx.save(); ctx.lineCap = "round";
+      for(let i=0;i<3;i++){ const v = (u - i*.05)/.35; if(v <= 0) continue; const sw = sfxEase(Math.min(1, v)), al = 1 - Math.max(0, (u - .35)/.35), x0 = b.x - r*.7 + i*r*.45, y0 = b.y - r*.9;
+        ctx.strokeStyle = `rgba(${WR_D},${.75*al})`; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 - r*.3, b.y, x0 + (r*.2)*sw, y0 + r*1.7*sw); ctx.stroke();
+        ctx.strokeStyle = `rgba(${WR_W},${al})`; ctx.lineWidth = 2; ctx.stroke(); }
+      const pull = Math.max(0, (u - .2)/.8); if(pull > 0 && pull < 1){ const k = sfxEase(pull), h = sfxArc(b, a, k, r*1.6), al = 1 - Math.max(0, (pull - .8)/.2);
+        ctx.globalCompositeOperation = "lighter"; for(let i=1;i<9;i++){ const q = sfxArc(b, a, Math.max(0, k - i*.05), r*1.6); ctx.fillStyle = `rgba(${WR_L},${.5*al*(1 - i/9)})`; ctx.beginPath(); ctx.arc(q.x + Math.sin(i + now*8)*r*.1, q.y, r*.26*(1 - i/10), 0, Math.PI*2); ctx.fill(); }
+        sfxGlow(h.x, h.y, r*.9, WR_V, .7*al); ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = `rgba(${WR_W},${.95*al})`; ctx.beginPath(); ctx.arc(h.x, h.y, r*.26, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = `rgba(${WR_D},${al})`; ctx.beginPath(); ctx.arc(h.x - r*.08, h.y - r*.03, r*.05, 0, Math.PI*2); ctx.arc(h.x + r*.08, h.y - r*.03, r*.05, 0, Math.PI*2); ctx.fill(); }
+      if(pull > .85){ const v = (pull - .85)/.15; ctx.globalCompositeOperation = "lighter"; sfxGlow(a.x, a.y, r*1.2, WR_L, .6*(1 - v)); }
+      ctx.restore();
+    },
+    // Withering Grasp: a ghostly hand rises over the target, fingers spread, and clenches shut on it
+    c_grasp(f, u, r, now){
+      const e = f.e, b = e && sfxAt(e, 1.35); if(!b) return; const rise = sfxEase(Math.min(1, u/.35)), cl = sfxEase(Math.max(0, Math.min(1, (u - .35)/.2))), al = 1 - Math.max(0, (u - .6)/.4), S2 = r*1.25;
+      ctx.save(); ctx.translate(b.x, b.y - r*.3 + (1 - rise)*r*.8); ctx.globalAlpha = al;
+      ctx.globalCompositeOperation = "lighter"; sfxGlow(0, 0, S2*1.5, WR_V, .45); ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = `rgba(${WR_W},.55)`; ctx.strokeStyle = `rgba(${WR_L},.95)`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, S2*.55, S2*.45, S2*.35, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke(); // palm below the target's middle
+      for(let i=0;i<5;i++){ const base = -Math.PI*.95 + i*Math.PI*.22 + (i===0 ? -.25 : 0), open = base, shut = -Math.PI/2 + (i - 2)*.12, a = open + (shut - open)*cl, L = S2*(i===0 ? .75 : 1.05)*(1 - .35*cl);
+        const x0 = Math.cos(base)*S2*.35, y0 = S2*.5 + Math.sin(base)*S2*.25, kx = x0 + Math.cos(a)*L*.55, ky = y0 + Math.sin(a)*L*.55, a2 = a + cl*1.2*(i < 2 ? 1 : -1)*.6, tx = kx + Math.cos(a2)*L*.5, ty = ky + Math.sin(a2)*L*.5;
+        ctx.lineCap = "round"; ctx.strokeStyle = `rgba(${WR_D},.7)`; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(kx, ky); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.strokeStyle = `rgba(${WR_W},.9)`; ctx.lineWidth = 3; ctx.stroke(); }
+      if(cl > 0){ ctx.globalCompositeOperation = "lighter"; sfxGlow(0, 0, S2*(.6 + .6*cl), WR_L, .55*cl); }
+      ctx.restore();
+    },
+    // Mark of Doom cast: the skull sigil stamps down over the target (the countdown ring takes over after)
+    c_doom(f, u, r, now){
+      const e = f.e, b0 = e && sfxAt(e, 2.95); if(!b0) return; const y = b0.y - r*.4, v = sfxEase(u), s2 = r*(1.3 - .88*v);
+      ctx.save(); cfxSkull(b0.x, y, s2, Math.min(1, u*4)); ctx.globalCompositeOperation = "lighter"; sfxGlow(b0.x, y, r*(1.8 - v), WR_V, .6*(1 - u));
+      ctx.strokeStyle = `rgba(${WR_L},${1 - u})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(b0.x, y, r*(.6 + 1.1*v), 0, Math.PI*2); ctx.stroke(); ctx.restore();
+    },
+    // Mark of Doom detonating: the skull cracks open and a burst of blight bursts out of the target
+    c_doompop(f, u, r, now){
+      const e = f.e, b = e && sfxAt(e, 1.35), t0 = e && sfxAt(e, 2.95); if(!b) return; const v = sfxEase(Math.min(1, u/.7)), sz = .8 + .06*Math.min(10, f.st||0);
+      ctx.save(); if(u < .35 && t0){ const k = u/.35, y = t0.y - r*.4; for(let i=0;i<2;i++){ ctx.save(); ctx.translate(t0.x + (i ? 1 : -1)*k*r*.5, y + k*k*r*.6); ctx.rotate((i ? 1 : -1)*k*.8); ctx.beginPath(); ctx.rect(i ? 0 : -r*.5, -r*.5, r*.5, r); ctx.clip(); cfxSkull(0, 0, r*.42, 1 - k); ctx.restore(); } }
+      ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*(1.2 + 1.8*v)*sz, WR_V, .75*(1 - u)); sfxGlow(b.x, b.y, r*.9, WR_W, .7*(1 - u));
+      ctx.strokeStyle = `rgba(${WR_L},${1 - u})`; ctx.lineWidth = 2.6*(1 - u) + .6; ctx.beginPath(); ctx.ellipse(b.x, b.y, r*(.6 + 2*v)*sz, r*(.6 + 2*v)*sz*.8, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.restore(); cfxWisp(b.x, b.y, r*1.3*sz, u, 1, 8);
+    },
+  });
   try{ if(typeof window!=="undefined") window.__cfx = { cfxCast, CFX_DRAW }; }catch(_){}
 
 
@@ -16545,6 +16621,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       const v = (prog-TR)/(1-TR), ease = 1-Math.pow(1-v,2);
       ctx.globalAlpha = (1-v)*0.95;
       if(fire){ ctx.globalAlpha = 1; cfxFlare(p2.x, p2.y, sfxR()*.9, v, 1); // compFxV1: a small flare instead of petals and a ring
+      } else if(b.hero==="wren"){ ctx.globalAlpha = 1; cfxWisp(p2.x, p2.y, sfxR()*.9, v, 1, 5); // compFxV1: a small curse wisp instead of the rune flash
       } else { // curse rune flash
         const R = (9+5*ease)*sc, rot = v*3;
         ctx.strokeStyle = "#1a0f2e"; ctx.lineWidth = Math.max(2.4, 4*sc*(1-v*0.5));
@@ -24632,7 +24709,7 @@ thrall(){return gs(14)+
           if(hasTalent("dpsCasterDot","ripeningDoom")) d = Math.round(d*CT.RIPENMUL); // Ripening Doom: +20%
           const dRaw = d;
           d = dealDamageToEnemy(target, d, dpsCaster);
-          spawnAoeBurst(target.x, target.y, "var(--dirge)");
+          cfxCast("doompop", { e: target, st: stacks }); // compFxV1: Mark of Doom detonating
           addThreat(target,"dpsCaster", d*dpsCaster.threatMul);
           pushLog("dmgOut", `${ab.name} detonates on ${target.name} for ${d}!`);
           if(hasTalent("dpsCasterDot","doomSpiral")){ const e2 = enemiesInFight().filter(x=>x!==target && x.alive && (x._curseStacks||0)>0).sort((a,b)=>dist(target.x,target.y,a.x,a.y)-dist(target.x,target.y,b.x,b.y))[0]; if(e2){ spawnBeam(target.x, target.y, e2.x, e2.y, "var(--dirge)", "wren"); spawnAoeBurst(e2.x, e2.y, "var(--dirge)"); const d2 = dealAs("Doom Spiral", e2, Math.round(dRaw*CT.DOOMSPIRAL), dpsCaster); addThreat(e2,"dpsCaster",d2*dpsCaster.threatMul); if(e2.hp<=0) killEnemy(e2,e2._group); } } // Doom Spiral: jumps to the nearest other cursed enemy
@@ -24659,13 +24736,12 @@ thrall(){return gs(14)+
           let d = Math.round(rand(...ab.dmg) * (1+0.12*(rankOf("dpsCasterDot","blightnova")-1)) * (1+((dpsCaster.damagePct||0)+fountainDamageBonus("dpsCaster"))/100));
           if(hasTalent("dpsCasterDot","feedingCurse")) d = Math.round(d*CT.FEEDNOVA); // Feeding Curse (reworked): Nova damage
           if(rankOf("dpsCasterDot","blightnova")>=5) d += Math.round(CT.NOVAV*(1+((dpsCaster.damagePct||0))/100)*(e._curseStacks||0)); // Rank V: +12 per curse stack already on the enemy (CT.NOVAV)
-          d = dealDamageToEnemy(e, d, dpsCaster);
-          spawnAoeBurst(e.x, e.y, "var(--dirge)");
+          d = dealDamageToEnemy(e, d, dpsCaster); // compFxV1: Blight Nova's wisp replaces the generic burst
           addThreat(e,"dpsCaster", d*threatMul);
           applyCurse(e, (hasTalent("dpsCasterDot","virulentNova") ? CT.VIRNOVA : 1) + (hasTalent("dpsCasterDot","doubledBlight") ? 2 : 0) + ((hasTalent("dpsCasterDot","swiftRuin") && !((e._curseStacks||0)>0)) ? CT.SWIFTRUIN : 0));
           if(e.hp<=0) killEnemy(e, e._group);
         });
-        pushLog("dmgOut", `${dpsCaster.label} unleashes ${ab.name}, cursing everyone in the fight!`);
+        pushLog("dmgOut", `${dpsCaster.label} unleashes ${ab.name}, cursing everyone in the fight!`); cfxCast("wnova", { es: allLiving.slice(0, 10) }); // compFxV1
         if(hasTalent("dpsCasterDot","plagueBloom") && cnt>=3){ // Plague Bloom: only into 3+ enemies
           if(dpsCaster._markOfDoomTarget) detonateMarkOfDoomNow();
           dpsCaster.ccds.markofdoom = Math.max(0, (dpsCaster.ccds.markofdoom||0)-CT.PLAGUEBLOOM);
@@ -24687,7 +24763,7 @@ thrall(){return gs(14)+
           if(hasTalent("dpsCasterDot","soulReap") && target.hp < target.maxHp*0.5) d = Math.round(d*CT.SOULREAP);
           if(malefic) d = Math.round(d*0.75);
           d = dealDamageToEnemy(target, d, dpsCaster);
-          spawnBeam(dpsCaster.x, dpsCaster.y, target.x, target.y, "var(--dirge)","wren");
+          cfxCast("rend", { e: target }); // compFxV1: Soul Rend
           let threatMul = dpsCaster.threatMul;
           addThreat(target,"dpsCaster", d*threatMul);
           pushLog("dmgOut", `${dpsCaster.label} lands ${ab.name} on ${target.name} for ${d}!`);
@@ -24709,7 +24785,7 @@ thrall(){return gs(14)+
           dpsCaster.gcd = COMPANION_GCD;
           let d = Math.round(rand(...ab.dmg) * (1+0.10*(rankOf("dpsCasterDot","witheringgrasp")-1)) * (1+((dpsCaster.damagePct||0)+fountainDamageBonus("dpsCaster"))/100));
           d = dealDamageToEnemy(target, d, dpsCaster);
-          spawnBeam(dpsCaster.x, dpsCaster.y, target.x, target.y, "var(--dirge)","wren");
+          cfxCast("grasp", { e: target }); // compFxV1: Withering Grasp
           addThreat(target,"dpsCaster", d*dpsCaster.threatMul);
           applyCurse(target, ab.curseStacks);
           target._graspAmpT = 5 + (rankOf("dpsCasterDot","witheringgrasp")>=5 ? 3 : 0);
@@ -24730,7 +24806,7 @@ thrall(){return gs(14)+
           dpsCaster._markOfDoomTarget = target;
           dpsCaster._markOfDoomT = hasTalent("dpsCasterDot","ripeningDoom") ? CT.RIPENDELAY : Math.max(0.5, ab.delay - 0.25*(rankOf("dpsCasterDot","markofdoom")-1));
           if(hasAffix("dpsCasterDot","blightflow")) applyCurse(target, 2);
-          pushLog("event", `${dpsCaster.label} marks ${target.name} with ${ab.name}!`);
+          pushLog("event", `${dpsCaster.label} marks ${target.name} with ${ab.name}!`); dpsCaster._doomTot = dpsCaster._markOfDoomT; cfxCast("doom", { e: target }); // compFxV1
         }
       }
     }
@@ -36781,7 +36857,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 74a81fdc62) */
+<script>/* phone app: offline cache (build 562ebbb8fb) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
