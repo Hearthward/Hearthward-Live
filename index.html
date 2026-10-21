@@ -12878,7 +12878,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     } else {
       spendMana(ability, S.target);
       S._reachMul = !!ability.range;
-      try{ ability.cast(S.target); } finally { S._reachMul = false; }
+      S._sfxCast = ability.id; // spellFxV1
+      try{ ability.cast(S.target); } finally { S._reachMul = false; S._sfxCast = null; }
+      try{ spellFxCast(ability.id, S.target); }catch(_){}
       if(S.arena && S.arena.tut) tutOnCast(ability.id, S.target); // tutorialV1
     }
   }
@@ -12895,7 +12897,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(ability && self.alive && self.mana >= effectiveCost(ability, target)){
         spendMana(ability, target);
         S._reachMul = !!ability.range;
-        try{ ability.cast(target); } finally { S._reachMul = false; }
+        S._sfxCast = ability.id; // spellFxV1
+        try{ ability.cast(target); } finally { S._reachMul = false; S._sfxCast = null; }
+        try{ spellFxCast(ability.id, target); }catch(_){}
         if(S.arena && S.arena.tut) tutOnCast(ability.id, target); // tutorialV1
       }
     }
@@ -13058,6 +13062,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   try{ if(typeof window!=="undefined") window.__bal = { bossHpMulFor, balAdjust, balTick, balStrainEase, mfNote, mfTick, mfFailedSince, modifierCountForLevel:(l)=>modifierCountForLevel(l), MECH_FAIL }; }catch(_){} // test hook
   const BOSS_HP_TUNE = { verdantmaw:0.8 }; // tune1V1: per-boss health trims on top of bossHpMulFor
   function damageMember(key, amount, srcName, sourceEnemy, isDot){
+    try{ const _m = S.party && S.party[arguments[0]], _e = arguments[3]; if(_m && _m.alive && _e && _e.x!=null && !arguments[4] && arguments[1] >= _m.maxHp*0.06) sfxSpawn({ k:"impact", at:arguments[0], dur:0.35, ang:Math.atan2(_m.y-_e.y, _m.x-_e.x) }); }catch(_){} // spellFxV1
     mfNote(key, amount, srcName); // mechFxV1
     amount = balAdjust(key, amount, srcName, sourceEnemy, isDot); // balanceV1
     irnFeedback(key, amount, srcName); // ironReworkV1: Feedback echoes 40% to the linked partner
@@ -15846,6 +15851,164 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
 
 
+
+  // ---- spellFxV1: spell signatures ----
+  const SFX = [], SFX_CAP = 90;
+  const SG = "255,207,106", SC = "255,243,196", SW = "238,190,110", SV = "176,124,255", SE = "255,140,60";
+  function sfxSpawn(o){ if(SFX.length >= SFX_CAP) SFX.shift(); o.t = 0; SFX.push(o); }
+  function sfxTick(dt){ for(let i=SFX.length-1;i>=0;i--){ SFX[i].t += dt; if(SFX[i].t >= SFX[i].dur) SFX.splice(i,1); } }
+  function sfxR(){ return 14*spriteZoomMul(); }
+  // screen point on a party member (or enemy): h = height above the feet in units of the sprite radius
+  function sfxAt(m, h){ if(!m) return null; const p = VIEW.project(m.x, m.y); return { x:p.x, y:p.y - (h||0)*sfxR(), fx:p.x, fy:p.y }; }
+  function sfxGlow(x, y, r, rgb, a){ if(!(r>0) || !(a>0)) return; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill(); }
+  const sfxEase = u=>1-Math.pow(1-u,3);
+  // a curved path from a to b, lifted in the middle; returns the point at u
+  function sfxArc(a, b, u, lift){ const mx = (a.x+b.x)/2, my = (a.y+b.y)/2 - lift; const v = 1-u; return { x: v*v*a.x + 2*v*u*mx + u*u*b.x, y: v*v*a.y + 2*v*u*my + u*u*b.y }; }
+  function sfxLantern(){ const me = S.party.self; if(!me) return null; const p = sfxAt(me, 2.1), f = me._hr && me._hr.view>=0.5 ? (me._hr.face||1) : (me._hr ? me._hr.faceK : 1); return { x: p.x + 0.9*sfxR()*(f||1), y: p.y }; }
+  // ---- what each healer spell spawns (called right after the spell resolves)
+  function spellFxCast(id, tKey){
+    const T = tKey && S.party[tKey];
+    if(id==="mend" && T) sfxSpawn({ k:"ribbon", to:tKey, dur:0.9, w:1, col:SG });
+    else if(id==="flicker" && T) sfxSpawn({ k:"comet", to:tKey, dur:1.1 });
+    else if(id==="hearth" && T) sfxSpawn({ k:"dart", to:tKey, dur:0.6 });
+    else if(id==="ward" && T) sfxSpawn({ k:"glob", to:tKey, dur:0.8 });
+    else if(id==="cleanse" && T) sfxSpawn({ k:"rite", at:tKey, dur:1.0 });
+    else if(id==="wind") sfxSpawn({ k:"wave", dur:1.3, R:320 });
+    else if(id==="misdirect" && T && tKey!=="tank") sfxSpawn({ k:"thread", from:tKey, dur:1.0 });
+    else if(id==="purge"){ sfxSpawn({ k:"rune", dur:0.7 }); const me = S.party.self;
+      (typeof enemiesInFight==="function" ? enemiesInFight() : []).filter(e=>e && e.alive && dist(e.x,e.y,me.x,me.y) <= PURGE_RANGE).slice(0,8).forEach((e,i)=>sfxSpawn({ k:"purge", e, dur:0.75, delay:i*0.03 })); }
+  }
+  // ---- lasting marks on the party, watched every frame
+  function sfxWatch(){
+    Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key]; if(!m) return;
+      const sh = m.alive ? (m.shield||0) : 0; if((m._sfxSh||0) > 0 && sh <= 0 && m.alive) sfxSpawn({ k:"crack", at:key, dur:0.6 }); m._sfxSh = sh; });
+  }
+  function sfxDrawLasting(){
+    const now = (S.tPrev||0)/1000, r = sfxR();
+    Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key]; if(!m || !m.alive) return; const b = sfxAt(m, 1.35);
+      if((m.shield||0) > 0){ // Wax Ward: a translucent amber shell, a highlight sliding over it
+        const R = r*1.7; ctx.save();
+        const g = ctx.createRadialGradient(b.x - R*.3, b.y - R*.35, R*.1, b.x, b.y, R); g.addColorStop(0, `rgba(${SC},.20)`); g.addColorStop(.7, `rgba(${SW},.12)`); g.addColorStop(1, `rgba(${SW},.38)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.86, R, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = `rgba(${SW},.75)`; ctx.lineWidth = 1.4; ctx.stroke();
+        ctx.strokeStyle = `rgba(255,250,235,.55)`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.7, R*.86, 0, Math.PI*1.05 + Math.sin(now*1.2)*.2, Math.PI*1.4 + Math.sin(now*1.2)*.2); ctx.stroke();
+        ctx.restore(); }
+      if((m._hots||[]).some(h=>h.name==="Hearthlight" && h.ticksLeft>0)){ // Hearthlight: warm embers drifting up from the feet
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        for(let i=0;i<4;i++){ const u = ((now*.7) + i/4 + (key.length*.13)) % 1, x = b.fx + Math.sin(i*2.3 + now*2)*r*.6, y = b.fy - u*r*2.2;
+          ctx.fillStyle = `rgba(${SG},${.75*Math.sin(u*Math.PI)})`; ctx.beginPath(); ctx.arc(x, y, Math.max(1, r*.09), 0, Math.PI*2); ctx.fill(); }
+        sfxGlow(b.fx, b.fy, r*.9, SG, .18); ctx.restore(); }
+    });
+  }
+  // ---- drawing each effect
+  function sfxDraw(){
+    if(!SFX.length && !S.party) return;
+    sfxDrawLasting();
+    const r = sfxR(), now = (S.tPrev||0)/1000;
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    SFX.forEach(f=>{ const t = f.t - (f.delay||0); if(t < 0) return; const u = Math.min(1, t/f.dur);
+      if(f.k==="ribbon" || f.k==="comet" || f.k==="dart" || f.k==="glob"){
+        const tm = S.party[f.to]; const a = sfxLantern(), b = tm && sfxAt(tm, 1.35); if(!a || !b) return;
+        const TRV = f.k==="dart" ? .35 : f.k==="comet" ? .45 : .42, tu = Math.min(1, u/TRV), lift = Math.min(60, Math.hypot(b.x-a.x, b.y-a.y)*.35) + r;
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        if(u < TRV + .25){ // the travelling part
+          const fade = 1 - Math.max(0, (u-TRV)/.25), N = f.k==="comet" ? 14 : f.k==="dart" ? 6 : 12;
+          if(f.k==="ribbon"){ // a ribbon of light arcing over: a tapered line with a bright head
+            for(let i=0;i<N;i++){ const u0 = Math.max(0, sfxEase(tu) - i*.035), u1 = Math.max(0, sfxEase(tu) - (i+1)*.035); if(u0<=0) break; const p0 = sfxArc(a,b,u0,lift), p1 = sfxArc(a,b,u1,lift), k = 1-i/N;
+              ctx.strokeStyle = `rgba(${i<3?SC:SG},${.9*k*fade})`; ctx.lineWidth = Math.max(1.2, (5.2*k)*(r/14)); ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.stroke(); }
+            const h = sfxArc(a,b,sfxEase(tu),lift); sfxGlow(h.x, h.y, r*1.15, SG, .85*fade);
+          } else if(f.k==="comet"){ // Ember Surge: a heavy ember comet, sparks shed behind it
+            const h = sfxArc(a,b,sfxEase(tu),lift);
+            for(let i=0;i<N;i++){ const uu = Math.max(0, sfxEase(tu) - i*.03), q = sfxArc(a,b,uu,lift), k = 1-i/N; ctx.fillStyle = `rgba(${i<4?SC:i<8?SG:SE},${.8*k*fade})`; ctx.beginPath(); ctx.arc(q.x + Math.sin(i*2.1+now*9)*r*.12*i/N, q.y + Math.cos(i*1.7)*r*.1*i/N, Math.max(1, r*.42*k), 0, Math.PI*2); ctx.fill(); }
+            sfxGlow(h.x, h.y, r*1.9, SE, .75*fade); ctx.fillStyle = `rgba(255,252,240,${fade})`; ctx.beginPath(); ctx.arc(h.x, h.y, r*.22, 0, Math.PI*2); ctx.fill();
+          } else if(f.k==="dart"){ // Hearthlight: a quick little spark
+            const h = sfxArc(a,b,tu,lift*.6); for(let i=0;i<N;i++){ const q = sfxArc(a,b,Math.max(0,tu-i*.05),lift*.6), k = 1-i/N; ctx.fillStyle = `rgba(${SG},${.85*k*fade})`; ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(.8, r*.17*k), 0, Math.PI*2); ctx.fill(); }
+            sfxGlow(h.x, h.y, r*.6, SG, .7*fade);
+          } else { // Wax Ward: a glob of warm wax lobbed over, dripping
+            const h = sfxArc(a,b,sfxEase(tu),lift*1.2); ctx.globalCompositeOperation = "source-over";
+            ctx.fillStyle = `rgba(${SW},${.95*fade})`; ctx.strokeStyle = `rgba(120,70,20,${.8*fade})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(h.x, h.y, r*.5, r*.42, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = `rgba(255,250,230,${.9*fade})`; ctx.beginPath(); ctx.arc(h.x - r*.1, h.y - r*.08, r*.09, 0, Math.PI*2); ctx.fill();
+            for(let i=1;i<4;i++){ const q = sfxArc(a,b,Math.max(0,sfxEase(tu)-i*.07),lift*1.2); ctx.fillStyle = `rgba(${SW},${.7*fade*(1-i/4)})`; ctx.beginPath(); ctx.ellipse(q.x, q.y + i*r*.15, r*.08, r*.13, 0, 0, Math.PI*2); ctx.fill(); }
+          }
+        }
+        if(u >= TRV*.9){ // the landing on the target
+          const v = Math.min(1, (u - TRV*.9)/(1 - TRV*.9)), e2 = sfxEase(v);
+          if(f.k==="ribbon"){ // motes rising and a brief golden outline glow
+            sfxGlow(b.x, b.y, r*2.2, SG, .55*(1-v));
+            ctx.strokeStyle = `rgba(${SG},${.8*(1-v)})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(b.fx, b.fy, r*(.6+.9*e2), r*(.25+.35*e2), 0, 0, Math.PI*2); ctx.stroke();
+            for(let i=0;i<8;i++){ const x = b.x + Math.sin(i*2.4)*r*.7, y = b.y + r*.6 - e2*r*(1.4 + (i%3)*.4); ctx.fillStyle = `rgba(${i%2?SC:SG},${.9*(1-v)})`; ctx.beginPath(); ctx.arc(x, y, Math.max(1, r*.13), 0, Math.PI*2); ctx.fill(); }
+          } else if(f.k==="comet"){ // a bloom of fire-light and a pillar rising through them
+            sfxGlow(b.x, b.y, r*2.6*(.5+.5*e2), SE, .65*(1-v));
+            const pg = ctx.createLinearGradient(b.x, b.fy, b.x, b.fy - r*4); pg.addColorStop(0, `rgba(${SG},${.55*(1-v)})`); pg.addColorStop(1, `rgba(${SG},0)`);
+            ctx.fillStyle = pg; ctx.fillRect(b.x - r*.55*(1-v*.5), b.fy - r*4, r*1.1*(1-v*.5), r*4);
+            for(let i=0;i<10;i++){ const ang = i*Math.PI/5 + .3, d = r*(.4 + 1.6*e2); ctx.fillStyle = `rgba(${i%2?SE:SG},${.9*(1-v)})`; ctx.beginPath(); ctx.arc(b.x + Math.cos(ang)*d, b.y + Math.sin(ang)*d*.6, Math.max(1, r*.13*(1-v)), 0, Math.PI*2); ctx.fill(); }
+          } else if(f.k==="dart"){
+            sfxGlow(b.fx, b.fy - r*.3, r*1.2, SG, .55*(1-v)); ctx.strokeStyle = `rgba(${SG},${.7*(1-v)})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(b.fx, b.fy, r*(.4+.6*e2), r*(.16+.24*e2), 0, 0, Math.PI*2); ctx.stroke();
+          } else { // the shell forming: a wax ring that rises and closes over them
+            ctx.globalCompositeOperation = "source-over"; const R = r*1.7;
+            ctx.strokeStyle = `rgba(${SW},${.95*(1-v*.6)})`; ctx.lineWidth = 2.2*(1-v*.5); ctx.beginPath(); ctx.ellipse(b.x, b.y, R*.86*(.4+.6*e2), R*(.4+.6*e2), 0, Math.PI*(1-e2), Math.PI*(2+e2)); ctx.stroke();
+            ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, R*1.1, SW, .35*(1-v));
+          }
+        }
+        ctx.restore();
+      } else if(f.k==="rite"){ // Cleansing Rite: a violet glyph turns over them, then the affliction shatters and falls away
+        const tm = S.party[f.at], b = tm && sfxAt(tm, 2.4); if(!b) return; const sp = Math.min(1, u/.45), sh = Math.max(0, (u-.4)/.6);
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(b.x, b.y); ctx.rotate(now*2);
+        const gr = r*(.5 + .4*sfxEase(sp)), ga = (1-sh)*.95; ctx.strokeStyle = `rgba(${SV},${ga})`; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(0,0,gr,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); for(let i=0;i<6;i++){ const a2 = i*Math.PI/3; ctx[i?'lineTo':'moveTo'](Math.cos(a2)*gr*.7, Math.sin(a2)*gr*.7); } ctx.closePath(); ctx.stroke();
+        ctx.beginPath(); for(let i=0;i<3;i++){ const a2 = i*Math.PI*2/3; ctx.moveTo(0,0); ctx.lineTo(Math.cos(a2)*gr*.7, Math.sin(a2)*gr*.7); } ctx.stroke();
+        ctx.rotate(-now*2); sfxGlow(0, 0, gr*1.8, SV, .35*(1-sh));
+        if(sh > 0){ for(let i=0;i<8;i++){ const a2 = i*Math.PI/4 + .2, d = gr*(.6 + sh*1.2), y = Math.sin(a2)*d + sh*sh*r*3; ctx.save(); ctx.translate(Math.cos(a2)*d, y); ctx.rotate(a2 + sh*4);
+          ctx.fillStyle = `rgba(${i%2?SV:"230,214,255"},${1-sh})`; ctx.beginPath(); ctx.moveTo(0,-r*.22); ctx.lineTo(r*.12,0); ctx.lineTo(0,r*.22); ctx.lineTo(-r*.12,0); ctx.closePath(); ctx.fill(); ctx.restore(); } }
+        ctx.restore();
+      } else if(f.k==="wave"){ // Second Wind: a ring of warmth rolls out from her across the party; each ally glows as it passes
+        const me = S.party.self, c = sfxAt(me, 0); if(!c) return; const R = f.R*VIEW.scale*sfxEase(u), sc2 = VIEW.scale;
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        const g = ctx.createRadialGradient(c.fx, c.fy, Math.max(0, R - 26*sc2), c.fx, c.fy, R + 4); g.addColorStop(0, `rgba(${SG},0)`); g.addColorStop(.75, `rgba(${SG},${.3*(1-u)})`); g.addColorStop(1, `rgba(${SC},${.55*(1-u)})`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c.fx, c.fy, R + 4, (R + 4)*.62, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = `rgba(${SC},${.8*(1-u)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(c.fx, c.fy, R, R*.62, 0, 0, Math.PI*2); ctx.stroke();
+        Object.keys(S.party).forEach(k=>{ const m = S.party[k]; if(!m || !m.alive) return; const d = dist(m.x, m.y, me.x, me.y)*VIEW.scale, hit = Math.max(0, 1 - Math.abs(R - d)/(40*sc2));
+          if(hit > 0){ const b = sfxAt(m, 1.35); sfxGlow(b.x, b.y, r*2, SG, .7*hit); for(let i=0;i<5;i++){ ctx.fillStyle = `rgba(${SC},${.9*hit})`; ctx.beginPath(); ctx.arc(b.x + Math.sin(i*2.6)*r*.6, b.y - (1-hit)*r*1.5 - i*r*.25, Math.max(1, r*.09), 0, Math.PI*2); ctx.fill(); } } });
+        ctx.restore();
+      } else if(f.k==="thread"){ // Misdirection: a thread drawn from the ally to Kessa, pulled taut, then it snaps into her
+        const fm = S.party[f.from], tk = S.party.tank, a = fm && sfxAt(fm, 1.35), b = tk && sfxAt(tk, 1.35); if(!a || !b) return;
+        const draw = Math.min(1, u/.45), snap = Math.max(0, (u-.55)/.45), sag = r*1.4*(1-draw);
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = `rgba(${SG},${.9*(1-snap)})`; ctx.lineWidth = 1.4; ctx.setLineDash([4,3]); ctx.lineDashOffset = -now*30;
+        const e2 = sfxEase(draw), ex = a.x + (b.x-a.x)*e2, ey = a.y + (b.y-a.y)*e2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x+ex)/2, (a.y+ey)/2 + sag, ex, ey); ctx.stroke(); ctx.setLineDash([]);
+        if(snap > 0){ sfxGlow(b.x, b.y, r*1.6, SG, .7*(1-snap)); for(let i=0;i<8;i++){ const a2 = i*Math.PI/4, d = r*(.3 + 1.1*snap); ctx.strokeStyle = `rgba(${SC},${1-snap})`; ctx.beginPath(); ctx.moveTo(b.x + Math.cos(a2)*d*.5, b.y + Math.sin(a2)*d*.5); ctx.lineTo(b.x + Math.cos(a2)*d, b.y + Math.sin(a2)*d); ctx.stroke(); } }
+        ctx.restore();
+      } else if(f.k==="rune"){ // Purge: a rune with an outward edge flares at her feet
+        const c = sfxAt(S.party.self, 0); if(!c) return; const R = r*(1.2 + 2.2*sfxEase(u)); ctx.save(); ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = `rgba(${SC},${.85*(1-u)})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(c.fx, c.fy, R, R*.6, 0, 0, Math.PI*2); ctx.stroke();
+        for(let i=0;i<12;i++){ const a2 = i*Math.PI/6 + now; ctx.beginPath(); ctx.moveTo(c.fx + Math.cos(a2)*R, c.fy + Math.sin(a2)*R*.6); ctx.lineTo(c.fx + Math.cos(a2)*(R + r*.5), c.fy + Math.sin(a2)*(R + r*.5)*.6); ctx.stroke(); }
+        ctx.restore();
+      } else if(f.k==="purge"){ // a beam to each enemy, and their buff breaks off above them
+        const e = f.e, a = sfxLantern(), b = e && sfxAt(e, 1.6); if(!a || !b) return; const bm = Math.min(1, u/.25), brk = Math.max(0, (u-.25)/.75);
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        if(brk < .5){ ctx.strokeStyle = `rgba(${SC},${.9*(1-brk*2)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + (b.x-a.x)*bm, a.y + (b.y-a.y)*bm); ctx.stroke();
+          ctx.strokeStyle = `rgba(${SG},${.5*(1-brk*2)})`; ctx.lineWidth = 5; ctx.stroke(); }
+        if(brk > 0){ const top = sfxAt(e, 2.8); for(let i=0;i<6;i++){ const a2 = -Math.PI/2 + (i-2.5)*.5, d = r*(.3 + 1.4*brk); ctx.fillStyle = `rgba(${i%2?SC:SG},${1-brk})`; ctx.save(); ctx.translate(top.x + Math.cos(a2)*d, top.y + Math.sin(a2)*d + brk*brk*r*2); ctx.rotate(a2 + brk*5); ctx.fillRect(-r*.12, -r*.12, r*.24, r*.24); ctx.restore(); }
+          sfxGlow(top.x, top.y, r*1.2, SC, .6*(1-brk)); }
+        ctx.restore();
+      } else if(f.k==="crack"){ // the ward breaking: the shell cracks and its pieces fall
+        const tm = S.party[f.at], b = tm && sfxAt(tm, 1.35); if(!b) return; const R = r*1.7, e2 = sfxEase(u);
+        ctx.save(); ctx.strokeStyle = `rgba(255,248,230,${1-u})`; ctx.lineWidth = 1.2;
+        for(let i=0;i<5;i++){ const a2 = i*1.26 + .4; ctx.beginPath(); ctx.moveTo(b.x + Math.cos(a2)*R*.3, b.y + Math.sin(a2)*R*.3); ctx.lineTo(b.x + Math.cos(a2+.2)*R*.65, b.y + Math.sin(a2+.2)*R*.7); ctx.lineTo(b.x + Math.cos(a2-.1)*R*.9, b.y + Math.sin(a2-.1)*R); ctx.stroke(); }
+        for(let i=0;i<10;i++){ const a2 = i*Math.PI/5, x = b.x + Math.cos(a2)*R*.85*(1 + e2*.3), y = b.y + Math.sin(a2)*R*(1 + e2*.2) + e2*e2*r*2.5;
+          ctx.fillStyle = `rgba(${SW},${.9*(1-u)})`; ctx.beginPath(); ctx.moveTo(x, y - r*.15); ctx.lineTo(x + r*.12, y + r*.08); ctx.lineTo(x - r*.1, y + r*.1); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+      } else if(f.k==="impact"){ // an enemy blow landing on a party member: a spark thrown from the side it came from
+        const tm = S.party[f.at], b = tm && sfxAt(tm, 1.3); if(!b) return; const e2 = sfxEase(u), ang = f.ang;
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; const cx2 = b.x - Math.cos(ang)*r*.5, cy2 = b.y - Math.sin(ang)*r*.5*.6;
+        sfxGlow(cx2, cy2, r*(.8 + .6*e2), "255,236,210", .7*(1-u));
+        for(let i=0;i<6;i++){ const a2 = ang + (i-2.5)*.35, d = r*(.3 + 1.3*e2); ctx.strokeStyle = `rgba(255,240,220,${1-u})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(cx2 + Math.cos(a2)*d*.4, cy2 + Math.sin(a2)*d*.4*.7); ctx.lineTo(cx2 + Math.cos(a2)*d, cy2 + Math.sin(a2)*d*.7); ctx.stroke(); }
+        ctx.restore();
+      }
+    });
+    ctx.restore();
+  }
+  try{ if(typeof window!=="undefined") window.__sfx = { SFX, spellFxCast, sfxSpawn }; }catch(_){}
+
   // ---- Round 122: hero action effects (world-space, cosmetic only) ----
   // Restyles the beams/slashes/bursts that heroes spawn (enemy beams keep the
   // old line style) and adds heal/hot/cleanse/tank-bash effects. Own PRNG so
@@ -15857,6 +16020,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function spawnActFx(type, x, y, opts){
     if(!S.actFx) S.actFx = [];
     if(S.actFx.length >= 60) return;
+    if(S._sfxCast && (type==="heal" || type==="hot" || type==="cleanse")) return; // spellFxV1: the spell's own signature is drawn instead
     const o = opts || {}, size = Math.max(0.15, Math.min(1, o.size==null?0.5:o.size));
     const n = type==="heal" ? 6+Math.round(size*8) : type==="bash" ? 8 : type==="cleanse" ? 10 : type==="eruption" ? 12 : type==="blast" ? 14 : type==="quake" ? 10 : 5;
     const parts = [];
@@ -15865,7 +16029,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     S.actFx.push({ type, x, y, ox:o.ox, oy:o.oy, rad:o.rad, size, parts, ttl:dur, ttlTotal:dur });
   }
   function tickActFx(dt){
-    if(!S.actFx || !S.actFx.length) return;
+    if(!S.actFx || !S.actFx.length){ sfxTick(dt); sfxWatch(); return; } // spellFxV1
+    sfxTick(dt); sfxWatch(); // spellFxV1
     S.actFx.forEach(f=>{ f.ttl -= dt; });
     S.actFx = S.actFx.filter(f=>f.ttl>0);
   }
@@ -15969,6 +16134,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // hero beams: Mira's fireball / Wren's shadow bolt (b.hero set at the spawn site)
   function drawHeroBeam(b){
     const p1 = VIEW.project(b.x1,b.y1), p2 = VIEW.project(b.x2,b.y2), sc = VIEW.scale;
+    p1.y -= 1.7*sfxR(); p2.y -= 1.3*sfxR(); // spellFxV1: from her hands to the body
     const t = Math.max(0, Math.min(1, b.ttl/(b.ttlTotal||1))), prog = 1-t;
     const fire = b.hero==="mira", TR = 0.62;
     const u = Math.min(1, prog/TR), dx = p2.x-p1.x, dy = p2.y-p1.y, ang = Math.atan2(dy,dx);
@@ -16017,7 +16183,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
   // hero melee: Rook's piercing thrust / Vex's crossing venom cuts
   function drawHeroSlash(s){
-    const p2 = VIEW.project(s.x,s.y), sc = VIEW.scale;
+    const p2 = VIEW.project(s.x,s.y), sc = VIEW.scale; p2.y -= 1.2*sfxR(); // spellFxV1: on the body
     const t = Math.max(0, Math.min(1, s.ttl/(s.ttlTotal||1))), prog = 1-t;
     const col = resolveColor(s.color || "var(--blood)");
     ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -25517,6 +25683,7 @@ thrall(){return gs(14)+
     (S.aoeBursts||[]).forEach(drawAoeBurst);
     (S.famFx||[]).forEach(drawFamilyFx); // Round 119
     (S.actFx||[]).forEach(drawActFx); // Round 122
+    try{ sfxDraw(); }catch(_){} // spellFxV1
 
     // depth-sort every mobile thing (plus pillars, which are tall enough to
     // occlude a unit standing behind one) by world (x+y) so closer tokens
@@ -26350,10 +26517,8 @@ thrall(){return gs(14)+
       /* oct10UiV1: dotted boundary ring removed — the tick pulse ring below marks the range */
       const u=bc._pulse!=null ? (now-bc._pulse)/550 : 2;   // heal tick: a ring sweeps out to the edge, threads to each ally healed
       if(u<1){ ctx.strokeStyle="rgba(255,225,150,"+(0.8*(1-u))+")"; ctx.lineWidth=Math.max(2,4*sc*(1-u)+1); ctx.beginPath(); ctx.arc(q.x,q.y,R*(0.2+0.8*u),0,6.2832); ctx.stroke();
-        (bc._hit||[]).forEach(k=>{ const a=S.party[k]; if(!a||!a.alive) return; const r2=VIEW.project(a.x,a.y);
-          ctx.strokeStyle="rgba(255,215,130,"+(0.75*(1-u))+")"; ctx.lineWidth=Math.max(1.5,3*sc); ctx.beginPath(); ctx.moveTo(q.x,q.y-14*sc); ctx.lineTo(r2.x,r2.y-14*sc); ctx.stroke();
-          ctx.fillStyle="rgba(255,235,170,"+(0.9*(1-u))+")"; ctx.beginPath(); ctx.arc(r2.x,r2.y-14*sc,(5+5*u)*sc+1,0,6.2832); ctx.fill(); }); }
-      const fy=q.y-(m._artGeom?m._artGeom.H:60)*sc*0.95-10*sc, fl=1+0.12*Math.sin(now/90);   // flame over the lit ally
+      } // spellFxV1: no threads out to each healed ally
+      const fy=q.y-3.0*sfxR(), fl=1+0.12*Math.sin(now/90); // spellFxV1: just over the redrawn character's head   // flame over the lit ally
       const fg=ctx.createRadialGradient(q.x,fy,1,q.x,fy,16*sc*fl+4); fg.addColorStop(0,"rgba(255,240,180,"+(0.95*fade)+")"); fg.addColorStop(0.45,"rgba(255,160,60,"+(0.6*fade)+")"); fg.addColorStop(1,"rgba(255,90,20,0)");
       ctx.fillStyle=fg; ctx.beginPath(); ctx.ellipse(q.x,fy,(9*sc+3)*fl,(15*sc+5)*fl,0,0,6.2832); ctx.fill();
       ctx.restore(); });
@@ -29245,8 +29410,7 @@ thrall(){return gs(14)+
     const w=32;
     const hpPct = Math.max(0,m.hp)/m.maxHp;
     if(m.shield>0){ // healerRigV1: overhead health bar removed
-      ctx.strokeStyle = resolveColor("var(--shield)"); ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(p.x, by, r+3, 0, Math.PI*2); ctx.stroke();
+      // spellFxV1: Wax Ward's shell is drawn by sfxDrawLasting
     }
     if(m.debuffs && m.debuffs.length){
       const pulse = 0.4 + 0.4*Math.sin((S.tPrev||0)/160);
@@ -36241,7 +36405,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build ab2ad46d8c) */
+<script>/* phone app: offline cache (build 3da0269f6a) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
