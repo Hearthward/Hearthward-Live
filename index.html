@@ -9079,7 +9079,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     const dpsCaster = S.party.dpsCaster; const ab = COMPANION_ABILITIES.dpsCaster.kindlingward; const o=_dmgSrc; _dmgSrc = ab.name;
     const targets = []; S.engagedGroups.forEach(g=>livingEnemiesOf(g).forEach(e=>{ if(!e._wardSealed) targets.push(e); }));
     const bt = dpsCaster._brandTarget && dpsCaster._brandTarget.alive ? dpsCaster._brandTarget : targets[0];
-    if(bt) spawnActFx("blast", bt.x, bt.y, { rad:40, size:0.7 }); // the burst
+    cfxCast("brandpop", { e: bt, es: targets.slice(0, 10) }); // compFxV1: the burst
     targets.forEach(e=>{
       let d = Math.round(rand(...ab.explodeDmg) * (1+0.2*(rankOf("dpsCaster","kindlingward")-1)) * (1+((dpsCaster.damagePct||0)+fountainDamageBonus("dpsCaster"))/100) * (hasTalent("dpsCaster","flashBrand") ? 0.75 : 1) * (hasTalent("dpsCaster","wideBrand") ? CT.WIDEBRAND : 1));
       const dRaw = d;
@@ -9087,7 +9087,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(hasAffix("dpsCaster","echoingDetonation") && e.alive){ const d2 = dealDamageToEnemy(e, Math.round(dRaw*0.4), dpsCaster); addThreat(e,"dpsCaster", d2*dpsCaster.threatMul); }
       if(hasAffix("dpsCaster","searingWard") && e.alive){ e.buffs = (e.buffs||[]).filter(b=>b.id!=="searingWard"); e.buffs.push({ id:"searingWard", label:"Searing Brand", purgeable:false, mitMul:1.08, dur:4, remaining:4 }); }
       if(hasAffix("dpsCaster","emberveil") && e.alive) engineAdd(e,"dpsCaster",2);
-      spawnAoeBurst(e.x, e.y, "var(--ember)");
+      // compFxV1: brandpop flares each enemy
       if(e.hp<=0) killEnemy(e, e._group);
     });
     if(hasTalent("dpsCaster","emberCascade")) dpsCaster.ccds.cindernova = 0;
@@ -15727,7 +15727,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function spawnBeam(x1, y1, x2, y2, color, hero){
     if(!S.beams) S.beams = [];
     const dur = hero ? 0.45 : BEAM_FLASH_DURATION; // Round 122: hero projectiles fly a little longer
-    S.beams.push({ x1, y1, x2, y2, color, hero: hero||null, ttl: dur, ttlTotal: dur });
+    let te = null, src = null; if(hero){ try{ te = enemiesInFight().find(e=>e.x===x2 && e.y===y2) || null; src = Object.values(S.party).find(m=>m.x===x1 && m.y===y1) || enemiesInFight().find(e=>e.x===x1 && e.y===y1) || null; }catch(_){} } // compFxV1
+    S.beams.push({ x1, y1, x2, y2, color, hero: hero||null, ttl: dur, ttlTotal: dur, te, src });
   }
   function tickBeams(dt){
     if(!S.beams || !S.beams.length) return;
@@ -15859,7 +15860,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function sfxTick(dt){ for(let i=SFX.length-1;i>=0;i--){ SFX[i].t += dt; if(SFX[i].t >= SFX[i].dur) SFX.splice(i,1); } }
   function sfxR(){ return 14*spriteZoomMul(); }
   // screen point on a party member (or enemy): h = height above the feet in units of the sprite radius
-  function sfxAt(m, h){ if(!m) return null; const p = VIEW.project(m.x, m.y); return { x:p.x, y:p.y - (h||0)*sfxR(), fx:p.x, fy:p.y }; }
+  function sfxAt(m, h){ if(!m) return null; let lx = 0, ly = 0; try{ if(m.role){ const L = lungeOffset(m); lx = L.dx||0; ly = L.dy||0; } }catch(_){} const p = VIEW.project(m.x + lx, m.y + ly); const g = !m.role && m._artGeom;
+    if(g && g.H > 0){ const vs = VIEW.scale||1, fx = p.x + (g.dx||0)*vs, fy = p.y + (g.dy||0)*vs; return { x:fx, y:fy - Math.min(1, (h||0)/2.7)*g.H*vs, fx, fy }; } // compFxV1: enemies by their own drawn height
+    return { x:p.x, y:p.y - (h||0)*sfxR(), fx:p.x, fy:p.y }; } // compFxV1: follows the lunge
   function sfxGlow(x, y, r, rgb, a){ if(!(r>0) || !(a>0)) return; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill(); }
   const sfxEase = u=>1-Math.pow(1-u,3);
   // a curved path from a to b, lifted in the middle; returns the point at u
@@ -16011,7 +16014,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- compFxV1: companion spell signatures ----
   const CFK_G = "255,212,120", CFK_C = "255,246,214", CFK_S = "214,222,232";
   let _sfxTop = false;
-  function sfxDrawTop(){ try{ cfxShells(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
+  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
   function cfxShells(){ const now = (S.tPrev||0)/1000, r = sfxR();
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key], fs = m && m._sfxFam; if(!m || !m.alive || !fs || !(fs.wax > 0 || fs.plate > 0)) return; const b = sfxAt(m, 1.35);
       if(fs.wax > 0) cfxWaxShell(b, r, now, fs.waxF, key); if(fs.plate > 0) cfxPlateShell(b, r, now, fs.plateF); }); }
@@ -16137,6 +16140,250 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI/2 + e2*3*(i%2?1:-1)); ctx.fillStyle = `rgba(${CFK_G},${.9*(1-u)})`; ctx.strokeStyle = `rgba(${CFK_C},${1-u})`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.rect(-r*.26, -r*.07, r*.52, r*.14); ctx.fill(); ctx.stroke(); ctx.restore(); }
     ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, R*.9, CFK_G, .4*(1-u)); ctx.restore();
+  };
+
+  // ---- compFxV1 Rook: steel and deep crimson (kept off fail-red), a spectral falcon
+  const RK_S = "238,234,226", RK_C = "190,48,62", RK_F = "255,226,190";
+  Object.assign(CFX_DUR, { wildcut:0.6, falcon:0.75, leap:0.6, focus:0.65 });
+  Object.assign(CFX_PASS, { wildcut:"top", falcon:"top", leap:"top", focus:"top" });
+  function cfxCrescent(cx, cy, R, a0, a1, w, rgb, al, sq){ // a tapered crescent from a0 to a1 (the head at a1)
+    const N = 14; for(let i=0;i<N;i++){ const t0 = i/N, t1 = (i+1)/N, k = t1;
+      ctx.strokeStyle = `rgba(${rgb},${al*k})`; ctx.lineWidth = Math.max(.8, w*k); ctx.beginPath();
+      ctx.ellipse(cx, cy, R, R*(sq||1), 0, a0 + (a1-a0)*t0, a0 + (a1-a0)*t1 + (a1>a0?.02:-.02)); ctx.stroke(); }
+  }
+  Object.assign(CFX_DRAW, {
+    // Wild Cut: Rook spins once, a steel crescent wheeling round him, then a crescent cut lands across every enemy it hits
+    c_wildcut(f, u, r, now){
+      const rk = S.party.dps, a = rk && sfxAt(rk, 1.2); if(!a) return;
+      ctx.save(); const sp = Math.min(1, u/.5);
+      if(sp < 1){ const head = -Math.PI/2 + sfxEase(sp)*Math.PI*2.4, al = 1 - Math.max(0, (sp - .7)/.3);
+        cfxCrescent(a.x, a.y, r*2.3, head - 2.6, head, 7, RK_C, .9*al, .55); cfxCrescent(a.x, a.y, r*2.2, head - 2.2, head, 4, RK_S, al, .55); }
+      (f.es||[]).forEach((e,i)=>{ const v = (u - .18 - (i%4)*.04)/.42; if(!e || v <= 0 || v >= 1) return; const b = sfxAt(e, 1.3), ang = -.6 + (i%2)*1.2, sw = sfxEase(Math.min(1, v*2.2)), al = 1 - Math.max(0, (v - .45)/.55);
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang); cfxCrescent(0, r*.12, r*1.6, -2.3, -2.3 + 2.6*sw, 6, RK_C, .9*al, .45); cfxCrescent(0, 0, r*1.6, -2.3, -2.3 + 2.6*sw, 3.4, RK_S, al, .45); ctx.restore(); });
+      ctx.restore();
+    },
+    // Falcon Strike: a spectral falcon stoops from high above onto the target and bursts into feathers
+    c_falcon(f, u, r, now){
+      const e = f.e, b = e && sfxAt(e, 1.3); if(!b) return; const rk = S.party.dps, side = rk && rk.x > e.x ? 1 : -1;
+      const TRV = .45, tu = Math.min(1, u/TRV);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      if(u < TRV){ const s0 = { x: b.x + side*r*4, y: b.y - r*8 }, e2 = tu*tu, x = s0.x + (b.x - s0.x)*e2, y = s0.y + (b.y - s0.y)*e2, ang = Math.atan2(b.y - s0.y, b.x - s0.x);
+        for(let i=1;i<7;i++){ const q = Math.max(0, tu - i*.05)**2; ctx.fillStyle = `rgba(${RK_F},${.35*(1 - i/7)})`; ctx.beginPath(); ctx.arc(s0.x + (b.x - s0.x)*q, s0.y + (b.y - s0.y)*q, r*.5*(1 - i/7), 0, Math.PI*2); ctx.fill(); }
+        sfxGlow(x, y, r*1.3, RK_C, .55);
+        ctx.save(); ctx.translate(x, y); ctx.rotate(ang - Math.PI/2); const fl = Math.sin(tu*Math.PI*3)*.35 + .2, W = r*1.6; ctx.scale(1.45, 1.45); ctx.globalCompositeOperation = "source-over"; // wings swept back as it stoops
+        ctx.fillStyle = `rgba(${RK_F},.95)`; ctx.strokeStyle = `rgba(${RK_C},.95)`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, r*.55); ctx.quadraticCurveTo(-W*.5, -r*.1 - fl*r, -W, -r*.55 - fl*r*.6); ctx.quadraticCurveTo(-W*.45, -r*.15, -r*.12, -r*.35);
+        ctx.lineTo(0, -r*.62); ctx.lineTo(r*.12, -r*.35); ctx.quadraticCurveTo(W*.45, -r*.15, W, -r*.55 - fl*r*.6); ctx.quadraticCurveTo(W*.5, -r*.1 - fl*r, 0, r*.55); ctx.fill(); ctx.stroke(); ctx.restore();
+      } else { const v = (u - TRV)/(1 - TRV), e2 = sfxEase(v);
+        sfxGlow(b.x, b.y, r*(1.2 + 1.2*e2), RK_C, .7*(1 - v)); sfxGlow(b.x, b.y, r*.9, RK_F, .8*(1 - v));
+        for(let i=0;i<8;i++){ const a2 = i*Math.PI/4 + .3, d = r*(.4 + 1.6*e2), x = b.x + Math.cos(a2)*d, y = b.y + Math.sin(a2)*d*.7 + e2*e2*r*.8;
+          ctx.save(); ctx.translate(x, y); ctx.rotate(a2 + v*3*(i%2?1:-1)); ctx.fillStyle = `rgba(${i%2?RK_F:RK_S},${.9*(1 - v)})`; ctx.beginPath(); ctx.ellipse(0, 0, r*.4, r*.12, 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+      }
+      ctx.restore();
+    },
+    // Predator's Leap: a streak of afterimages from Rook to his quarry, then three claw gouges rake across it
+    c_leap(f, u, r, now){
+      const rk = S.party.dps, e = f.e, a = rk && sfxAt(rk, 1.2), b = e && sfxAt(e, 1.3); if(!a || !b) return;
+      ctx.save(); const st = Math.min(1, u/.3), sa = 1 - Math.max(0, (u - .2)/.35);
+      if(sa > 0){ ctx.globalCompositeOperation = "lighter"; const ang = Math.atan2(b.y - a.y, b.x - a.x), D = Math.hypot(b.x - a.x, b.y - a.y);
+        for(let i=0;i<5;i++){ const k = (i + 1)/6*sfxEase(st), x = a.x + (b.x - a.x)*k, y = a.y + (b.y - a.y)*k - Math.sin(k*Math.PI)*Math.min(D*.25, r*2);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.strokeStyle = `rgba(${i%2?RK_C:RK_S},${.8*sa*(i+1)/5})`; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(-r*.7, -r*.5); ctx.lineTo(0, 0); ctx.lineTo(-r*.7, r*.5); ctx.stroke(); ctx.restore(); } }
+      ctx.globalCompositeOperation = "source-over";
+      for(let i=0;i<3;i++){ const v = (u - .22 - i*.05)/.3; if(v <= 0) continue; const sw = Math.min(1, v), al = 1 - Math.max(0, (u - .45)/.55);
+        const x0 = b.x - r*1.0 + i*r*.5, y0 = b.y - r*1.2, x1 = x0 + r*.75, y1 = b.y + r*.9;
+        ctx.strokeStyle = `rgba(40,10,14,${.7*al})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + r*.65, (y0+y1)/2, x0 + (x1-x0)*sw, y0 + (y1-y0)*sw); ctx.stroke();
+        ctx.strokeStyle = `rgba(${i===1?RK_S:RK_C},${al})`; ctx.lineWidth = 3.2; ctx.stroke(); }
+      ctx.restore();
+    },
+    // Focused Strikes: activation only. His eyes catch a glint and a crimson ring draws tight into him; the window is a pip
+    c_focus(f, u, r, now){
+      const rk = S.party.dps, c = rk && sfxAt(rk, 1.2), h = rk && sfxAt(rk, 2.35); if(!c) return; const fc = cfxFace(rk);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const R = r*(2.6 - 1.9*sfxEase(Math.min(1, u/.55))), al = 1 - Math.max(0, (u - .45)/.55);
+      ctx.strokeStyle = `rgba(${RK_C},${.9*al})`; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.ellipse(c.x, c.y, R*.85, R, 0, 0, Math.PI*2); ctx.stroke();
+      for(let i=0;i<8;i++){ const a2 = i*Math.PI/4, d0 = R*1.05, d1 = R*1.3; ctx.strokeStyle = `rgba(${RK_S},${.7*al})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(c.x + Math.cos(a2)*d1*.85, c.y + Math.sin(a2)*d1); ctx.lineTo(c.x + Math.cos(a2)*d0*.85, c.y + Math.sin(a2)*d0); ctx.stroke(); }
+      const gl = Math.max(0, 1 - Math.abs(u - .5)/.25), ex = h.x + fc*r*.18; // the glint
+      if(gl > 0){ sfxGlow(ex, h.y, r*.6, RK_F, .9*gl); ctx.strokeStyle = `rgba(255,250,240,${gl})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(ex - r*.9*gl, h.y); ctx.lineTo(ex + r*.9*gl, h.y); ctx.moveTo(ex, h.y - r*.35*gl); ctx.lineTo(ex, h.y + r*.35*gl); ctx.stroke(); }
+      ctx.restore();
+    },
+  });
+
+  // ---- compFxV1 Vex: venom chartreuse (his corrosion colour), dark olive edges, a pale fang white
+  const VX_V = "195,209,90", VX_D = "70,80,18", VX_W = "246,244,222";
+  Object.assign(CFX_DUR, { spray:0.65, fang:0.6, bite:0.7, bloom:0.85 });
+  Object.assign(CFX_PASS, { spray:"top", fang:"top", bite:"top", bloom:"top" });
+  function cfxDrop(x, y, s, ang, al){ // a teardrop of venom pointing along ang
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.fillStyle = `rgba(${VX_V},${al})`; ctx.strokeStyle = `rgba(${VX_D},${al})`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(s*1.6, 0); ctx.quadraticCurveTo(0, -s, -s*.6, 0); ctx.quadraticCurveTo(0, s, s*1.6, 0); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  function cfxSplat(x, y, r, v, n, al, big){ // a venom splash: droplets flung out and falling
+    const e2 = sfxEase(v); for(let i=0;i<n;i++){ const a = i*Math.PI*2/n + .35, d = r*(.3 + (big?1.6:1.1)*e2)*(.7 + .3*((i*7)%3)), x2 = x + Math.cos(a)*d, y2 = y + Math.sin(a)*d*.65 + e2*e2*r*.7;
+      cfxDrop(x2, y2, r*(big?.26:.2)*(1 - v*.4), a, al*(1 - v)); }
+  }
+  Object.assign(CFX_DRAW, {
+    // Viper's Spray: Vex flicks a fan of venom from his blades; a stream of droplets reaches every enemy and splashes on it
+    c_spray(f, u, r, now){
+      const vx = S.party.dps, a = vx && sfxAt(vx, 1.3); if(!a) return; ctx.save();
+      (f.es||[]).forEach((e,j)=>{ if(!e) return; const b = sfxAt(e, 1.2), TRV = .38 + (j%3)*.04, tu = Math.min(1, u/TRV), ang = Math.atan2(b.y - a.y, b.x - a.x), lift = Math.min(40, Math.hypot(b.x-a.x, b.y-a.y)*.18);
+        if(u < TRV + .1){ const fade = 1 - Math.max(0, (u - TRV)/.1);
+          for(let i=0;i<6;i++){ const k = Math.max(0, sfxEase(tu) - i*.07); if(k <= 0) break; const q = sfxArc(a, b, k, lift), wob = Math.sin(i*2.1 + j)*r*.25*(1-k);
+            cfxDrop(q.x, q.y + wob, r*.28*(1 - i/8), ang, .95*fade*(1 - i/7)); } }
+        if(u >= TRV*.95){ const v = Math.min(1, (u - TRV*.95)/(1 - TRV*.95)); cfxSplat(b.x, b.y, r, v, 7, 1, false);
+          ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*1.1, VX_V, .45*(1 - v)); ctx.globalCompositeOperation = "source-over"; } });
+      ctx.restore();
+    },
+    // Rending Fang: two curved fang slashes cross on the target; venom he cashes in bursts out of the wound, bigger with more stacks
+    c_fang(f, u, r, now){
+      const e = f.e, b = e && sfxAt(e, 1.3); if(!b) return; ctx.save();
+      for(let i=0;i<2;i++){ const v = (u - i*.08)/.4; if(v <= 0) continue; const sw = sfxEase(Math.min(1, v)), al = 1 - Math.max(0, (u - .35)/.4), sg = i ? -1 : 1;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.scale(sg, 1);
+        const p0 = { x: -r*1.3, y: -r*1.4 }, p1 = { x: r*1.3, y: r*1.1 }, c = { x: r*.85, y: -r*.85 };
+        ctx.strokeStyle = `rgba(${VX_D},${.7*al})`; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(p0.x, p0.y);
+        const q = t=>({ x: (1-t)*(1-t)*p0.x + 2*(1-t)*t*c.x + t*t*p1.x, y: (1-t)*(1-t)*p0.y + 2*(1-t)*t*c.y + t*t*p1.y });
+        for(let k=1;k<=12;k++){ const p = q(sw*k/12); ctx.lineTo(p.x, p.y); } ctx.stroke(); ctx.strokeStyle = `rgba(${VX_W},${al})`; ctx.lineWidth = 3.2; ctx.stroke();
+        ctx.strokeStyle = `rgba(${VX_V},${.9*al})`; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore(); }
+      const st = f.st||0; if(st > 0){ const v = Math.max(0, (u - .22)/.78); if(v > 0){ const big = st >= (f.max||5), sz = .6 + .1*Math.min(10, st);
+        ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*(1 + 1.4*sz)*sfxEase(v), VX_V, .6*(1 - v)); ctx.globalCompositeOperation = "source-over";
+        cfxSplat(b.x, b.y, r*sz, v, 6 + Math.min(8, st), 1, big); } }
+      ctx.restore();
+    },
+    // Paralytic Bite: jaws snap shut on the target (two fangs closing), then a few jittering nerve-sparks around it
+    c_bite(f, u, r, now){
+      const e = f.e, b0 = e && sfxAt(e, 1.4); if(!b0) return; ctx.save(); const b = b0; r = r*1.6;
+      const cl = sfxEase(Math.min(1, u/.25)), al = 1 - Math.max(0, (u - .3)/.3);
+      if(al > 0) for(let i=0;i<2;i++){ const sg = i ? 1 : -1, y = b.y + sg*r*(1.0 - .75*cl);
+        ctx.fillStyle = `rgba(${VX_W},${al})`; ctx.strokeStyle = `rgba(${VX_D},${al})`; ctx.lineWidth = 1.2;
+        for(let k=-1;k<=1;k+=2){ const x = b.x + k*r*.32; ctx.beginPath(); ctx.moveTo(x - r*.15, y); ctx.lineTo(x + r*.15, y); ctx.lineTo(x, y - sg*r*.5); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+        ctx.strokeStyle = `rgba(${VX_D},${.8*al})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(b.x - r*.6, y); ctx.quadraticCurveTo(b.x, y + sg*r*.25, b.x + r*.6, y); ctx.stroke(); }
+      if(u > .22){ const v = (u - .22)/.78, n = 5; ctx.globalCompositeOperation = "lighter";
+        if(v < .3) sfxGlow(b.x, b.y, r*1.2, VX_V, .7*(1 - v/.3));
+        for(let i=0;i<n;i++){ const a = i*Math.PI*2/n + Math.floor(now*14)*.7, d = r*(.8 + .25*Math.sin(now*40 + i)), x = b.x + Math.cos(a)*d, y = b.y + Math.sin(a)*d*.8;
+          ctx.strokeStyle = `rgba(${VX_V},${.9*(1 - v)})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y);
+          for(let k=1;k<=3;k++){ ctx.lineTo(x + Math.cos(a)*r*.14*k + (k%2?1:-1)*r*.1, y + Math.sin(a)*r*.14*k + (k%2?-1:1)*r*.1); } ctx.stroke(); } }
+      ctx.restore();
+    },
+    // Toxic Bloom: on every poisoned enemy a venom flower opens and bursts, its size set by the stacks it detonates
+    c_bloom(f, u, r, now){
+      ctx.save();
+      (f.es||[]).forEach((o,j)=>{ const e = o.e, b = e && sfxAt(e, 1.1); if(!b) return; const v = (u - (j%5)*.03); if(v <= 0) return;
+        const sz = .7 + .08*Math.min(10, o.st||1), op = sfxEase(Math.min(1, v/.45)), burst = Math.max(0, (v - .45)/.55), R = r*sz*1.25;
+        const N = 6; for(let i=0;i<N;i++){ const a = i*Math.PI*2/N + j*.4, al = 1 - burst, d = R*op*(1 + burst*.8);
+          ctx.save(); ctx.translate(b.x + Math.cos(a)*d*.35, b.y + Math.sin(a)*d*.35*.7); ctx.rotate(a);
+          ctx.fillStyle = `rgba(${VX_V},${.85*al})`; ctx.strokeStyle = `rgba(${VX_D},${al})`; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(d*.5, -d*.32, d*.95, 0); ctx.quadraticCurveTo(d*.5, d*.32, 0, 0); ctx.fill(); ctx.stroke(); ctx.restore(); }
+        ctx.fillStyle = `rgba(${VX_W},${1 - burst})`; ctx.beginPath(); ctx.arc(b.x, b.y, R*.2*op, 0, Math.PI*2); ctx.fill();
+        if(burst > 0){ ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, R*(1.2 + 1.2*burst), VX_V, .6*(1 - burst)); ctx.globalCompositeOperation = "source-over"; cfxSplat(b.x, b.y, R*.8, burst, 8, 1, true); } });
+      ctx.restore();
+    },
+  });
+
+  // ---- compFxV1 basic-attack hit marks: small, a quarter of a second, on the body
+  Object.assign(CFX_DUR, { rhit:0.24, vhit:0.26 });
+  Object.assign(CFX_PASS, { rhit:"top", vhit:"top" });
+  Object.assign(CFX_DRAW, {
+    c_rhit(f, u, r, now){ // Rook: one thin steel cut across the body, angled from where he stands, and a pinpoint spark
+      const e = f.e, b = e && sfxAt(e, 1.35), rk = S.party.dps; if(!b) return; const side = rk && rk.x > e.x ? -1 : 1, L = r*.75, sw = sfxEase(Math.min(1, u/.45)), al = 1 - Math.max(0, (u - .4)/.6);
+      const a = (f.v ? -.5 : .5)*side, x0 = b.x - Math.cos(a)*L*side, y0 = b.y - Math.sin(a)*L*side*.6 - L*.25, x1 = x0 + (b.x + Math.cos(a)*L*side - x0)*sw, y1 = y0 + (b.y + L*.25 - y0)*sw;
+      ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = `rgba(40,10,14,${.6*al})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.strokeStyle = `rgba(${RK_S},${al})`; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x1, y1, r*.35, RK_F, .7*al); ctx.restore();
+    },
+    c_vhit(f, u, r, now){ // Vex: two short fang nicks and a couple of venom flecks
+      const e = f.e, b = e && sfxAt(e, 1.35); if(!b) return; const sw = sfxEase(Math.min(1, u/.4)), al = 1 - Math.max(0, (u - .4)/.6), fl = f.v ? -1 : 1;
+      ctx.save(); ctx.lineCap = "round";
+      for(let i=0;i<2;i++){ const ox = (i - .5)*r*.28, x0 = b.x + ox + fl*r*.3, y0 = b.y - r*.4, x1 = b.x + ox - fl*r*.2, y1 = b.y + r*.3;
+        const xm = x0 + (x1 - x0)*sw, ym = y0 + (y1 - y0)*sw; ctx.strokeStyle = `rgba(${VX_D},${.7*al})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 - fl*r*.1, (y0+ym)/2, xm, ym); ctx.stroke();
+        ctx.strokeStyle = `rgba(${VX_W},${al})`; ctx.lineWidth = 1.4; ctx.stroke(); }
+      if(u > .2){ const v = (u - .2)/.8; for(let i=0;i<3;i++){ const a = .6 + i*.9, d = r*(.2 + .5*v); cfxDrop(b.x + Math.cos(a)*d*fl, b.y + r*.2 + Math.sin(a)*d*.5 + v*v*r*.4, r*.09, a, .9*(1 - v)); } }
+      ctx.restore();
+    },
+  });
+
+  // ---- compFxV1 Mira: ember orange, forge gold, a white-hot core, a deep red-orange edge
+  const MR_O = "255,140,60", MR_G = "255,200,90", MR_W = "255,246,225", MR_D = "150,50,20";
+  Object.assign(CFX_DUR, { nova:0.55, lance:0.55, brand:0.6, brandpop:0.7, meteor:0.7 });
+  Object.assign(CFX_PASS, { nova:"both", lance:"top", brand:"top", brandpop:"top", meteor:"top" });
+  function mrHands(){ const m = S.party.dpsCaster, p = m && sfxAt(m, 1.75); if(!p) return null; return { x: p.x + cfxFace(m)*sfxR()*.5, y: p.y }; }
+  function cfxFlare(x, y, r, v, al){ // a small ember flare on a body: flame tongues licking up (solid, dark-edged so they read on bright art) and a hot core
+    const e2 = sfxEase(v), k = al*(1 - v); ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x, y, r*(.7 + .9*e2), MR_O, .6*k); ctx.globalCompositeOperation = "source-over";
+    for(let i=0;i<5;i++){ const a = -Math.PI/2 + (i - 2)*.5, d = r*(.45 + .85*e2)*(i===2 ? 1.25 : 1), w = r*.2*(1 - v*.5), bx = x + Math.cos(a)*r*.2, by = y + Math.sin(a)*r*.2, tx = x + Math.cos(a)*d, ty = y + Math.sin(a)*d;
+      const nx = -Math.sin(a)*w, ny = Math.cos(a)*w; ctx.fillStyle = `rgba(${i%2?MR_G:MR_O},${k})`; ctx.strokeStyle = `rgba(${MR_D},${.8*k})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(bx + nx, by + ny); ctx.quadraticCurveTo((bx+tx)/2 + nx*.6, (by+ty)/2 + ny*.6, tx, ty); ctx.quadraticCurveTo((bx+tx)/2 - nx*.6, (by+ty)/2 - ny*.6, bx - nx, by - ny); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = `rgba(${MR_W},${k})`; ctx.beginPath(); ctx.arc(x, y, r*.22*(1 - v*.5), 0, Math.PI*2); ctx.fill(); ctx.restore();
+  }
+  function cfxSigil(x, y, s, rot, al){ // Kindling Brand's sigil: a ring, a flame rune inside, three ticks
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.strokeStyle = `rgba(${MR_G},${al})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI*2); ctx.stroke();
+    for(let i=0;i<3;i++){ const a = i*Math.PI*2/3; ctx.beginPath(); ctx.moveTo(Math.cos(a)*s, Math.sin(a)*s); ctx.lineTo(Math.cos(a)*s*1.35, Math.sin(a)*s*1.35); ctx.stroke(); }
+    ctx.rotate(-rot); ctx.fillStyle = `rgba(${MR_O},${al})`; ctx.beginPath(); ctx.moveTo(0, -s*.7); ctx.quadraticCurveTo(s*.5, -s*.05, 0, s*.55); ctx.quadraticCurveTo(-s*.5, -s*.05, 0, -s*.7); ctx.fill();
+    ctx.fillStyle = `rgba(${MR_W},${al})`; ctx.beginPath(); ctx.moveTo(0, -s*.25); ctx.quadraticCurveTo(s*.2, s*.1, 0, s*.35); ctx.quadraticCurveTo(-s*.2, s*.1, 0, -s*.25); ctx.fill(); ctx.restore();
+  }
+  // the smouldering brand: a small sigil turning slowly over the branded enemy until it bursts (replaces the 4s of floor rings)
+  function cfxEnemyMarks(){ const m = S.party.dpsCaster; if(!m || m._brandT==null || S.casterSpec==="dot") return; const e = m._brandTarget; if(!e || !e.alive) return;
+    const r = sfxR(), now = (S.tPrev||0)/1000, b = sfxAt(e, 2.95), pulse = .75 + .25*Math.sin(now*6); cfxSigil(b.x, b.y - r*.35, r*.32*pulse + r*.05, now*1.5, .85);
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y - r*.35, r*.6, MR_O, .35*pulse); ctx.restore(); }
+  Object.assign(CFX_DRAW, {
+    // Cinder Nova: a tight ring of flame snaps out from her feet and is gone; each enemy it scorches flares
+    c_nova(f, u, r, now){
+      const m = S.party.dpsCaster, c = m && sfxAt(m, 0); if(!c) return;
+      if(!_sfxTop){ const v = Math.min(1, u/.5), R = r*(.8 + 3.4*sfxEase(v)), al = 1 - v; if(al <= 0) return;
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = `rgba(${MR_O},${.9*al})`; ctx.lineWidth = 3*al + .8; ctx.beginPath(); ctx.ellipse(c.fx, c.fy, R, R*.6, 0, 0, Math.PI*2); ctx.stroke();
+        ctx.strokeStyle = `rgba(${MR_W},${.7*al})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(c.fx, c.fy, R*.92, R*.55, 0, 0, Math.PI*2); ctx.stroke();
+        for(let i=0;i<12;i++){ const a = i*Math.PI/6 + .2, h = r*(.35 + .25*((i*5)%3))*al; ctx.strokeStyle = `rgba(${i%2?MR_G:MR_O},${al})`; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.moveTo(c.fx + Math.cos(a)*R, c.fy + Math.sin(a)*R*.6); ctx.lineTo(c.fx + Math.cos(a)*R, c.fy + Math.sin(a)*R*.6 - h); ctx.stroke(); } ctx.restore(); return; }
+      (f.es||[]).forEach((e,i)=>{ const v = (u - .12 - (i%4)*.03)/.6; if(!e || v <= 0 || v >= 1) return; const b = sfxAt(e, 1.35); cfxFlare(b.x, b.y, r*1.1, v, 1); });
+    },
+    // Emberlance: a spinning lance of fire leaves her hands and drives into the target
+    c_lance(f, u, r, now){
+      const e = f.e, a = mrHands(), b = e && sfxAt(e, 1.35); if(!a || !b) return; const TRV = .3, tu = Math.min(1, u/TRV), ang = Math.atan2(b.y - a.y, b.x - a.x);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      if(u < TRV + .12){ const fade = 1 - Math.max(0, (u - TRV)/.12), hx = a.x + (b.x - a.x)*sfxEase(tu), hy = a.y + (b.y - a.y)*sfxEase(tu), L = r*2.2;
+        ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang);
+        const g = ctx.createLinearGradient(-L, 0, r*.4, 0); g.addColorStop(0, `rgba(${MR_O},0)`); g.addColorStop(.6, `rgba(${MR_O},${.8*fade})`); g.addColorStop(1, `rgba(${MR_W},${fade})`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r*.45, 0); ctx.lineTo(-L*.2, -r*.2); ctx.lineTo(-L, 0); ctx.lineTo(-L*.2, r*.2); ctx.closePath(); ctx.fill();
+        for(let i=0;i<10;i++){ const x = -i*L*.1, sp = Math.sin(now*30 + i*.9)*r*.28*(1 - i/12); ctx.fillStyle = `rgba(${i%2?MR_G:MR_O},${fade*(1 - i/10)})`; ctx.beginPath(); ctx.arc(x, sp, Math.max(1, r*.09), 0, Math.PI*2); ctx.fill(); }
+        ctx.restore(); sfxGlow(hx, hy, r*.9, MR_O, .6*fade); }
+      if(u >= TRV*.9){ const v = (u - TRV*.9)/(1 - TRV*.9); cfxFlare(b.x, b.y, r*1.5, v, 1);
+        for(let i=0;i<6;i++){ const a2 = ang + Math.PI + (i - 2.5)*.35, d = r*(.4 + 1.6*sfxEase(v)); ctx.fillStyle = `rgba(${MR_G},${1 - v})`; ctx.beginPath(); ctx.arc(b.x + Math.cos(a2)*d, b.y + Math.sin(a2)*d*.7, Math.max(1, r*.1), 0, Math.PI*2); ctx.fill(); } }
+      ctx.restore();
+    },
+    // Kindling Brand: the sigil she traced flies from her hands and stamps onto the target
+    c_brand(f, u, r, now){
+      const e = f.e, a = mrHands(), b0 = e && sfxAt(e, 2.95); if(!a || !b0) return; const b = { x: b0.x, y: b0.y - r*.35 }, TRV = .45, tu = Math.min(1, u/TRV);
+      ctx.save();
+      if(u < TRV){ const h = sfxArc(a, b, sfxEase(tu), r*1.5); ctx.globalCompositeOperation = "lighter"; sfxGlow(h.x, h.y, r*1, MR_O, .5); ctx.globalCompositeOperation = "source-over"; cfxSigil(h.x, h.y, r*.5, now*6, 1); }
+      else { const v = (u - TRV)/(1 - TRV), s2 = r*(.75 - .4*sfxEase(v)); cfxSigil(b.x, b.y, s2, now*1.5, 1); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*(1.6 - .8*v), MR_O, .6*(1 - v));
+        ctx.strokeStyle = `rgba(${MR_G},${1 - v})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(b.x, b.y, r*(.5 + 1.2*sfxEase(v)), 0, Math.PI*2); ctx.stroke(); }
+      ctx.restore();
+    },
+    // the brand bursting: the sigil flares into a ring of fire on its target, and every enemy it reaches flares
+    c_brandpop(f, u, r, now){
+      const bt = f.e, b = bt && sfxAt(bt, 1.35); ctx.save();
+      if(b){ const v = Math.min(1, u/.6), e2 = sfxEase(v); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*(1.4 + 1.6*e2), MR_O, .7*(1 - v));
+        ctx.strokeStyle = `rgba(${MR_G},${1 - v})`; ctx.lineWidth = 2.6*(1 - v) + .6; ctx.beginPath(); ctx.ellipse(b.x, b.y, r*(.6 + 2*e2), r*(.6 + 2*e2)*.8, 0, 0, Math.PI*2); ctx.stroke();
+        if(v < .5) cfxSigil(b.x, b.y - r*.2, r*(.5 + .8*v), 0, 1 - v*2); }
+      (f.es||[]).forEach((e,i)=>{ if(!e || e===bt) return; const v = (u - .15 - (i%4)*.03)/.6; if(v <= 0 || v >= 1) return; const p = sfxAt(e, 1.35); cfxFlare(p.x, p.y, r*1.1, v, 1); });
+      ctx.restore();
+    },
+    // Forge Overload's release: the charge she held overhead comes down on the target as a meteor
+    c_meteor(f, u, r, now){
+      const e = f.e, b = e && sfxAt(e, 1.2); if(!b) return; const m = S.party.dpsCaster, side = m && m.x < e.x ? -1 : 1, TRV = .35, tu = Math.min(1, u/TRV);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      if(u < TRV){ const s0 = { x: b.x + side*r*2.5, y: b.y - r*7 }, k = tu*tu, x = s0.x + (b.x - s0.x)*k, y = s0.y + (b.y - s0.y)*k;
+        for(let i=1;i<9;i++){ const q = Math.max(0, tu - i*.04)**2; ctx.fillStyle = `rgba(${i<3?MR_G:MR_O},${.6*(1 - i/9)})`; ctx.beginPath(); ctx.arc(s0.x + (b.x - s0.x)*q, s0.y + (b.y - s0.y)*q, r*.55*(1 - i/10), 0, Math.PI*2); ctx.fill(); }
+        sfxGlow(x, y, r*1.8, MR_O, .8); ctx.fillStyle = `rgba(${MR_W},1)`; ctx.beginPath(); ctx.arc(x, y, r*.4, 0, Math.PI*2); ctx.fill(); }
+      else { const v = (u - TRV)/(1 - TRV), e2 = sfxEase(v); sfxGlow(b.x, b.y, r*(1.6 + 1.8*e2), MR_O, .85*(1 - v)); sfxGlow(b.x, b.y, r*1.1, MR_W, .9*(1 - v));
+        ctx.strokeStyle = `rgba(${MR_G},${1 - v})`; ctx.lineWidth = 3*(1 - v) + .6; ctx.beginPath(); ctx.ellipse(b.fx, b.fy, r*(.8 + 2.2*e2), r*(.8 + 2.2*e2)*.55, 0, 0, Math.PI*2); ctx.stroke();
+        for(let i=0;i<10;i++){ const a2 = -Math.PI + i*Math.PI/9, d = r*(.5 + 2*e2); ctx.fillStyle = `rgba(${i%2?MR_G:MR_O},${1 - v})`; ctx.beginPath(); ctx.arc(b.x + Math.cos(a2)*d, b.y + Math.sin(a2)*d*.8 + e2*e2*r, Math.max(1, r*.14*(1 - v)), 0, Math.PI*2); ctx.fill(); } }
+      ctx.restore();
+    },
+  });
+
+  Object.assign(CFX_DUR, { khit:0.26 }); Object.assign(CFX_PASS, { khit:"top" });
+  CFX_DRAW.c_khit = function(f, u, r, now){ // a short, heavy steel arc with a gold edge across the body, and a pinpoint spark
+    const e = f.e, b = e && sfxAt(e, 1.35), tk = S.party.tank; if(!b) return; const side = tk && tk.x > e.x ? -1 : 1, sw = sfxEase(Math.min(1, u/.45)), al = 1 - Math.max(0, (u - .4)/.6), R = r*.7;
+    const a0 = side > 0 ? -2.3 : -.84, a1 = a0 + side*1.6*sw;
+    ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = `rgba(60,40,12,${.6*al})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(b.x - side*r*.2, b.y + r*.1, R, Math.min(a0, a1), Math.max(a0, a1)); ctx.stroke();
+    ctx.strokeStyle = `rgba(${CFK_G},${al})`; ctx.lineWidth = 2; ctx.stroke();
+    const ex = b.x - side*r*.2 + Math.cos(a1)*R, ey = b.y + r*.1 + Math.sin(a1)*R; ctx.globalCompositeOperation = "lighter"; sfxGlow(ex, ey, r*.4, CFK_C, .8*al); ctx.restore();
   };
   try{ if(typeof window!=="undefined") window.__cfx = { cfxCast, CFX_DRAW }; }catch(_){}
 
@@ -16267,6 +16514,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function drawHeroBeam(b){
     const p1 = VIEW.project(b.x1,b.y1), p2 = VIEW.project(b.x2,b.y2), sc = VIEW.scale;
     p1.y -= 1.7*sfxR(); p2.y -= 1.3*sfxR(); // spellFxV1: from her hands to the body
+    if(b.src){ const q = b.src.role ? sfxAt(b.src, 1.75) : sfxAt(b.src, 1.35); if(q){ p1.x = q.x + (b.src.role ? cfxFace(b.src)*sfxR()*.5 : 0); p1.y = q.y; } } // compFxV1
+    if(b.te){ const q = sfxAt(b.te, 1.35); if(q){ p2.x = q.x; p2.y = q.y; } }
     const t = Math.max(0, Math.min(1, b.ttl/(b.ttlTotal||1))), prog = 1-t;
     const fire = b.hero==="mira", TR = 0.62;
     const u = Math.min(1, prog/TR), dx = p2.x-p1.x, dy = p2.y-p1.y, ang = Math.atan2(dy,dx);
@@ -16295,12 +16544,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(prog>=TR){
       const v = (prog-TR)/(1-TR), ease = 1-Math.pow(1-v,2);
       ctx.globalAlpha = (1-v)*0.95;
-      if(fire){
-        for(let i=0;i<7;i++){
-          const a = i*6.2832/7 + 0.3; fxDrop(p2.x+Math.cos(a)*4*sc, p2.y+Math.sin(a)*4*sc, (8+10*ease)*sc*(1-v*0.4), 2.4*sc*(1-v), a);
-          ctx.fillStyle = i%2?"#ffb347":"#ff7a3a"; ctx.strokeStyle = "#8a2a10"; ctx.lineWidth = Math.max(0.8, sc*0.8); ctx.fill(); ctx.stroke();
-        }
-        ctx.beginPath(); ctx.arc(p2.x,p2.y,(4+9*ease)*sc,0,6.2832); ctx.strokeStyle = "#ffd27a"; ctx.lineWidth = Math.max(1.5,2.4*sc*(1-v)); ctx.stroke();
+      if(fire){ ctx.globalAlpha = 1; cfxFlare(p2.x, p2.y, sfxR()*.9, v, 1); // compFxV1: a small flare instead of petals and a ring
       } else { // curse rune flash
         const R = (9+5*ease)*sc, rot = v*3;
         ctx.strokeStyle = "#1a0f2e"; ctx.lineWidth = Math.max(2.4, 4*sc*(1-v*0.5));
@@ -22141,7 +22385,7 @@ thrall(){return gs(14)+
         let retaliated = false;
         tank._autoN = (tank._autoN||0)+1; if(hasAffix("tank","retaliation") && tank._autoN%5===0){ d = d*2; retaliated = true; } // Double Strike
         triggerAttackLunge(tank, tankFocus.x, tankFocus.y); // Round 40: visual-only forward lunge on the swing
-        spawnActFx("bash", tankFocus.x, tankFocus.y, { ox:tank.x, oy:tank.y }); // Round 122
+        cfxCast("khit", { e: tankFocus }); // compFxV1: Kessa's basic attack (was a gold crescent at the enemy's feet)
         d = dealAs("Auto-attack", tankFocus, d, tank);
         if(hasTalent("tank","overwhelmingForce") && d>0){ const _t0 = tank.hp; tank.hp = Math.min(tank.maxHp, tank.hp + d*0.08); if(S.arena) arenaRec("heal","tank","Overwhelming Force",tank.hp-_t0); }
         if(hasAffix("tank","ironResolve") && tank.hp < tank.maxHp*0.5){ const _t0 = tank.hp; tank.hp = Math.min(tank.maxHp, tank.hp + Math.round(tank.maxHp*0.015)); if(S.arena) arenaRec("heal","tank","Vengeful Vigor",tank.hp-_t0); }
@@ -22246,7 +22490,7 @@ thrall(){return gs(14)+
           engineAdd(dpsFocus, "dps"); // stack engine
           // Rank V capstone — at full stacks, Rook's auto-attacks refresh Marked.
           if(rankOf("dps","auto")>=5 && engineStacks(dpsFocus,"dps")>=engineCap("dps") && dpsFocus.buffs) dpsFocus.buffs.forEach(b=>{ if(b.id==="marked" && b.dur) b.remaining = b.dur; });
-          spawnSlash(dpsFocus.x, dpsFocus.y, "var(--blood)"); // Round 92
+          cfxCast("rhit", { e: dpsFocus, v: (S._cfxSw = !S._cfxSw) }); // compFxV1: Rook's basic attack
           addThreat(dpsFocus,"dps", d*dps.threatMul);
           pushLog("dmgOut", `${dps.label} rends ${dpsFocus.name} for ${d}.`);
           if(dpsFocus.hp<=0) killEnemy(dpsFocus, dpsFocus._group);
@@ -22265,7 +22509,7 @@ thrall(){return gs(14)+
           if(hasAffix("dpsDot","venomousMomentum") && Math.random()<0.1) dps.ccds.vipersspray = 0;
           triggerAttackLunge(dps, dpsFocus.x, dpsFocus.y); // Round 40
           d = dealAs("Auto-attack", dpsFocus, d, dps);
-          spawnSlash(dpsFocus.x, dpsFocus.y, "var(--corrosion)"); // Round 92
+          cfxCast("vhit", { e: dpsFocus, v: (S._cfxSw = !S._cfxSw) }); // compFxV1: Vex's basic attack
           addThreat(dpsFocus,"dps", d*dps.threatMul);
           pushLog("dmgOut", `${dps.label} bites ${dpsFocus.name} for ${d}.`);
           // Venomous Overflow (Fang): at max venom a swing bursts for poison damage instead of a wasted stack.
@@ -24043,7 +24287,7 @@ thrall(){return gs(14)+
             let d = Math.round(rand(...ab.dmg) * (1+0.12*(rankOf("dps","wildcut")-1)) * (1+((dps.damagePct||0)+fountainDamageBonus("dps"))/100));
             d = Math.round(d*rookOwnHitMul(e)*(hasTalent("dps","momentumShift") ? MT.MSHIFTDMG : 1)*bitw);
             d = dealDamageToEnemy(e, d, dps); hits++; e._aoeHit = true;
-            spawnAoeBurst(e.x, e.y, "var(--blood)"); // Round 92
+            // compFxV1: Wild Cut's crescent cut is drawn instead of the generic burst
             if(rankOf("dps","wildcut")>=5) engineAdd(e, "dps"); // Rank V capstone: Wild Cut adds a stack to every enemy it hits
             addThreat(e,"dps", d*threatMul);
             if(markedGround && e.alive){
@@ -24057,7 +24301,7 @@ thrall(){return gs(14)+
         fireWildCut();
         if(hasTalent("dps","whirlingOnslaught")) fireWildCut();
         if(hasAffix("dps","whirlingFang")) dps.ccds.falconstrike = Math.max(0,(dps.ccds.falconstrike||0)-hits); // Whirling Fang: 1s per enemy hit
-        pushLog("dmgOut", `${dps.label} unleashes ${ab.name}, hitting everyone in the fight!`);
+        pushLog("dmgOut", `${dps.label} unleashes ${ab.name}, hitting everyone in the fight!`); cfxCast("wildcut", { es: allLiving.filter(Boolean).slice(0, 10) }); // compFxV1
       }
       if((dps.gcd||0)<=0 && (dps.ccds.falconstrike||0)<=0){
         const ab = COMPANION_ABILITIES.dps.burst; _dmgSrc = ab.name;
@@ -24076,7 +24320,7 @@ thrall(){return gs(14)+
           target._falconHit = true;
           const dRaw = d; // Twin Fangs copies the raw hit, never a crit
           d = dealDamageToEnemy(target, d, dps);
-          spawnSlash(target.x, target.y, "var(--blood)"); // Round 92
+          cfxCast("falcon", { e: target }); // compFxV1: Falcon Strike
           if(lowHp && (hasTalent("dps","coupDeGrace") || hasTalent("dps","executioner") || hasAffix("dps","bloodletting"))) meleeFinisherFx(target, "var(--blood)", true);
           if(hasTalent("dps","huntersMark")) target._huntersMarkStacks = 5;
           // Unified Mark (Huntmaster): Marked on the target and the 2 nearest other enemies.
@@ -24091,7 +24335,7 @@ thrall(){return gs(14)+
           if(hasTalent("dps","twinFangs")){
             allLiving.filter(e2=>e2!==target && e2.alive).sort((a,b)=>dist(target.x,target.y,a.x,a.y)-dist(target.x,target.y,b.x,b.y)).slice(0,2).forEach(e2=>{
               const d2 = dealDamageToEnemy(e2, dRaw, dps); addThreat(e2,"dps", d2*dps.threatMul);
-              spawnSlash(e2.x, e2.y, "var(--blood)");
+              cfxCast("rhit", { e: e2 }); // compFxV1: Twin Fangs' extra hits
               pushLog("dmgOut", `${dps.label}'s ${ab.name} also strikes ${e2.name} for ${d2}!`);
               if(e2.hp<=0) killEnemy(e2, e2._group);
             });
@@ -24111,7 +24355,7 @@ thrall(){return gs(14)+
           let d = Math.round(rand(...ab.dmg) * (1+((dps.damagePct||0)+fountainDamageBonus("dps"))/100));
           d = Math.round(d*rookOwnHitMul(focus)*(leapV ? 1.5 : 1)); // checked before this cast's own new mark lands; rank V: +50%
           d = dealDamageToEnemy(focus, d, dps);
-          spawnSlash(focus.x, focus.y, "var(--blood)"); // Round 92
+          cfxCast("leap", { e: focus }); // compFxV1: Predator's Leap
           addThreat(focus,"dps", d*dps.threatMul);
           // Amplified Mark (Huntmaster): +25% instead of +15%; ranks II-V add +3 points each.
           const markMul = (hasTalent("dps","amplifiedMark") ? MT.AMP : ab.markMul) + 0.03*(rankOf("dps","predatorsleap")-1);
@@ -24128,7 +24372,7 @@ thrall(){return gs(14)+
         dps.gcd = COMPANION_GCD;
         dps.focusedStrikesT = ab.dur + 0.5*(rankOf("dps","focusedstrikes")-1) + affixEffectiveStacks("dps","lingeringFocus") + (hasTalent("dps","killerInstinct") ? 2 : 0);
         dps._fsMul = (hasTalent("dps","killerInstinct") ? MT.FSKI : ab.dmgMul) + 0.02*(rankOf("dps","focusedstrikes")-1);
-        pushLog("event", `${dps.label} enters a hunting focus with ${ab.name}!`);
+        pushLog("event", `${dps.label} enters a hunting focus with ${ab.name}!`); cfxCast("focus"); // compFxV1
       }
     }
 
@@ -24140,14 +24384,13 @@ thrall(){return gs(14)+
         dps.gcd = COMPANION_GCD;
         allLiving.forEach(e=>{
           let d = Math.round(rand(...ab.dmg) * (1+0.12*(rankOf("dpsDot","vipersspray")-1)) * (1+((dps.damagePct||0)+fountainDamageBonus("dps"))/100));
-          d = dealDamageToEnemy(e, d, dps);
-          spawnAoeBurst(e.x, e.y, "var(--corrosion)"); // Round 92
+          d = dealDamageToEnemy(e, d, dps); // compFxV1: Viper's Spray signature replaces the generic burst
           addThreat(e,"dps", d*dps.threatMul);
           e._aoeHit = true;
           applyVenom(e, (hasTalent("dpsDot","deepBite") ? MT.DEEPBITE : 1) + (rankOf("dpsDot","vipersspray")>=5 ? 1 : 0)); // Rank V capstone: +1 stack
           if(e.hp<=0) killEnemy(e, e._group);
         });
-        pushLog("dmgOut", `${dps.label} unleashes ${ab.name}, coating everyone in the fight with venom!`);
+        pushLog("dmgOut", `${dps.label} unleashes ${ab.name}, coating everyone in the fight with venom!`); cfxCast("spray", { es: allLiving.slice(0, 10) }); // compFxV1
       }
       if((dps.gcd||0)<=0 && (dps.ccds.rendingfang||0)<=0){
         const ab = COMPANION_ABILITIES.dpsDot.burst; _dmgSrc = ab.name;
@@ -24169,8 +24412,8 @@ thrall(){return gs(14)+
           d += bonus;
           if(hasTalent("dpsDot","executionVenom") && lowHp) d = Math.round(d*MT.EXEV);
           d = dealDamageToEnemy(target, d, dps);
-          spawnSlash(target.x, target.y, "var(--corrosion)"); // Round 92
-          if(stacks>0){ meleeFinisherFx(target, "var(--corrosion)", stacks>=venomMaxStacks(target)); spawnFloatingText(target.x, target.y-18, `☠${stacks}`, "var(--corrosion)"); } // venom detonation
+          cfxCast("fang", { e: target, st: stacks, max: venomMaxStacks(target) }); // compFxV1: Rending Fang
+          if(stacks>0){ spawnFloatingText(target.x, target.y-18, `☠${stacks}`, "var(--corrosion)"); } // venom detonation
           let cd = (ab.cd - 2.5*Math.min(3,fangR-1));
           if(hasTalent("dpsDot","viciousCycle")) cd *= MT.VICIOUS;
           if(hasTalent("dpsDot","executionVenom") && lowHp) cd *= MT.EXEVCD;
@@ -24203,7 +24446,7 @@ thrall(){return gs(14)+
           target._venomAmpMul = ab.venomAmpMul + 0.1*(rankOf("dpsDot","paralyticbite")-1) + 0.1*affixEffectiveStacks("dpsDot","envenomedFang"); // Envenomed Fang (+ rank steps)
           if(rankOf("dpsDot","paralyticbite")>=5){ const sec = allLiving.filter(e2=>e2!==target && e2.alive)[0]; if(sec){ sec._venomAmpT = target._venomAmpT; sec._venomAmpMul = target._venomAmpMul; } }
           applyVexMark(target, vexMarkDur());
-          spawnSlash(target.x, target.y, "var(--corrosion)"); // Round 92 — Paralytic Bite deals no direct damage, but it's still a bite landing
+          cfxCast("bite", { e: target }); // compFxV1: Paralytic Bite
           pushLog("event", `${dps.label} sinks his fangs into ${target.name} with ${ab.name}, priming its venom!`);
         }
       }
@@ -24224,12 +24467,12 @@ thrall(){return gs(14)+
             const surge = hasTalent("dpsDot","toxicSurge") && e.hp < e.maxHp*0.3;
             let d = Math.round(perStackBonus * stacks * (1+((dps.damagePct||0))/100) * (surge ? MT.SURGE : 1));
             d = dealDamageToEnemy(e, d, dps);
-            spawnAoeBurst(e.x, e.y, "var(--corrosion)"); // Round 92
-            if(surge) meleeFinisherFx(e, null, true);
+            (S._cfxBloom = S._cfxBloom || []).push({ e, st: stacks }); // compFxV1: Toxic Bloom signature replaces the generic burst
             totalDmg += d;
             addThreat(e,"dps", d*dps.threatMul);
             if(e.hp<=0) killEnemy(e, e._group);
           });
+          cfxCast("bloom", { es: (S._cfxBloom||[]).slice(0, 10) }); S._cfxBloom = null; // compFxV1
           pushLog("dmgOut", `${dps.label} unleashes ${ab.name}, detonating ${totalStacks} venom stack${totalStacks===1?"":"s"} across ${poisoned.length} enem${poisoned.length===1?"y":"ies"} for ${totalDmg}!`);
         }
       }
@@ -24243,7 +24486,7 @@ thrall(){return gs(14)+
         const bt = dpsCaster._brandTarget;
         const early = hasAffix("dpsCaster","volatileWard") && !(bt && bt.alive) && dpsCaster._brandT>0;
         dpsCaster._brandFx = (dpsCaster._brandFx||0) - dt; // the brand mark: a pulsing ember ring on the target while it smoulders
-        if(bt && bt.alive && dpsCaster._brandFx<=0){ dpsCaster._brandFx = 0.5; S.fxRings = S.fxRings||[]; S.fxRings.push({ x:bt.x, y:bt.y, t:0, ttl:0.45 }); addPuff(bt.x+(Math.random()-0.5)*8, bt.y-10, 4, 0.5, 0, -18, 0.3); }
+        // compFxV1: the smouldering brand is a small sigil over the target (cfxEnemyMarks), not floor rings
         if(dpsCaster._brandT<=0 || early){
           dpsCaster._brandT = null;
           detonateKindlingBrand();
@@ -24272,14 +24515,14 @@ thrall(){return gs(14)+
             d = dealDamageToEnemy(e, d, dpsCaster);
             if(hasTalent("dpsCaster","searingNova") && e.alive){ e._bleeds = e._bleeds||[]; e._bleeds.push({ tick: Math.round(novaBase*CT.SEARNOVA/4), ticksLeft:4, interval:1, timer:1, src:"dpsCaster", noCrit:true, fx:"burn" }); }
             if(hasTalent("dpsCaster","cinderHarvest") && e.alive) engineAdd(e,"dpsCaster",CT.SPREADST); // Cinder Harvest: after cashing in, leaves 3 fresh stacks
-            spawnAoeBurst(e.x, e.y, "var(--ember)");
+            // compFxV1: Cinder Nova's flare is drawn instead of the generic burst
             addThreat(e,"dpsCaster", d*threatMul);
             if(e.hp<=0) killEnemy(e, e._group);
           });
         };
         fireCinderNova();
         if(hasTalent("dpsCaster","wildfireBloom") && allLiving.filter(e=>e.alive).length>=3) fireCinderNova(); // Wildfire Bloom: second pulse only into 3+ enemies
-        pushLog("dmgOut", `${dpsCaster.label} unleashes ${ab.name}, scorching everyone in the fight!`);
+        pushLog("dmgOut", `${dpsCaster.label} unleashes ${ab.name}, scorching everyone in the fight!`); cfxCast("nova", { es: allLiving.slice(0, 10) }); // compFxV1
       }
       if((dpsCaster.gcd||0)<=0 && dpsCaster._forgeOverloadCastT==null && (dpsCaster.ccds.emberlance||0)<=0){
         const ab = COMPANION_ABILITIES.dpsCaster.burst; _dmgSrc = ab.name;
@@ -24299,7 +24542,7 @@ thrall(){return gs(14)+
           target._stkM = 0;
           if(hasAffix("dpsCaster","embermark")) dpsCaster.ccds.emberlance = Math.max(4, dpsCaster.ccds.emberlance - 0.5*_st); // Embermark: 0.5s cooldown back per stack spent
           if(hasAffix("dpsCaster","spentEmbers") && _st>=5) dpsCaster.ccds.forgeoverload = Math.max(0,(dpsCaster.ccds.forgeoverload||0)-4);
-          spawnBeam(dpsCaster.x, dpsCaster.y, target.x, target.y, "var(--ember)","mira");
+          cfxCast("lance", { e: target }); // compFxV1: Emberlance
           let threatMul = dpsCaster.threatMul;
           addThreat(target,"dpsCaster", d*threatMul);
           pushLog("dmgOut", `${dpsCaster.label} lands ${ab.name} on ${target.name} for ${d}!`);
@@ -24319,7 +24562,7 @@ thrall(){return gs(14)+
           dpsCaster.gcd = COMPANION_GCD;
           dpsCaster._brandT = hasTalent("dpsCaster","flashBrand") ? 1 : 4; if(rankOf("dpsCaster","kindlingward")>=5) dpsCaster.ccds.kindlingward -= 4; // Rank V: 4s shorter cooldown
           dpsCaster._brandTarget = target;
-          dpsCaster._brandFx = 0; spawnFloatingText(target.x, target.y-20, "❃", "var(--ember)");
+          dpsCaster._brandFx = 0; cfxCast("brand", { e: target }); // compFxV1
           pushLog("event", `${dpsCaster.label} brands ${target.name} with smouldering embers!`);
         }
       }
@@ -24339,7 +24582,7 @@ thrall(){return gs(14)+
             let d = Math.round(rand(...ab.dmg) * (1+0.10*(rankOf("dpsCaster","forgeoverload")-1)) * (1+((dpsCaster.damagePct||0)+fountainDamageBonus("dpsCaster"))/100));
             if(hasTalent("dpsCaster","flashover") && target.hp < target.maxHp*0.3) d = Math.round(d*CT.FLASHOVER);
             d = dealDamageToEnemy(target, d, dpsCaster);
-            spawnBeam(dpsCaster.x, dpsCaster.y, target.x, target.y, "var(--ember)","mira"); // Round 92: was var(--arcane) — Mira's own ember theme
+            cfxCast("meteor", { e: target }); // compFxV1: Forge Overload
             addThreat(target,"dpsCaster", d*dpsCaster.threatMul);
             pushLog("dmgOut", `${dpsCaster.label}'s ${ab.name} detonates on ${target.name} for ${d}!`);
             if(target.hp<=0) killEnemy(target, target._group);
@@ -31013,6 +31256,10 @@ thrall(){return gs(14)+
       buffs.push({ name: hasLiveKindlingWard ? "Kindling Ward" : "Warded", remaining:m.shieldT, kind:"shield",
                    glyph: hasLiveKindlingWard ? SHIELD_SOURCE_GLYPHS.kindlingward : GENERIC_SHIELD_GLYPH, desc });
     }
+    if(key==="dps" && m.alive && S.meleeSpec!=="dot" && (m.focusedStrikesT||0)>0) // compFxV1: Rook's damage window
+      buffs.push({ name:"Focused Strikes", remaining:m.focusedStrikesT, kind:"mitigation", glyph:COMPANION_ABILITIES.dps.focusedstrikes.glyph, desc:`Damage dealt +${Math.round(((m._fsMul||1.2)-1)*100)}%.` });
+    if(key==="dpsCaster" && m.alive && S.casterSpec!=="dot" && (m.forgeOverloadAmpT||0)>0) // compFxV1: Mira's Overcharged window
+      buffs.push({ name:"Overcharged", remaining:m.forgeOverloadAmpT, kind:"mitigation", glyph:COMPANION_ABILITIES.dpsCaster.forgeoverload.glyph, desc:"Mira deals more damage." });
     if(m.alive && S.party.tank && (S.party.tank.mitigateT||0)>0){ // compFxV1: every row, with that member's own reduction
       const pct = Math.round((COMPANION_ABILITIES.tank.bulwark.partyRed + (hasTalent("tank","unyielding") ? (key==="tank" ? 0.20 : 0.10) : 0) + ((key!=="tank" && hasTalent("tank","sharedBulwark")) ? 0.15 : 0))*100);
       buffs.push({ name:"Bulwark Stance", remaining:S.party.tank.mitigateT, kind:"mitigation", glyph:MITIGATION_GLYPH, desc:`Kessa's Bulwark Stance: damage taken reduced ${pct}%.` });
@@ -36534,7 +36781,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 97c59d2e61) */
+<script>/* phone app: offline cache (build 74a81fdc62) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
