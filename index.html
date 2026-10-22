@@ -3042,7 +3042,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
              ] },
     ysolt: { hp:1000, dmg:[19,29], atkEvery:1.7, r:24, color:"var(--veil)", label:"Ysolt, the Unspooling Seer",
              excludeFromCompletion:true,
-             phases:[ { at:0.5, tint:"#e28cff", everyMul:{}, mods:{ fourfoldgaze:{ rotateInterval:3 } }, note:"The green safe wedge now jumps every 3s instead of 4s." } ], // Round 103
+             phases:[ { at:0.5, tint:"#e28cff", everyMul:{}, mods:{ fourfoldgaze:{ rotateInterval:3 } }, note:"The pale blue safe wedge now jumps every 3s instead of 4s." } ], // Round 103
              mechanics:[
                // The one rotatingQuadrants mechanic in the game so far — see
                // that kind in combatTick, activeQuadrantGaze/
@@ -3056,8 +3056,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
                // no "lean early into the gap before it arrives" tell.
                { id:"fourfoldgaze", name:"Fourfold Gaze", kind:"rotatingQuadrants", every:22, windup:2.5,
                  duration:12, rotateInterval:4, tickDmg:14, tickInterval:1, radius:220,
-                 trigger:"Every ~22s, Ysolt opens her Fourfold Gaze. After a 2.5s warning, four wedges of the room around her ignite, three red and one green. For the ~12s it lasts, the green safe wedge jumps to a new quadrant every 4s.",
-                 counter:"Get into the green SAFE wedge (watch the on-screen wedges and the on-screen hint). Kessa, Rook/Vex, and Mira/Wren reposition on their own, but you have to walk yourself. Be ready to jump again the instant it moves. It teleports instead of sweeping." },
+                 trigger:"Every ~22s, Ysolt opens her Fourfold Gaze. After a 2.5s warning, four wedges of the room around her ignite: three burn violet, one stays pale blue and safe. For the ~12s it lasts, the safe wedge jumps to a new quadrant every 4s.",
+                 counter:"Get into the pale blue safe wedge, between the rune posts (watch the on-screen wedges and the on-screen hint). Kessa, Rook/Vex, and Mira/Wren reposition on their own, but you have to walk yourself. Be ready to jump again the instant it moves. It teleports instead of sweeping." },
                { id:"fatemark", name:"Fatemark", kind:"debuffApply", every:12, debuff:"tether", verb:"CLOSE IN", color:"var(--arcane)",
                  trigger:"Every ~12s, two of you are bound by a thread of fate: either your two damage dealers, or you and one ally.",
                  counter:"Both take damage each second while more than 70 apart. Close the gap, or cleanse either end." },
@@ -4193,10 +4193,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       const mech = (kindMechs(k)||[]).find(m=>m.kind==="rotatingQuadrants"), st = mech && e.mech[mech.id];
       if(st && st.active && st.nextQ!=null && mech.previewP2 && (e._phase||0)>0){
         const p = VIEW.project(e.x, e.y), rPx = mech.radius*VIEW.scale, a0 = (st.offsetDeg + st.nextQ*90)*Math.PI/180;
-        ctx.save(); ctx.setLineDash([8,6]); ctx.strokeStyle = resolveColor("var(--moss)"); ctx.lineWidth = 3; ctx.globalAlpha = 0.5+0.35*pulse;
+        ctx.save(); ctx.setLineDash([8,6]); ctx.strokeStyle = "#afe8ff"; ctx.lineWidth = 3; ctx.globalAlpha = 0.5+0.35*pulse; // gazeV1: pale blue like the safe wedge
         ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, rPx, a0, a0+Math.PI/2); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
-        const mid = a0+Math.PI/4; ctx.fillStyle = resolveColor("var(--moss)"); ctx.textAlign = "center"; ctx.font = `700 ${Math.round(Math.max(10, 12*VIEW.scale))}px 'Space Mono', monospace`;
-        ctx.fillText("NEXT", p.x+Math.cos(mid)*rPx*0.8, p.y+Math.sin(mid)*rPx*0.8); ctx.restore();
+        ctx.restore(); gazeNextCue(p, rPx, st, a0, now);
       }
     }
   }
@@ -4255,12 +4254,12 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         counter:"Walk to the glowing glyph beside the cell and step on it to free them, ideally before the next Tide." },
     ];
     Y.ember = true; Y.emberTick = "arcane"; Y.arcane = "ysolt";
-    Y.phases = [ { at:0.5, tint:"#e28cff", everyMul:{}, mods:{ fourfoldgaze:{ rotateInterval:2.5 } }, note:"<b>Unspooled Sight.</b> The safe wedge now jumps every 2.5s and can jump to any other wedge, but a dashed green ghost marked NEXT shows where it will go. Move to the future, not the present." } ];
+    Y.phases = [ { at:0.5, tint:"#e28cff", everyMul:{}, mods:{ fourfoldgaze:{ rotateInterval:2.5 } }, note:"<b>Unspooled Sight.</b> The safe wedge now jumps every 2.5s and can jump to any other wedge, but a dashed pale blue ghost wedge, with arrows running toward it around the edge, shows where it will go. Move to the future, not the present." } ];
     Y.mechanics = [
       { id:"fourfoldgaze", name:"Fourfold Gaze", kind:"rotatingQuadrants", every:22, first:12, windup:2.5,
         duration:12, rotateInterval:4, tickDmg:14, tickInterval:1, radius:220, ramp:0.10, previewP2:true, grace:0.8,
-        trigger:"Every ~22s, after a 2.5s warning, four wedges of the room around Ysolt ignite, three red and one green. For ~12s the green wedge jumps every 4s. Each tick anyone takes adds Unspooling: +10% on the next Gaze, up to 3.",
-        counter:"Stay in the green SAFE wedge and jump the moment it moves (you get a moment of grace after each jump); companions reposition on their own. A Gaze nobody gets hurt in clears an Unspooling stack." },
+        trigger:"Every ~22s, after a 2.5s warning, four wedges of the room around Ysolt ignite: three burn violet, one stays pale blue and safe. For ~12s the safe wedge jumps every 4s. Each tick anyone takes adds Unspooling: +10% on the next Gaze, up to 3.",
+        counter:"Stay in the pale blue safe wedge (between the rune posts) and jump the moment it moves (you get a moment of grace after each jump); companions reposition on their own. A Gaze nobody gets hurt in clears an Unspooling stack." },
       { id:"fates", name:"Fates Exchanged", kind:"script", fn:"fates", every:14, first:6, verb:"DECIDE", color:"var(--veil)",
         trigger:"Every ~14s, two of you are bound (your two damage dealers, or you and an ally). After 6s their health percentages swap.",
         counter:"Cleanse either end to cancel it, or let it run when the swap helps (a full-health ally trading with a dying one)." },
@@ -25530,7 +25529,7 @@ thrall(){return gs(14)+
     if(gaze){
       const selfAngle = angleOf(S.party.self.x-gaze.e.x, S.party.self.y-gaze.e.y);
       if(quadrantAngleIndex(gaze.mech, gaze.st, selfAngle) !== gaze.st.safeQuadrant){
-        setHint("👁 Get to the green SAFE wedge. The red ones are burning!");
+        setHint("👁 Get to the pale blue safe wedge. The violet ones are burning!");
         return;
       }
     }
@@ -27443,43 +27442,58 @@ thrall(){return gs(14)+
   // convergence arcs and the evacuation beacon, but as wedges rather than a
   // ring band, since this hazard cares about angle from the boss at ANY
   // distance out to radius, not a narrow band around one fixed radius.
+  // gazeV1: Fourfold Gaze. Burning wedges in rune violet with glyph motes streaming out from her; the safe wedge pale
+  // blue (the game's "go here" shading) with rune posts on its edges; pink only washes a burning wedge you stand in.
   function drawQuadrantGaze(e, mech, st){
-    const p = VIEW.project(e.x, e.y);
-    const sc = VIEW.scale, rPx = mech.radius * sc;
-    const toRad = d => d*Math.PI/180;
-    const now = (S.tPrev||0)/1000, pulse = .5+.5*Math.sin(now*6);
-    const bloodC = resolveColor("var(--blood)"), mossC = resolveColor("var(--moss)");
+    const p = VIEW.project(e.x, e.y), sc = VIEW.scale, rPx = mech.radius * sc, now = (S.tPrev||0)/1000, pulse = .5 + .5*Math.sin(now*6);
+    const T = RING_THEMES.rune, GOOD = "175,232,255", BAD = "255,70,150", toRad = d=>d*Math.PI/180;
+    const me = S.party.self, myAng = me ? (Math.atan2(me.y - e.y, me.x - e.x)*180/Math.PI + 360) % 360 : 0, myIn = me && dist(me.x, me.y, e.x, e.y) <= mech.radius;
+    if(st._gzPrev !== st.safeQuadrant){ st._gzFlash = 1; st._gzPrev = st.safeQuadrant; }
+    st._gzFlash = Math.max(0, (st._gzFlash||0) - 1/60);
     for(let q=0;q<4;q++){
-      const isSafe = q===st.safeQuadrant;
-      const startDeg = st.offsetDeg + q*90, endDeg = startDeg+90;
-      ctx.save();
-      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, rPx, toRad(startDeg), toRad(endDeg)); ctx.closePath();
+      const isSafe = q===st.safeQuadrant, d0 = st.offsetDeg + q*90, a0 = toRad(d0), a1 = toRad(d0 + 90);
+      const rel = ((myAng - d0) % 360 + 360) % 360, meHere = myIn && rel < 90;
+      ctx.save(); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, rPx, a0, a1); ctx.closePath();
       if(isSafe){
-        ctx.fillStyle = mossC; ctx.globalAlpha = .28+.12*pulse; ctx.fill();
-        const mid = toRad(startDeg+45);
-        const lx = p.x+Math.cos(mid)*rPx*.62, ly = p.y+Math.sin(mid)*rPx*.62;
-        ctx.globalAlpha = .6+.3*pulse;
-        ctx.font = `700 ${Math.round(13*sc)}px system-ui,sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
-        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.strokeText("SAFE", lx, ly);
-        ctx.fillStyle = "#d9f7d0"; ctx.fillText("SAFE", lx, ly);
+        const g = ctx.createRadialGradient(p.x, p.y, rPx*.15, p.x, p.y, rPx); g.addColorStop(0, `rgba(${GOOD},0)`); g.addColorStop(.35, `rgba(${GOOD},${.12 + .05*pulse})`); g.addColorStop(1, `rgba(${GOOD},${.26 + .08*pulse})`);
+        ctx.fillStyle = g; ctx.fill();
+        if(st._gzFlash > 0){ ctx.globalAlpha = st._gzFlash*.5; ctx.fillStyle = `rgba(${GOOD},1)`; ctx.fill(); ctx.globalAlpha = 1; }
+        ctx.strokeStyle = `rgba(${GOOD},.95)`; ctx.lineWidth = 2; ctx.setLineDash([7,5]); ctx.lineDashOffset = -now*20; ctx.stroke(); ctx.setLineDash([]);
       } else {
-        ctx.fillStyle = bloodC; ctx.globalAlpha = .22+.1*pulse; ctx.fill();
-        ctx.clip();
-        ctx.globalAlpha = .26; ctx.strokeStyle = bloodC; ctx.lineWidth = 3*sc;
-        const off = (now*40)%22;
-        ctx.beginPath(); for(let k=-rPx*1.5-22;k<rPx*1.5;k+=22){ ctx.moveTo(p.x+k+off-rPx,p.y-rPx); ctx.lineTo(p.x+k+off+rPx,p.y+rPx); } ctx.stroke();
+        const g = ctx.createRadialGradient(p.x, p.y, rPx*.1, p.x, p.y, rPx); g.addColorStop(0, `rgba(${T.core},.10)`); g.addColorStop(.7, `rgba(${T.core},${.22 + .06*pulse})`); g.addColorStop(1, `rgba(${T.lead},${.34 + .08*pulse})`);
+        ctx.fillStyle = g; ctx.fill();
+        if(meHere){ ctx.globalAlpha = .16 + .1*pulse; ctx.fillStyle = `rgba(${BAD},1)`; ctx.fill(); ctx.globalAlpha = 1; }
+        ctx.clip(); ctx.globalCompositeOperation = "lighter"; // glyph motes streaming out from her gaze
+        for(let i=0;i<14;i++){ const h = Math.sin(i*91.7 + q*13.3)*43758.5; const fa = h - Math.floor(h), k = ((now*.35) + i/14) % 1, ang = a0 + (.08 + .84*fa)*(a1 - a0), rr = rPx*(.12 + .88*k);
+          const x = p.x + Math.cos(ang)*rr, y = p.y + Math.sin(ang)*rr, al = Math.sin(k*Math.PI)*.8, sz = (2.2 + 2*fa)*sc;
+          ctx.strokeStyle = `rgba(${T.lead},${al})`; ctx.lineWidth = Math.max(1, sc*.9); ctx.beginPath(); ctx.moveTo(x - sz, y); ctx.lineTo(x, y - sz); ctx.lineTo(x + sz, y); ctx.lineTo(x, y + sz); ctx.closePath(); ctx.stroke(); }
+        ctx.globalCompositeOperation = "source-over";
       }
       ctx.restore();
-      if(!isSafe){
-        ctx.save();
-        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, rPx, toRad(startDeg), toRad(endDeg)); ctx.closePath();
-        ctx.strokeStyle = bloodC; ctx.globalAlpha = .9; ctx.lineWidth = 2.5; ctx.stroke();
-        ctx.restore();
-      }
+      if(!isSafe){ // a bright rim at the wedge's edge: how far the gaze reaches
+        ctx.save(); ctx.strokeStyle = "rgba(20,14,30,.6)"; ctx.lineWidth = 5*Math.max(.6, sc*.6); ctx.beginPath(); ctx.arc(p.x, p.y, rPx, a0 + .02, a1 - .02); ctx.stroke();
+        ctx.strokeStyle = `rgba(${T.lead},.9)`; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore(); }
     }
+    { const s0 = toRad(st.offsetDeg + st.safeQuadrant*90); // rune posts on the safe wedge's two edges, part-way out and at the rim
+      [s0, s0 + Math.PI/2].forEach(a=>{ ringPost(T, p.x, p.y, rPx, a, sc, 1, 14); ringPost(T, p.x, p.y, rPx*.55, a, sc, .85, 10); }); }
+    { const r0 = 16*sc; ctx.save(); ctx.globalCompositeOperation = "lighter"; // the gaze itself: a turning iris at her feet
+      ctx.strokeStyle = `rgba(${T.lead},${.6 + .3*pulse})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(p.x, p.y, r0, r0*.6, 0, 0, Math.PI*2); ctx.stroke();
+      for(let i=0;i<4;i++){ const a = toRad(st.offsetDeg + i*90 + 45); ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a)*r0*.4, p.y + Math.sin(a)*r0*.4*.6); ctx.lineTo(p.x + Math.cos(a)*r0*1.25, p.y + Math.sin(a)*r0*1.25*.6); ctx.stroke(); }
+      ctx.restore(); }
     ctx.globalAlpha = 1;
   }
 
+  function gazeNextCue(p, rPx, st, a0, now){ // gazeV1
+    const sc = VIEW.scale, T = RING_THEMES.rune, GOOD = "175,232,255";
+    [a0, a0 + Math.PI/2].forEach(a=>ringPost(T, p.x, p.y, rPx, a, sc, .35 + .25*Math.sin(now*6), 10)); // its posts already rising
+    const c0 = (st.offsetDeg + st.safeQuadrant*90 + 45)*Math.PI/180, c1 = a0 + Math.PI/4; let d = c1 - c0; while(d > Math.PI) d -= 2*Math.PI; while(d < -Math.PI) d += 2*Math.PI;
+    const dir = Math.sign(d) || 1, R = rPx*1.06, n = Math.max(2, Math.round(Math.abs(d)/(Math.PI/10)));
+    ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for(let i=0;i<n;i++){ const k = ((i/n) + now*.9) % 1, a = c0 + d*k, al = Math.sin(k*Math.PI), x = p.x + Math.cos(a)*R, y = p.y + Math.sin(a)*R, tan = a + dir*Math.PI/2, sz = 7*Math.max(.7, sc);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(tan); ctx.strokeStyle = "rgba(20,14,30,.6)"; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(-sz*.6, -sz*.7); ctx.lineTo(sz*.4, 0); ctx.lineTo(-sz*.6, sz*.7); ctx.stroke();
+      ctx.strokeStyle = `rgba(${GOOD},${.95*al})`; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore(); }
+    ctx.restore();
+  }
   function drawRing(wx,wy,worldR,color,alpha){
     const p = VIEW.project(wx,wy);
     ctx.beginPath();
@@ -36893,7 +36907,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 9327b59ff6) */
+<script>/* phone app: offline cache (build 938dab790e) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
