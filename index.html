@@ -9124,7 +9124,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(cur && left(cur) >= left(hl)) return; // never shorten a longer Hearthlight
       m2._hots = (m2._hots||[]).filter(h=>h.name!=="Hearthlight");
       m2._hots.push({ ticksLeft:hl.ticksLeft, maxTicks:hl.maxTicks, interval:hl.interval, timer:hl.timer, tick:hl.tick, name:"Hearthlight", finalCleanse:hl.finalCleanse, spread:true });
-      spawnActFx("hot", m2.x, m2.y, { ox:src.x, oy:src.y });
+      try{ sfxSpawn({ k:"dart", to:k2, dur:0.6, delay: 0.1 + Math.min(.6, dist(m2.x, m2.y, src.x, src.y)/320*.6) }); }catch(_){} // compFxV1: Spreading Embers
     });
     pushLog("heal", "Spreading Embers carries Hearthlight to the whole party.");
   }
@@ -9212,7 +9212,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         S._lastHealCrit = false;
         heal(t, amt, "Ember Mend");
         // Twin Flames: a critical Mend lights Hearthlight on a target without one.
-        if(hasTalent("self","twinFlames") && S._lastHealCrit){ const tm0=S.party[t]; if(tm0 && tm0.alive && !(tm0._hots||[]).some(h=>h.name==="Hearthlight")){ applyHearthlight(t, ABILITIES.find(a=>a.id==="hearth")); pushLog("event","Twin Flames kindles Hearthlight."); } }
+        if(hasTalent("self","twinFlames") && S._lastHealCrit){ const tm0=S.party[t]; if(tm0 && tm0.alive && !(tm0._hots||[]).some(h=>h.name==="Hearthlight")){ applyHearthlight(t, ABILITIES.find(a=>a.id==="hearth")); try{ sfxSpawn({ k:"dart", to:t, dur:0.6, delay:0.35 }); }catch(_){} pushLog("event","Twin Flames kindles Hearthlight."); } }
         { const T=_HT(), tm1=S.party[t];
           // Kindled Beacon: Mend on the lit ally keeps the beacon burning.
           if(tm1 && tm1._beacon && hasTalent("self","kindledBeacon") && tm1._beacon.ext < T.kindMax){ tm1._beacon.t += T.kindExt; tm1._beacon.ext += T.kindExt; }
@@ -12715,7 +12715,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     // different color (arcane blue, not heal's accent gold or a debuff's
     // blood red) stands in for "something was removed" instead.
     spawnFloatingText(t.x, t.y, "✦ Cleansed", "var(--arcane)");
-    spawnActFx("cleanse", t.x, t.y); // Round 122
+    if(S._sfxCast!=="cleanse"){ try{ sfxSpawn({ k:"rite", at:targetKey, dur:0.7, small:true }); }catch(_){} } // compFxV1: a short rite glyph (the old puff was hidden during casts)
     return true;
   }
   // Round 49: Cleansing Rite is no longer an instant single purge — casting
@@ -13716,8 +13716,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         const st = enemy._stkM||0;
         if(hasTalent("dpsCaster","combustion") && st>0){ // Combustion (Pyre tier 5): explodes onto the nearest other enemy
           const o=_dmgSrc; _dmgSrc="Combustion"; const e2 = nearestOtherEnemy(enemy);
-          spawnActFx("eruption", enemy.x, enemy.y, { rad:26, size:0.5 });
-          if(e2){ spawnBeam(enemy.x, enemy.y, e2.x, e2.y, "var(--ember)", "mira"); const cd = dealDamageToEnemy(e2, Math.round(CT.COMBUST*(1+((dc.damagePct||0))/100)*st), dc); addThreat(e2,"dpsCaster",cd*dc.threatMul); if(e2.hp<=0) killEnemy(e2,e2._group); }
+          cfxCast("combust", { from: enemy, e: e2 }); // compFxV1: Combustion
+          if(e2){ const cd = dealDamageToEnemy(e2, Math.round(CT.COMBUST*(1+((dc.damagePct||0))/100)*st), dc); addThreat(e2,"dpsCaster",cd*dc.threatMul); if(e2.hp<=0) killEnemy(e2,e2._group); }
           _dmgSrc=o;
         }
         if(hasAffix("dpsCaster","rekindle") && st>0){ const nx = nearestOtherEnemy(enemy); if(nx) engineAdd(nx,"dpsCaster",st); } // Rekindle (affix)
@@ -15857,7 +15857,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   const SFX = [], SFX_CAP = 90;
   const SG = "255,207,106", SC = "255,243,196", SW = "238,190,110", SV = "176,124,255", SE = "255,140,60";
   function sfxSpawn(o){ if(SFX.length >= SFX_CAP) SFX.shift(); o.t = 0; SFX.push(o); }
-  function sfxTick(dt){ for(let i=SFX.length-1;i>=0;i--){ SFX[i].t += dt; if(SFX[i].t >= SFX[i].dur) SFX.splice(i,1); } }
+  function sfxTick(dt){ for(let i=SFX.length-1;i>=0;i--){ SFX[i].t += dt; if(SFX[i].t >= SFX[i].dur + (SFX[i].delay||0)) SFX.splice(i,1); } } // compFxV1: delay-aware
   function sfxR(){ return 14*spriteZoomMul(); }
   // screen point on a party member (or enemy): h = height above the feet in units of the sprite radius
   function sfxAt(m, h){ if(!m) return null; let lx = 0, ly = 0; try{ if(m.role){ const L = lungeOffset(m); lx = L.dx||0; ly = L.dy||0; } }catch(_){} const p = VIEW.project(m.x + lx, m.y + ly); const g = !m.role && m._artGeom;
@@ -15871,7 +15871,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- what each healer spell spawns (called right after the spell resolves)
   function spellFxCast(id, tKey){
     const T = tKey && S.party[tKey];
-    if(id==="mend" && T) sfxSpawn({ k:"ribbon", to:tKey, dur:0.9, w:1, col:SG });
+    if(id==="mend" && T){ const sm = S.party.self, rs = (rankOf("self","mend")>=5 && sm._rhythmTarget===tKey) ? (sm._rhythmStacks||0) : 0; sfxSpawn({ k:"ribbon", to:tKey, dur:0.9, w:1 + .3*rs, rs, col:SG }); } // compFxV1: Steady Rhythm
     else if(id==="flicker" && T) sfxSpawn({ k:"comet", to:tKey, dur:1.1 });
     else if(id==="hearth" && T) sfxSpawn({ k:"dart", to:tKey, dur:0.6 });
     else if(id==="ward" && T) sfxSpawn({ k:"glob", to:tKey, dur:0.8 });
@@ -15879,7 +15879,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     else if(id==="wind") sfxSpawn({ k:"wave", dur:1.3, R:320 });
     else if(id==="misdirect" && T && tKey!=="tank") sfxSpawn({ k:"thread", from:tKey, dur:1.0 });
     else if(id==="purge"){ sfxSpawn({ k:"rune", dur:0.7 }); const me = S.party.self;
-      (typeof enemiesInFight==="function" ? enemiesInFight() : []).filter(e=>e && e.alive && dist(e.x,e.y,me.x,me.y) <= PURGE_RANGE).slice(0,8).forEach((e,i)=>sfxSpawn({ k:"purge", e, dur:0.75, delay:i*0.03 })); }
+      (typeof enemiesInFight==="function" ? enemiesInFight() : []).filter(e=>e && e.alive && dist(e.x,e.y,me.x,me.y) <= PURGE_RANGE).slice(0,8).forEach((e,i)=>sfxSpawn({ k:"purge", e, dur:0.75, delay:i*0.03, ex: rankOf("self","purge")>=5 })); } // compFxV1: ex = Exposed
   }
   // ---- lasting marks on the party, watched every frame
   function sfxWatch(){
@@ -15917,7 +15917,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
           const fade = 1 - Math.max(0, (u-TRV)/.25), N = f.k==="comet" ? 14 : f.k==="dart" ? 6 : 12;
           if(f.k==="ribbon"){ // a ribbon of light arcing over: a tapered line with a bright head
             for(let i=0;i<N;i++){ const u0 = Math.max(0, sfxEase(tu) - i*.035), u1 = Math.max(0, sfxEase(tu) - (i+1)*.035); if(u0<=0) break; const p0 = sfxArc(a,b,u0,lift), p1 = sfxArc(a,b,u1,lift), k = 1-i/N;
-              ctx.strokeStyle = `rgba(${i<3?SC:SG},${.9*k*fade})`; ctx.lineWidth = Math.max(1.2, (5.2*k)*(r/14)); ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.stroke(); }
+              ctx.strokeStyle = `rgba(${i<3?SC:SG},${.9*k*fade})`; ctx.lineWidth = Math.max(1.2, (5.2*k)*(r/14)*(f.w||1)); ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.stroke(); }
             const h = sfxArc(a,b,sfxEase(tu),lift); sfxGlow(h.x, h.y, r*1.15, SG, .85*fade);
           } else if(f.k==="comet"){ // Ember Surge: a heavy ember comet, sparks shed behind it
             const h = sfxArc(a,b,sfxEase(tu),lift);
@@ -15936,7 +15936,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         if(u >= TRV*.9){ // the landing on the target
           const v = Math.min(1, (u - TRV*.9)/(1 - TRV*.9)), e2 = sfxEase(v);
           if(f.k==="ribbon"){ // motes rising and a brief golden outline glow
-            sfxGlow(b.x, b.y, r*2.2, SG, .55*(1-v));
+            sfxGlow(b.x, b.y, r*2.2*(f.w||1), SG, .55*(1-v));
+            for(let i=0;i<(f.rs||0);i++){ const a2 = -Math.PI/2 + (i - ((f.rs||0)-1)/2)*.5; ctx.fillStyle = `rgba(${SC},${1-v})`; ctx.beginPath(); ctx.arc(b.x + Math.cos(a2)*r*1.5, b.y - r*1.6 + Math.sin(a2)*r*.3 - v*r*.4, Math.max(1.2, r*.13), 0, Math.PI*2); ctx.fill(); } // compFxV1: a pip per Rhythm stack
             ctx.strokeStyle = `rgba(${SG},${.8*(1-v)})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(b.fx, b.fy, r*(.6+.9*e2), r*(.25+.35*e2), 0, 0, Math.PI*2); ctx.stroke();
             for(let i=0;i<8;i++){ const x = b.x + Math.sin(i*2.4)*r*.7, y = b.y + r*.6 - e2*r*(1.4 + (i%3)*.4); ctx.fillStyle = `rgba(${i%2?SC:SG},${.9*(1-v)})`; ctx.beginPath(); ctx.arc(x, y, Math.max(1, r*.13), 0, Math.PI*2); ctx.fill(); }
           } else if(f.k==="comet"){ // a bloom of fire-light and a pillar rising through them
@@ -15956,7 +15957,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       } else if(f.k==="rite"){ // Cleansing Rite: a violet glyph turns over them, then the affliction shatters and falls away
         const tm = S.party[f.at], b = tm && sfxAt(tm, 2.4); if(!b) return; const sp = Math.min(1, u/.45), sh = Math.max(0, (u-.4)/.6);
         ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(b.x, b.y); ctx.rotate(now*2);
-        const gr = r*(.5 + .4*sfxEase(sp)), ga = (1-sh)*.95; ctx.strokeStyle = `rgba(${SV},${ga})`; ctx.lineWidth = 1.4;
+        const gr = r*(.5 + .4*sfxEase(sp))*(f.small ? .7 : 1), ga = (1-sh)*.95; ctx.strokeStyle = `rgba(${SV},${ga})`; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.arc(0,0,gr,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); for(let i=0;i<6;i++){ const a2 = i*Math.PI/3; ctx[i?'lineTo':'moveTo'](Math.cos(a2)*gr*.7, Math.sin(a2)*gr*.7); } ctx.closePath(); ctx.stroke();
         ctx.beginPath(); for(let i=0;i<3;i++){ const a2 = i*Math.PI*2/3; ctx.moveTo(0,0); ctx.lineTo(Math.cos(a2)*gr*.7, Math.sin(a2)*gr*.7); } ctx.stroke();
         ctx.rotate(-now*2); sfxGlow(0, 0, gr*1.8, SV, .35*(1-sh));
@@ -15990,7 +15991,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         if(brk < .5){ ctx.strokeStyle = `rgba(${SC},${.9*(1-brk*2)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(a.x + (b.x-a.x)*bm, a.y + (b.y-a.y)*bm); ctx.stroke();
           ctx.strokeStyle = `rgba(${SG},${.5*(1-brk*2)})`; ctx.lineWidth = 5; ctx.stroke(); }
         if(brk > 0){ const top = sfxAt(e, 2.8); for(let i=0;i<6;i++){ const a2 = -Math.PI/2 + (i-2.5)*.5, d = r*(.3 + 1.4*brk); ctx.fillStyle = `rgba(${i%2?SC:SG},${1-brk})`; ctx.save(); ctx.translate(top.x + Math.cos(a2)*d, top.y + Math.sin(a2)*d + brk*brk*r*2); ctx.rotate(a2 + brk*5); ctx.fillRect(-r*.12, -r*.12, r*.24, r*.24); ctx.restore(); }
-          sfxGlow(top.x, top.y, r*1.2, SC, .6*(1-brk)); }
+          sfxGlow(top.x, top.y, r*1.2, SC, .6*(1-brk)); if(f.ex) cfxExposed(b.x, b.y + r*.3, r, brk); }
         ctx.restore();
       } else if(f.k==="crack"){ // the ward breaking: the shell cracks and its pieces fall
         const tm = S.party[f.at], b = tm && sfxAt(tm, 1.35); if(!b) return; const R = r*1.7, e2 = sfxEase(u);
@@ -16173,7 +16174,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         ctx.save(); ctx.translate(x, y); ctx.rotate(ang - Math.PI/2); const fl = Math.sin(tu*Math.PI*3)*.35 + .2, W = r*1.6; ctx.scale(1.45, 1.45); ctx.globalCompositeOperation = "source-over"; // wings swept back as it stoops
         ctx.fillStyle = `rgba(${RK_F},.95)`; ctx.strokeStyle = `rgba(${RK_C},.95)`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(0, r*.55); ctx.quadraticCurveTo(-W*.5, -r*.1 - fl*r, -W, -r*.55 - fl*r*.6); ctx.quadraticCurveTo(-W*.45, -r*.15, -r*.12, -r*.35);
         ctx.lineTo(0, -r*.62); ctx.lineTo(r*.12, -r*.35); ctx.quadraticCurveTo(W*.45, -r*.15, W, -r*.55 - fl*r*.6); ctx.quadraticCurveTo(W*.5, -r*.1 - fl*r, 0, r*.55); ctx.fill(); ctx.stroke(); ctx.restore();
-      } else { const v = (u - TRV)/(1 - TRV), e2 = sfxEase(v);
+      } else { const v = (u - TRV)/(1 - TRV), e2 = sfxEase(v)*(f.big ? 1.5 : 1);
         sfxGlow(b.x, b.y, r*(1.2 + 1.2*e2), RK_C, .7*(1 - v)); sfxGlow(b.x, b.y, r*.9, RK_F, .8*(1 - v));
         for(let i=0;i<8;i++){ const a2 = i*Math.PI/4 + .3, d = r*(.4 + 1.6*e2), x = b.x + Math.cos(a2)*d, y = b.y + Math.sin(a2)*d*.7 + e2*e2*r*.8;
           ctx.save(); ctx.translate(x, y); ctx.rotate(a2 + v*3*(i%2?1:-1)); ctx.fillStyle = `rgba(${i%2?RK_F:RK_S},${.9*(1 - v)})`; ctx.beginPath(); ctx.ellipse(0, 0, r*.4, r*.12, 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
@@ -16282,10 +16283,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   Object.assign(CFX_PASS, { rhit:"top", vhit:"top" });
   Object.assign(CFX_DRAW, {
     c_rhit(f, u, r, now){ // Rook: one thin steel cut across the body, angled from where he stands, and a pinpoint spark
-      const e = f.e, b = e && sfxAt(e, 1.35), rk = S.party.dps; if(!b) return; const side = rk && rk.x > e.x ? -1 : 1, L = r*.75, sw = sfxEase(Math.min(1, u/.45)), al = 1 - Math.max(0, (u - .4)/.6);
+      const e = f.e, b = e && sfxAt(e, 1.35), rk = S.party.dps; if(!b) return; const side = rk && rk.x > e.x ? -1 : 1, L = r*(f.big ? 1.1 : .75), sw = sfxEase(Math.min(1, u/.45)), al = 1 - Math.max(0, (u - .4)/.6);
       const a = (f.v ? -.5 : .5)*side, x0 = b.x - Math.cos(a)*L*side, y0 = b.y - Math.sin(a)*L*side*.6 - L*.25, x1 = x0 + (b.x + Math.cos(a)*L*side - x0)*sw, y1 = y0 + (b.y + L*.25 - y0)*sw;
       ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = `rgba(40,10,14,${.6*al})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-      ctx.strokeStyle = `rgba(${RK_S},${al})`; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x1, y1, r*.35, RK_F, .7*al); ctx.restore();
+      ctx.strokeStyle = f.gold ? `rgba(255,214,120,${al})` : `rgba(${RK_S},${al})`; ctx.lineWidth = f.big ? 2.6 : 1.5; ctx.stroke(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x1, y1, r*(f.big ? .7 : .35), f.gold ? "255,214,120" : RK_F, .7*al); ctx.restore();
     },
     c_vhit(f, u, r, now){ // Vex: two short fang nicks and a couple of venom flecks
       const e = f.e, b = e && sfxAt(e, 1.35); if(!b) return; const sw = sfxEase(Math.min(1, u/.4)), al = 1 - Math.max(0, (u - .4)/.6), fl = f.v ? -1 : 1;
@@ -16461,6 +16462,40 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       ctx.restore(); cfxWisp(b.x, b.y, r*1.3*sz, u, 1, 8);
     },
   });
+
+  // ---- compFxV1 talents / rank V
+  Object.assign(CFX_DUR, { rward:0.7, combust:0.6, harvest:0.55, chain:0.4, spiral:0.6, blight:0.6 });
+  Object.assign(CFX_PASS, { rward:"top", combust:"top", harvest:"top", chain:"top", spiral:"top", blight:"top" });
+  Object.assign(CFX_DRAW, {
+    // Kessa's Rallying Ward: a few gold motes rise off each ally as the shout's mend lands
+    c_rward(f, u, r, now){ const m = S.party[f.at], b = m && m.alive && sfxAt(m, 1.0); if(!b) return; ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for(let i=0;i<5;i++){ const k = (u + i*.12) % 1, x = b.x + Math.sin(i*2.3)*r*.6, y = b.y + r*.4 - k*r*1.8; ctx.fillStyle = `rgba(${CFK_G},${.9*Math.sin(k*Math.PI)*(1 - u*.5)})`; ctx.beginPath(); ctx.arc(x, y, Math.max(1, r*.1), 0, Math.PI*2); ctx.fill(); }
+      sfxGlow(b.x, b.y, r*1.1, CFK_G, .3*(1 - u)); ctx.restore(); },
+    // Mira's Combustion: the dying enemy's embers leap in an arc to the nearest other enemy and flare on it
+    c_combust(f, u, r, now){ const a = f.from && sfxAt(f.from, 1.35), b = f.e && sfxAt(f.e, 1.35); if(!a) return; ctx.save();
+      if(u < .35) cfxFlare(a.x, a.y, r*1.4, u/.35, 1);
+      if(b){ const TRV = .45, tu = Math.min(1, u/TRV); if(u < TRV + .05){ ctx.globalCompositeOperation = "lighter"; for(let i=0;i<7;i++){ const q = sfxArc(a, b, Math.max(0, sfxEase(tu) - i*.05), r*2); ctx.fillStyle = `rgba(${i<2?MR_W:i<4?MR_G:MR_O},${.9*(1 - i/7)})`; ctx.beginPath(); ctx.arc(q.x, q.y, r*.3*(1 - i/8), 0, Math.PI*2); ctx.fill(); } ctx.globalCompositeOperation = "source-over"; }
+        if(u >= TRV) cfxFlare(b.x, b.y, r*1.2, (u - TRV)/(1 - TRV), 1); }
+      ctx.restore(); },
+    // Mira's Cinder Harvest: the stacks on a wounded enemy burst as one bigger flare, sized by the stacks
+    c_harvest(f, u, r, now){ const b = f.e && sfxAt(f.e, 1.35); if(!b) return; cfxFlare(b.x, b.y, r*(1.1 + .12*Math.min(8, f.st||1)), u, 1); },
+    // Mira's Chain Bolt: a short ember lance jumps from the target to a neighbour
+    c_chain(f, u, r, now){ const a = f.from && sfxAt(f.from, 1.35), b = f.e && sfxAt(f.e, 1.35); if(!a || !b) return; const tu = Math.min(1, u/.5), ang = Math.atan2(b.y - a.y, b.x - a.x);
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; if(tu < 1){ const h = { x: a.x + (b.x - a.x)*sfxEase(tu), y: a.y + (b.y - a.y)*sfxEase(tu) }; ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(ang);
+        const g = ctx.createLinearGradient(-r*1.4, 0, r*.3, 0); g.addColorStop(0, `rgba(${MR_O},0)`); g.addColorStop(1, `rgba(${MR_W},1)`); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(r*.3, 0); ctx.lineTo(-r*.3, -r*.13); ctx.lineTo(-r*1.4, 0); ctx.lineTo(-r*.3, r*.13); ctx.closePath(); ctx.fill(); ctx.restore(); }
+      ctx.restore(); if(u >= .45) cfxFlare(b.x, b.y, r*.9, (u - .45)/.55, 1); },
+    // Wren's Doom Spiral: a skull-wisp spirals off the detonation to the next cursed enemy and bursts on it
+    c_spiral(f, u, r, now){ const a = f.from && sfxAt(f.from, 1.35), b = f.e && sfxAt(f.e, 1.35); if(!a || !b) return; const TRV = .5, tu = Math.min(1, u/TRV); ctx.save();
+      if(u < TRV){ const k = sfxEase(tu), sp = (1 - k)*r*.9; ctx.globalCompositeOperation = "lighter"; for(let i=0;i<7;i++){ const kk = Math.max(0, k - i*.05), q = sfxArc(a, b, kk, r*1.2), ang = kk*12; ctx.fillStyle = `rgba(${WR_L},${.6*(1 - i/7)})`; ctx.beginPath(); ctx.arc(q.x + Math.cos(ang)*sp, q.y + Math.sin(ang)*sp*.6, r*.22*(1 - i/8), 0, Math.PI*2); ctx.fill(); }
+        ctx.globalCompositeOperation = "source-over"; const q = sfxArc(a, b, k, r*1.2); cfxSkull(q.x + Math.cos(k*12)*sp, q.y + Math.sin(k*12)*sp*.6, r*.32, 1); }
+      else { const v = (u - TRV)/(1 - TRV); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*(1 + 1.4*v), WR_V, .7*(1 - v)); ctx.restore(); ctx.save(); cfxWisp(b.x, b.y, r*1.1, v, 1, 6); }
+      ctx.restore(); },
+    // Wren's Spreading Blight / Spreading Doom: a curse wisp breathes off every other cursed enemy
+    c_blight(f, u, r, now){ (f.es||[]).forEach((e,i)=>{ if(!e || !e.alive) return; const v = (u - (i%4)*.04)/.8; if(v <= 0 || v >= 1) return; const b = sfxAt(e, 1.35); cfxWisp(b.x, b.y, r*.95, v, 1, 5); }); },
+  });
+  // Purge rank V (Exposed): each purged enemy's guard visibly cracks
+  function cfxExposed(x, y, r, v){ ctx.save(); ctx.strokeStyle = `rgba(${SC},${1 - v})`; ctx.lineWidth = 1.4; const R = r*(.7 + .3*sfxEase(v));
+    for(let i=0;i<6;i++){ const a = i*Math.PI/3 + .3; ctx.beginPath(); ctx.moveTo(x + Math.cos(a)*R*.35, y + Math.sin(a)*R*.35); ctx.lineTo(x + Math.cos(a + .25)*R*.7, y + Math.sin(a + .25)*R*.7); ctx.lineTo(x + Math.cos(a - .1)*R, y + Math.sin(a - .1)*R); ctx.stroke(); } ctx.restore(); }
   try{ if(typeof window!=="undefined") window.__cfx = { cfxCast, CFX_DRAW }; }catch(_){}
 
 
@@ -22556,18 +22591,18 @@ thrall(){return gs(14)+
           if(dpsFocus._huntersMarkStacks>0){ d = Math.round(d*MT.HUNTMARK); dpsFocus._huntersMarkStacks--; }
           triggerAttackLunge(dps, dpsFocus.x, dpsFocus.y); // Round 40
           d = dealAs("Auto-attack", dpsFocus, d, dps);
-          if(opened) spawnSlash(dpsFocus.x, dpsFocus.y, "var(--accent-strong)"); // Opening Strikes
-          if(hasTalent("dps","executioner") && lowHp && Math.random()<0.25) meleeFinisherFx(dpsFocus, null, false);
+          if(opened) dps._cfxOpen = true; // compFxV1: Opening Strikes marks this swing gold (drawn with the hit mark below)
+          if(hasTalent("dps","executioner") && lowHp && Math.random()<0.25) dps._cfxExec = true; // compFxV1: Executioner's extra blow, a heavier hit mark
           // Pack Tactics: each auto also hits up to two other engaged enemies (three with Frenzied Fangs at max Frenzy).
           if(hasTalent("dps","packTactics")){
             const _others = []; S.engagedGroups.forEach(g=>livingEnemiesOf(g).forEach(e=>{ if(e!==dpsFocus && e.alive) _others.push(e); }));
             _others.sort((a,b)=>dist(a.x,a.y,dpsFocus.x,dpsFocus.y)-dist(b.x,b.y,dpsFocus.x,dpsFocus.y));
-            _others.slice(0, 2+((hasAffix("dps","frenziedFangs") && (dps.feedingFrenzyStacks||0)>=feedingFrenzyCap())?1:0)).forEach(e=>{ e._aoeHit = true; const dd = dealAs("Auto-attack (cleave)", e, Math.round(_cleaveBase*MT.CLEAVE), dps); addThreat(e,"dps",dd*dps.threatMul*0.5); if(e.hp<=0) killEnemy(e, e._group); });
+            _others.slice(0, 2+((hasAffix("dps","frenziedFangs") && (dps.feedingFrenzyStacks||0)>=feedingFrenzyCap())?1:0)).forEach(e=>{ e._aoeHit = true; cfxCast("rhit", { e, delay:0.05 }); /* compFxV1: Pack Tactics cleave */ const dd = dealAs("Auto-attack (cleave)", e, Math.round(_cleaveBase*MT.CLEAVE), dps); addThreat(e,"dps",dd*dps.threatMul*0.5); if(e.hp<=0) killEnemy(e, e._group); });
           }
           engineAdd(dpsFocus, "dps"); // stack engine
           // Rank V capstone — at full stacks, Rook's auto-attacks refresh Marked.
           if(rankOf("dps","auto")>=5 && engineStacks(dpsFocus,"dps")>=engineCap("dps") && dpsFocus.buffs) dpsFocus.buffs.forEach(b=>{ if(b.id==="marked" && b.dur) b.remaining = b.dur; });
-          cfxCast("rhit", { e: dpsFocus, v: (S._cfxSw = !S._cfxSw) }); // compFxV1: Rook's basic attack
+          cfxCast("rhit", { e: dpsFocus, v: (S._cfxSw = !S._cfxSw), gold: !!dps._cfxOpen, big: !!dps._cfxExec }); dps._cfxOpen = false; dps._cfxExec = false; // compFxV1: Rook's basic attack
           addThreat(dpsFocus,"dps", d*dps.threatMul);
           pushLog("dmgOut", `${dps.label} rends ${dpsFocus.name} for ${d}.`);
           if(dpsFocus.hp<=0) killEnemy(dpsFocus, dpsFocus._group);
@@ -24242,7 +24277,7 @@ thrall(){return gs(14)+
       if(hasAffix("tank","unbreakableWill")) allLiving.forEach(e=>{ const th = S.threat[enemyRef(e)] || (S.threat[enemyRef(e)] = {self:0,tank:0,dps:0,dpsCaster:0}); const lead = Math.max(th.self||0, th.dps||0, th.dpsCaster||0); if((th.tank||0) <= lead) th.tank = lead*1.1 + 1; });
       if(hasAffix("tank","swiftRally") && hits>0) shield("tank", Math.round(tankBaseHp()*0.03*Math.min(5,hits)), 6, "Swift Rally", null, true);
       if(hasTalent("tank","commandingShout")){ Object.values(S.party).forEach(m3=>{ if(m3.alive) m3._cmdShoutT = 4; }); allLiving.forEach(e=>{ if(e.alive) addThreat(e,"tank", Math.max(1,rd)*tank.threatMul*2); }); } // Commanding Shout: party -5% and a threat burst
-      if(hasTalent("tank","rallyingWard")){ const rw = Math.round(tankBaseHp()*0.02); Object.values(S.party).forEach(m3=>{ if(m3.alive){ const b = m3.hp; m3.hp = clamp(m3.hp+rw, 0, m3.maxHp); if(S.arena) arenaRec("heal","tank","Rallying Ward",m3.hp-b); } }); } // flat: Kessa's own HP only
+      if(hasTalent("tank","rallyingWard")){ const rw = Math.round(tankBaseHp()*0.02); Object.entries(S.party).forEach(([k3,m3])=>{ if(m3.alive){ const b = m3.hp; m3.hp = clamp(m3.hp+rw, 0, m3.maxHp); if(S.arena) arenaRec("heal","tank","Rallying Ward",m3.hp-b); cfxCast("rward", { at:k3, delay:0.25 }); } }); } // flat: Kessa's own HP only; compFxV1 motes
       if(hasTalent("tank","rallyingGuard")){ const lk = lowestHpAllyKey([]); if(lk) shield(lk, Math.round(tankBaseHp()*0.05), 6, "Rallying Guard", null, true); }
       if(rankOf("tank","rally")>=5) S._rallyDmgT = 4; // Rousing Shout
       pushLog("event", `${tank.label} bellows ${ab.name}, rallying every enemy's attention!`); cfxCast("rally", { es: allLiving.slice(0, 12) }); // compFxV1
@@ -24398,7 +24433,7 @@ thrall(){return gs(14)+
           const dRaw = d; // Twin Fangs copies the raw hit, never a crit
           d = dealDamageToEnemy(target, d, dps);
           cfxCast("falcon", { e: target }); // compFxV1: Falcon Strike
-          if(lowHp && (hasTalent("dps","coupDeGrace") || hasTalent("dps","executioner") || hasAffix("dps","bloodletting"))) meleeFinisherFx(target, "var(--blood)", true);
+          if(lowHp && (hasTalent("dps","coupDeGrace") || hasTalent("dps","executioner") || hasAffix("dps","bloodletting"))){ try{ const _ff = SFX.find(o=>o.k==="c_falcon" && o.e===target && o.t < .1); if(_ff) _ff.big = true; }catch(_){} } // compFxV1: a bigger falcon burst
           if(hasTalent("dps","huntersMark")) target._huntersMarkStacks = 5;
           // Unified Mark (Huntmaster): Marked on the target and the 2 nearest other enemies.
           if(hasTalent("dps","unifiedMark")){
@@ -24521,7 +24556,7 @@ thrall(){return gs(14)+
           dps.gcd = COMPANION_GCD;
           target._venomAmpT = ab.venomAmpDur + 1.5*affixEffectiveStacks("dpsDot","venomHarvest"); // Venom Harvest
           target._venomAmpMul = ab.venomAmpMul + 0.1*(rankOf("dpsDot","paralyticbite")-1) + 0.1*affixEffectiveStacks("dpsDot","envenomedFang"); // Envenomed Fang (+ rank steps)
-          if(rankOf("dpsDot","paralyticbite")>=5){ const sec = allLiving.filter(e2=>e2!==target && e2.alive)[0]; if(sec){ sec._venomAmpT = target._venomAmpT; sec._venomAmpMul = target._venomAmpMul; } }
+          if(rankOf("dpsDot","paralyticbite")>=5){ const sec = allLiving.filter(e2=>e2!==target && e2.alive)[0]; if(sec){ sec._venomAmpT = target._venomAmpT; sec._venomAmpMul = target._venomAmpMul; cfxCast("bite", { e: sec, delay: 0.15 }); } } // compFxV1
           applyVexMark(target, vexMarkDur());
           cfxCast("bite", { e: target }); // compFxV1: Paralytic Bite
           pushLog("event", `${dps.label} sinks his fangs into ${target.name} with ${ab.name}, priming its venom!`);
@@ -24586,7 +24621,7 @@ thrall(){return gs(14)+
             if(hasTalent("dpsCaster","conflagration")) d = Math.round(d*(1+CT.CONFLAG*Math.min(4, cnt-1)));
             if(hasAffix("dpsCaster","cinderflow") && !e._cfHit){ d = Math.round(d*1.5); e._cfHit = true; } // Cinderflow: first Nova hit on each enemy +50%
             const novaBase = d;
-            if(hasTalent("dpsCaster","cinderHarvest") && e.hp < e.maxHp*0.5){ const st = engineStacks(e,"dpsCaster"); if(st>0){ d += Math.round(CT.HARVEST*(1+((dpsCaster.damagePct||0))/100)*st*kindleMul(e)); e._stkM = 0; spawnActFx("blast", e.x, e.y, { rad:18+3*st, size:0.4 }); spawnFloatingText(e.x, e.y-18, `✹${st}`, "var(--ember)"); } }
+            if(hasTalent("dpsCaster","cinderHarvest") && e.hp < e.maxHp*0.5){ const st = engineStacks(e,"dpsCaster"); if(st>0){ d += Math.round(CT.HARVEST*(1+((dpsCaster.damagePct||0))/100)*st*kindleMul(e)); e._stkM = 0; cfxCast("harvest", { e, st, delay:0.1 }); /* compFxV1: Cinder Harvest */ spawnFloatingText(e.x, e.y-18, `✹${st}`, "var(--ember)"); } }
             if(rankOf("dpsCaster","cindernova")>=5 && e.hp < e.maxHp*0.3) d = d*2; // Rank V capstone: double damage below 30%
             if(hasTalent("dpsCaster","pyroclasm") && e.hp < e.maxHp*0.5) d = Math.round(d*CT.PYRO); // Pyroclasm
             d = dealDamageToEnemy(e, d, dpsCaster);
@@ -24598,7 +24633,7 @@ thrall(){return gs(14)+
           });
         };
         fireCinderNova();
-        if(hasTalent("dpsCaster","wildfireBloom") && allLiving.filter(e=>e.alive).length>=3) fireCinderNova(); // Wildfire Bloom: second pulse only into 3+ enemies
+        if(hasTalent("dpsCaster","wildfireBloom") && allLiving.filter(e=>e.alive).length>=3){ fireCinderNova(); cfxCast("nova", { es: allLiving.filter(e=>e.alive).slice(0, 10), delay: 0.3 }); } // Wildfire Bloom: second pulse only into 3+ enemies (compFxV1: its own ring)
         pushLog("dmgOut", `${dpsCaster.label} unleashes ${ab.name}, scorching everyone in the fight!`); cfxCast("nova", { es: allLiving.slice(0, 10) }); // compFxV1
       }
       if((dpsCaster.gcd||0)<=0 && dpsCaster._forgeOverloadCastT==null && (dpsCaster.ccds.emberlance||0)<=0){
@@ -24624,7 +24659,7 @@ thrall(){return gs(14)+
           addThreat(target,"dpsCaster", d*threatMul);
           pushLog("dmgOut", `${dpsCaster.label} lands ${ab.name} on ${target.name} for ${d}!`);
           if(hasTalent("dpsCaster","chainBolt")){
-            enemiesInFight().filter(x=>x!==target && x.alive).sort((a,b)=>dist(target.x,target.y,a.x,a.y)-dist(target.x,target.y,b.x,b.y)).slice(0,2).forEach(nearest=>{ const d2 = dealDamageToEnemy(nearest, Math.round(dRaw*CT.CHAIN), dpsCaster); addThreat(nearest,"dpsCaster", d2*threatMul); if(nearest.hp<=0) killEnemy(nearest, nearest._group); }); // Chain Bolt: two nearest others
+            enemiesInFight().filter(x=>x!==target && x.alive).sort((a,b)=>dist(target.x,target.y,a.x,a.y)-dist(target.x,target.y,b.x,b.y)).slice(0,2).forEach(nearest=>{ cfxCast("chain", { from: target, e: nearest, delay: 0.28 }); /* compFxV1: Chain Bolt */ const d2 = dealDamageToEnemy(nearest, Math.round(dRaw*CT.CHAIN), dpsCaster); addThreat(nearest,"dpsCaster", d2*threatMul); if(nearest.hp<=0) killEnemy(nearest, nearest._group); }); // Chain Bolt: two nearest others
           }
           if(target.hp<=0) killEnemy(target, target._group);
         }
@@ -24712,11 +24747,11 @@ thrall(){return gs(14)+
           cfxCast("doompop", { e: target, st: stacks }); // compFxV1: Mark of Doom detonating
           addThreat(target,"dpsCaster", d*dpsCaster.threatMul);
           pushLog("dmgOut", `${ab.name} detonates on ${target.name} for ${d}!`);
-          if(hasTalent("dpsCasterDot","doomSpiral")){ const e2 = enemiesInFight().filter(x=>x!==target && x.alive && (x._curseStacks||0)>0).sort((a,b)=>dist(target.x,target.y,a.x,a.y)-dist(target.x,target.y,b.x,b.y))[0]; if(e2){ spawnBeam(target.x, target.y, e2.x, e2.y, "var(--dirge)", "wren"); spawnAoeBurst(e2.x, e2.y, "var(--dirge)"); const d2 = dealAs("Doom Spiral", e2, Math.round(dRaw*CT.DOOMSPIRAL), dpsCaster); addThreat(e2,"dpsCaster",d2*dpsCaster.threatMul); if(e2.hp<=0) killEnemy(e2,e2._group); } } // Doom Spiral: jumps to the nearest other cursed enemy
+          if(hasTalent("dpsCasterDot","doomSpiral")){ const e2 = enemiesInFight().filter(x=>x!==target && x.alive && (x._curseStacks||0)>0).sort((a,b)=>dist(target.x,target.y,a.x,a.y)-dist(target.x,target.y,b.x,b.y))[0]; if(e2){ cfxCast("spiral", { from: target, e: e2, delay: 0.2 }); /* compFxV1: Doom Spiral */ const d2 = dealAs("Doom Spiral", e2, Math.round(dRaw*CT.DOOMSPIRAL), dpsCaster); addThreat(e2,"dpsCaster",d2*dpsCaster.threatMul); if(e2.hp<=0) killEnemy(e2,e2._group); } } // Doom Spiral: jumps to the nearest other cursed enemy
           if(hasAffix("dpsCasterDot","dreadVeil") && target.alive){ target.buffs = (target.buffs||[]).filter(b=>b.id!=="dreadVeil"); target.buffs.push({ id:"dreadVeil", label:"Dread Mark", purgeable:false, mitMul:1+0.08*affixEffectiveStacks("dpsCasterDot","dreadVeil"), dur:5, remaining:5 }); }
           if(hasAffix("dpsCasterDot","deepeningDoom") && target.alive && (target._curseStacks||0)>=curseMaxStacks()) target._doomAmpT = 4;
           if(hasAffix("dpsCasterDot","spreadingDoom") && (target._curseStacks||0)>0){
-            const st0 = target._curseStacks; S.engagedGroups.forEach(g=>livingEnemiesOf(g).forEach(e=>{ if(e!==target && e.alive) applyCurse(e, st0); }));
+            const st0 = target._curseStacks; const _sp = []; S.engagedGroups.forEach(g=>livingEnemiesOf(g).forEach(e=>{ if(e!==target && e.alive){ applyCurse(e, st0); _sp.push(e); } })); cfxCast("blight", { es: _sp.slice(0, 10), delay: 0.25 }); // compFxV1: Spreading Doom
           }
           if(hasAffix("dpsCasterDot","doomsLegacy")) dpsCaster.ccds.soulrend = Math.max(0,(dpsCaster.ccds.soulrend||0)-4); // Doom's Legacy
           if(target.hp<=0){ killEnemy(target, target._group); if(hasTalent("dpsCasterDot","doomsday")) dpsCaster.ccds.markofdoom = 0; }
@@ -24767,6 +24802,7 @@ thrall(){return gs(14)+
           let threatMul = dpsCaster.threatMul;
           addThreat(target,"dpsCaster", d*threatMul);
           pushLog("dmgOut", `${dpsCaster.label} lands ${ab.name} on ${target.name} for ${d}!`);
+          if(hasTalent("dpsCasterDot","spreadingBlight")) cfxCast("blight", { es: enemiesInFight().filter(e2=>e2!==target && e2.alive && (e2._curseStacks||0)>0).slice(0, 10), delay: 0.3 }); // compFxV1
           if(hasTalent("dpsCasterDot","spreadingBlight")){ // Spreading Blight: every other cursed enemy takes a share of the curse-stack bonus
             enemiesInFight().forEach(e2=>{ if(e2!==target && e2.alive && (e2._curseStacks||0)>0){ const d2 = dealAs("Spreading Blight", e2, Math.round(CT.SPRBLIGHT*bonus*(e2._curseStacks/Math.max(1,stacks||1))), dpsCaster); addThreat(e2,"dpsCaster",d2*threatMul); if(e2.hp<=0) killEnemy(e2,e2._group); } });
           }
@@ -36857,7 +36893,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 562ebbb8fb) */
+<script>/* phone app: offline cache (build 9327b59ff6) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
