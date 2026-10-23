@@ -3475,9 +3475,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       ctx.fillStyle = "rgba(20,8,4,.82)"; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI*2); ctx.fill();
       ctx.strokeStyle = resolveColor("var(--ember)"); ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(cx, cy, rr-2, -Math.PI/2, -Math.PI/2 + Math.PI*2*frac); ctx.stroke();
-      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = resolveColor("var(--ember)");
-      ctx.font = `700 ${Math.round(rr*1.15)}px Cinzel, serif`; ctx.fillText(txt, cx, cy+1);
-      ctx.font = `700 ${Math.round(Math.max(9, rr*0.42))}px 'Space Mono', monospace`; ctx.fillText("ROAR", cx, cy+rr+9);
+      { const em2 = resolveColor("var(--ember)"), pulse2 = st.casting ? 1 : .55 + .45*frac; ctx.strokeStyle = em2; ctx.lineCap = "round"; // floorTextV1: a roar icon, no digits
+        ctx.globalAlpha = .7 + .3*pulse2; ctx.fillStyle = em2; ctx.beginPath(); ctx.arc(cx - rr*.32, cy, rr*.16, 0, Math.PI*2); ctx.fill();
+        for(let i=0;i<3;i++){ const ar = rr*(.3 + .18*i) + (st.casting ? rr*.12*Math.sin((S.tPrev||0)/60) : 0); ctx.lineWidth = Math.max(1.5, rr*.1); ctx.globalAlpha = (.95 - i*.22)*(st.casting ? 1 : (frac > i/3 ? 1 : .35)); ctx.beginPath(); ctx.arc(cx - rr*.32, cy, ar, -.75, .75); ctx.stroke(); }
+        ctx.globalAlpha = 1; if(st.casting){ ctx.strokeStyle = em2; ctx.lineWidth = 2; ctx.globalAlpha = .6 + .4*Math.sin((S.tPrev||0)/50); ctx.beginPath(); ctx.arc(cx, cy, rr*1.35, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1; } }
       ctx.restore();
     },
   };
@@ -4049,8 +4050,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         const mx = (L.x1+L.x2)/2, my = (L.y1+L.y2)/2, p = VIEW.project(mx, my), rr = Math.max(11, 13*VIEW.scale);
         ctx.save(); ctx.fillStyle = "rgba(20,8,30,.85)"; ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, Math.PI*2); ctx.fill();
         ctx.strokeStyle = resolveColor("var(--veil)"); ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = resolveColor("var(--veil)"); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.font = `700 ${Math.round(rr*1.3)}px Cinzel, serif`; ctx.fillText(String(L.n), p.x, p.y+1); ctx.restore();
+        { const nextN = Math.min(...(st.lines||[]).filter(q=>!q.fired).map(q=>q.n)), isNext = L.n===nextN, vc = resolveColor("var(--veil)"); // floorTextV1: pips, not digits
+          ftPips(p.x, p.y, rr, L.n, vc, isNext ? 1 : .45); if(isNext){ ctx.globalAlpha = .5 + .5*Math.sin((S.tPrev||0)/90); ctx.strokeStyle = vc; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, rr*1.45, 0, Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1; } }
+        ctx.restore();
       });
     },
     hazards(e, mech, st){ return st.casting && st.lines ? st.lines.filter(L=>!L.fired).map(L=>({ line:true, x1:L.x1, y1:L.y1, x2:L.x2, y2:L.y2, radius:mech.width+HAZARD_SAFE_MARGIN })) : []; },
@@ -4709,8 +4711,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(em.devour){ const p = VIEW.project(e.x, e.y), s = VIEW.scale, v = em.devour, f = Math.min(1, (v.hp0-e.hp)/(e.maxHp*v.breakPct));
       ctx.save(); ctx.strokeStyle = resolveColor("var(--bloom)"); ctx.lineWidth = 4; ctx.globalAlpha = 0.8;
       ctx.beginPath(); ctx.arc(p.x, p.y, 40*s, -Math.PI/2, -Math.PI/2 + Math.PI*2*f); ctx.stroke();
-      ctx.fillStyle = resolveColor("var(--bloom)"); ctx.textAlign = "center"; ctx.font = `700 ${Math.round(Math.max(10, 12*s))}px 'Space Mono', monospace`;
-      ctx.fillText(`${displayName(S.party[v.key]||{label:"?"}).toUpperCase()} INSIDE · ${Math.round(f*100)}%`, p.x, p.y+56*s); ctx.restore(); }
+      ftPortrait(v.key, p.x, p.y + 58*s, Math.max(14, 17*s), resolveColor("var(--bloom)"), pulse); ctx.restore(); } // floorTextV1: who is inside, as a portrait
   }
   function thkHazards(e, k, hz){
     const em = emOf(e);
@@ -25468,6 +25469,7 @@ thrall(){return gs(14)+
 
   function updateHint(){
     if(S.over){ setHint(""); return; }
+    { const _ft = ftRaidHint(false); if(_ft){ setHint(_ft); return; } } // floorTextV1: the raid's must-do instructions first
     { const wb = activeBossEnemy();
       if(wb && wb._ward && wb._ward.plates){ const left = wb._ward.plates.filter(p=>!p.on).length; setHint(`${wb._ward.def.breaker.glyph||"⬡"} ${wb._ward.def.hint} (${left} left)`); return; }
       if(wb && wb._ward && wb._ward.def.breaker.kind==="crystal"){ setHint(`💎 ${wb._ward.def.hint} (${wb._ward.progressText||""})`); return; }
@@ -25625,6 +25627,7 @@ thrall(){return gs(14)+
       { const ct = S.treasureChests[chest.idx]; setHint(ct.mod==="mimic" ? "Something feels off about this one" : `${CHEST_TIERS[ct.tier||0].name}${ct.mod==="trapped" ? " (trapped)" : ""}`); }
       return;
     }
+    { const _ft = ftRaidHint(true); if(_ft){ setHint(_ft); return; } } // floorTextV1: the rest only when nothing more urgent is showing
     setHint("");
   }
   // Context prompts: the old Drink / Use / Chest / Pull buttons stay in the DOM (hidden) as the source of "is this
@@ -25704,6 +25707,25 @@ thrall(){return gs(14)+
     el.classList.toggle("complete", pct>=100);
   }
   let lastHint="";
+
+  // ---- floorTextV1 helpers
+  function ftPips(x, y, rr, n, col, al){ ctx.save(); ctx.globalAlpha = al; ctx.fillStyle = col; const d = rr*.42, pr = Math.max(2, rr*.2);
+    const pts = n===1 ? [[0,0]] : n===2 ? [[-d*.6,0],[d*.6,0]] : n===3 ? [[0,-d*.6],[-d*.6,d*.45],[d*.6,d*.45]] : Array.from({length:n},(_,i)=>{ const a = -Math.PI/2 + i*Math.PI*2/n; return [Math.cos(a)*d, Math.sin(a)*d]; });
+    pts.forEach(([px,py])=>{ ctx.beginPath(); ctx.arc(x+px, y+py, pr, 0, Math.PI*2); ctx.fill(); }); ctx.restore(); }
+  function ftPortrait(key, x, y, R, col, pulse){ const m = S.party && S.party[key]; ctx.save();
+    ctx.fillStyle = "rgba(14,10,8,.88)"; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = col; ctx.globalAlpha = .7 + .3*(pulse||0); ctx.lineWidth = 2.5; ctx.stroke(); ctx.globalAlpha = 1;
+    try{ const rk = m && rosterKeyForPartyMember(m), C = rk && CR_CHARS[rk]; if(C && C.rig){ ctx.beginPath(); ctx.arc(x, y, R - 2, 0, Math.PI*2); ctx.clip();
+      C.rig.draw(ctx, x, y + R*2.1, R/30, { pose:"idle", view:1, t:(S.tPrev||0)/1000, faceK:1, staffSide:1, lantern:{a:0,v:0}, speed:0, phase:0, combat:0 }, null); } }catch(_){}
+    ctx.restore(); }
+  // the Unbanked Hearth's instructions, in the hint bar instead of on the floor
+  function ftRaidHint(low){ const r = S.arena && S.arena.raid, k = r && r.k; if(!k) return "";
+    const f = k.intro && k.intro.st==="wait" ? (S.features||[]).find(q=>q.type==="raidIntro" && !q.used && (q.id==="kindleHearth" || /^ashWell/.test(q.id))) : null;
+    if(!low){ if(f) return f.id==="kindleHearth" ? "🔥 Stand in the glowing ring at the Cold Hearth and use it to rouse her." : "🔥 Stand in each glowing ring and use it to light the Ember Wells.";
+    if(k.bank) return "🔥 He is banking the hall's light. Relight two of the pale blue wells to break it!"; return ""; }
+    if(k.win && !k.win.taken) return "🔥 Stand in the gold ring to steal his embers before the ring runs out.";
+    if(k.hearts && k.hearts.some(h=>!h.done && h.prog>0 && !h.inside)) return "🔥 Get back in the ring. The Cinder Heart is losing progress!";
+    if(k.hearts && k.hearts.some(h=>!h.done)) return "🔥 Stand in a Cinder Heart's ring to carry it home.";
+    return ""; }
   function setHint(t){
     if(t===lastHint) return; lastHint=t;
     const el = document.getElementById("hint");
@@ -33234,8 +33256,7 @@ thrall(){return gs(14)+
         ctx.lineWidth = 3*sc; ctx.strokeStyle = "rgba(120,120,125,0.5)"; ctx.setLineDash([6,5]); ctx.beginPath(); ctx.arc(q.x,q.y,R,0,6.2832); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.arc(q.x,q.y,R*0.8,0,6.2832); ctx.fill();
       }
-      ctx.textAlign = "center"; ctx.font = "bold "+Math.max(9,Math.round(10*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle = alive ? "rgba("+o.rgb+",0.95)" : "rgba(170,170,170,0.8)"; ctx.strokeStyle = "rgba(10,6,6,0.9)"; ctx.lineWidth = 3;
-      ctx.strokeText(o.name.toUpperCase(), q.x, q.y+R+14*sc); ctx.fillText(o.name.toUpperCase(), q.x, q.y+R+14*sc);
+      // floorTextV1: no name under the circle
       ctx.restore();
       if(alive) kEmbers(P, sc, now, o.x, o.y, 6, 40, 90, o.rgb, 2.4, 0.3);
     });
@@ -33274,8 +33295,7 @@ thrall(){return gs(14)+
       if(it.st==="wait"){
         const pr = 0.7+0.3*Math.sin(now*4);
         raidStepRing(c.x, c.y, 112*sc, "255,190,90", pr, now);
-        ctx.save(); ctx.textAlign = "center"; ctx.font = "bold "+Math.max(10,Math.round(13*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle = "rgba(255,235,170,"+pr+")"; ctx.strokeStyle = "rgba(20,10,10,0.9)"; ctx.lineWidth = 3;
-        ctx.strokeText("STAND AT THE HEARTH · PRESS E", c.x, c.y+112*sc+24*sc); ctx.fillText("STAND AT THE HEARTH · PRESS E", c.x, c.y+112*sc+24*sc); ctx.restore();
+        // floorTextV1: the instruction moved to the hint bar
       }
       it.comets.forEach(cm=>{
         const u = Math.max(0,Math.min(1,(it.t-K_SHOW_END-0)/K_COMET_T)); if(u<=0 || u>=1) return;
@@ -33347,9 +33367,7 @@ thrall(){return gs(14)+
         ctx.strokeStyle = "rgba(150,190,230,0.9)"; ctx.lineWidth = 4*sc; ctx.beginPath(); ctx.arc(q.x,q.y,R*0.62,-Math.PI/2,-Math.PI/2+Math.PI*2*c); ctx.stroke(); }
       if(h.crackT0!=null && now-h.crackT0<0.6){ const u = (now-h.crackT0)/0.6; ctx.strokeStyle = "rgba(255,220,160,"+(1-u)+")"; ctx.lineWidth = 5*sc; ctx.beginPath(); ctx.arc(q.x,q.y,(30+70*u)*sc,0,6.2832); ctx.stroke(); }
       if(h.prog>0){ ctx.strokeStyle = h.inside ? "rgba(255,240,170,0.95)" : "rgba(255,120,80,0.9)"; ctx.lineWidth = 6*sc; ctx.beginPath(); ctx.arc(q.x,q.y,R*0.8,-Math.PI/2,-Math.PI/2+Math.PI*2*h.prog); ctx.stroke(); }
-      ctx.textAlign = "center"; ctx.font = "bold "+Math.max(10,Math.round(13*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle = "rgba(255,235,170,0.98)"; ctx.strokeStyle = "rgba(20,10,10,0.9)"; ctx.lineWidth = 3;
-      const lab = h.prog>0 ? (h.inside ? "ESCORTING  "+Math.round(h.prog*100)+"%" : "LOSING PROGRESS  "+Math.round(h.prog*100)+"%") : "STAND HERE";
-      ctx.strokeText(lab, q.x, q.y-R-8*sc); ctx.fillText(lab, q.x, q.y-R-8*sc);
+      if(h.prog>0 && !h.inside){ ctx.strokeStyle = "rgba(255,70,150,"+(.45+.4*Math.sin(now*10))+")"; ctx.lineWidth = 3*sc; ctx.beginPath(); ctx.arc(q.x,q.y,R*0.92,0,6.2832); ctx.stroke(); } // floorTextV1: losing progress pulses pink, no words
       ctx.restore();
     });
     // Part 2 Flashfire wedges
@@ -34344,8 +34362,9 @@ thrall(){return gs(14)+
     // the steal lands: a burst of light around you
     if(w.takenT!=null && me){ const ft = bt - w.takenT; if(ft>=0 && ft<1.0){ const q = ft/1.0, hp = VIEW.project(me.x, me.y); ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = "rgba(255,235,170,"+(0.9*(1-q))+")"; ctx.lineWidth = 6*(1-q)+1; ctx.beginPath(); ctx.arc(hp.x,hp.y,(20+260*q)*sc,0,6.2832); ctx.stroke(); const g = ctx.createRadialGradient(hp.x,hp.y,2,hp.x,hp.y,(70+80*q)*sc); g.addColorStop(0,"rgba(255,240,190,"+(0.8*(1-q))+")"); g.addColorStop(1,"rgba(255,170,70,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hp.x,hp.y,(70+80*q)*sc,0,6.2832); ctx.fill(); ctx.restore(); } }
     ctx.textAlign = "center"; ctx.font = "bold "+Math.max(11,Math.round(13*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle = w.taken ? "rgba(200,200,200,0.9)" : "rgba(255,225,150,0.98)"; ctx.strokeStyle = "rgba(20,10,10,0.9)"; ctx.lineWidth = 3;
-    const label = w.taken ? "He wakes in "+Math.ceil(w.t)+"s" : "STEAL THE EMBERS  "+Math.ceil(w.t)+"s";
-    ctx.strokeText(label, p.x, p.y - R - 10); ctx.fillText(label, p.x, p.y - R - 10);
+    { const tot = w.taken ? (w._ftT0 = w._ftT0 || Math.max(1, w.t)) : (GATE_WINDOW + FALL_IMPACT), f2 = Math.max(0, Math.min(1, w.t/tot)), cpt = w.taken ? bp0 : p, RR = w.taken ? 90*sc : R*1.14; // floorTextV1: a timer ring, no words
+      ctx.lineCap = "round"; ctx.strokeStyle = "rgba(20,10,10,0.75)"; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(cpt.x, cpt.y, RR, 0, 6.2832); ctx.stroke();
+      ctx.strokeStyle = w.taken ? "rgba(200,190,230,"+(f2 < .3 ? .6+.4*Math.sin(now*10) : .9)+")" : "rgba(255,215,120,"+(f2 < .25 ? .6+.4*Math.sin(now*10) : .95)+")"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cpt.x, cpt.y, RR, -Math.PI/2, -Math.PI/2 + Math.PI*2*f2); ctx.stroke(); }
     ctx.restore();
   }
 
@@ -35510,7 +35529,8 @@ thrall(){return gs(14)+
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = "rgba(255,200,110,0.95)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(c.x,c.y,120*sc,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(1,bk.t/6))); ctx.stroke();
     ctx.textAlign = "center"; ctx.font = "bold "+Math.max(12,Math.round(16*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle = "rgba(255,225,150,0.98)"; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.lineWidth = 3;
-    const t = "BANKING  "+bk.t.toFixed(1)+"s   (relight 2 wells: "+lit+"/2)"; ctx.strokeText(t, c.x, c.y-140*sc); ctx.fillText(t, c.x, c.y-140*sc);
+    for(let i=0;i<2;i++){ const px2 = c.x + 142*sc, py2 = c.y + (i - .5)*28*sc, on = i < lit; ctx.fillStyle = on ? "rgba(255,215,120,0.98)" : "rgba(20,12,10,0.8)"; ctx.strokeStyle = "rgba(255,215,120,0.95)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px2, py2, 8*sc, 0, 6.2832); ctx.fill(); ctx.stroke(); } // floorTextV1: wells relit, as pips
+    k.wells.forEach(w=>{ if(w.lit || w.dead) return; const q = VIEW.project(w.x, w.y), pu = .5 + .5*Math.sin(now*6 + w.x); raidStepRing(q.x, q.y, 66*sc, "175,232,255", .6 + .35*pu, now); });
     ctx.restore();
   }
   function drawRaidDesp(r){
@@ -35530,7 +35550,7 @@ thrall(){return gs(14)+
       ctx.strokeStyle = "rgba(255,70,40,"+(0.45+0.4*q)+")"; ctx.lineWidth = 4; ctx.setLineDash([16,10]); ctx.lineDashOffset = -now*40; ctx.beginPath(); ctx.arc(bp.x,bp.y,Rr,0,6.2832); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = "rgba(255,50,20,"+(0.04+0.12*q)+")"; ctx.fillRect(0,0,LW(),LH());
       ctx.textAlign = "center"; ctx.font = "bold "+Math.max(12,Math.round(20*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle = "rgba(255,150,110,0.95)"; ctx.strokeStyle = "rgba(0,0,0,0.8)"; ctx.lineWidth = 3;
-      const t = "LAST EMBER  "+d.blast.t.toFixed(1)+"s"; ctx.strokeText(t, bp.x, bp.y-150*sc); ctx.fillText(t, bp.x, bp.y-150*sc);
+      // floorTextV1: the closing ring is the countdown
     }
     if(d.flash>0){ ctx.fillStyle = "rgba(255,120,70,"+(0.45*d.flash/0.45)+")"; ctx.fillRect(0,0,LW(),LH()); }
     ctx.restore();
@@ -35611,7 +35631,7 @@ thrall(){return gs(14)+
       const it = k.intro;
       if(it.st==="wait"){
         k.wells.forEach(w=>{ if(w.lit) return; const q = VIEW.project(w.x,w.y), pr = 0.7+0.3*Math.sin(now*4+w.x); raidStepRing(q.x,q.y,66*sc,"255,190,90",pr,now);
-          ctx.save(); ctx.textAlign="center"; ctx.font="bold "+Math.max(10,Math.round(13*sc*1.6))+"px Cinzel, serif"; ctx.fillStyle="rgba(255,235,170,"+pr+")"; ctx.strokeStyle="rgba(20,10,10,0.9)"; ctx.lineWidth=3; ctx.strokeText("LIGHT THE WELL · E", q.x, q.y+66*sc+22*sc); ctx.fillText("LIGHT THE WELL · E", q.x, q.y+66*sc+22*sc); ctx.restore(); });
+          /* floorTextV1: the instruction moved to the hint bar */ });
       }
       k.wells.forEach(w=>{ if(w.igT!=null){ const u = (now-w.igT)/1.0; if(u>=0 && u<1){ const q = VIEW.project(w.x,w.y); ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.strokeStyle="rgba(255,220,140,"+(0.9*(1-u))+")"; ctx.lineWidth=8*(1-u)+1; ctx.beginPath(); ctx.arc(q.x,q.y,(30+230*u)*sc,0,6.2832); ctx.stroke(); ctx.restore(); } } });
       if(it.st==="leap"){
@@ -36693,7 +36713,8 @@ thrall(){return gs(14)+
           const a=fl?0.85:(done?0.7:0.18+0.06*Math.sin(tm*2+i)); ctx.fillStyle=(done?"rgba(140,255,170,":"rgba("+col+",")+a+")"; ctx.beginPath(); ctx.ellipse(c.x,c.y,R*0.62,R*0.34,0,0,6.2832); ctx.fill();
           if(fl){ const g=ctx.createRadialGradient(c.x,c.y,2,c.x,c.y,R*2.4); g.addColorStop(0,"rgba("+col+",.45)"); g.addColorStop(1,"rgba("+col+",0)"); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(c.x,c.y,R*2.4,0,6.2832); ctx.fill(); }
           ctx.strokeStyle="rgba(10,8,12,.7)"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(c.x-R*0.25,c.y+R*0.05); ctx.lineTo(c.x,c.y-R*0.2); ctx.lineTo(c.x+R*0.25,c.y+R*0.05); ctx.stroke();
-          if(st.fails>=3 && !st.solved && order>=0){ ctx.fillStyle="#fff"; ctx.font="bold "+Math.round(14*s)+"px 'Cinzel',serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.strokeStyle="rgba(0,0,0,.8)"; ctx.lineWidth=3; ctx.strokeText(String(order+1),c.x,c.y-R*1.3); ctx.fillText(String(order+1),c.x,c.y-R*1.3); }
+          if(st.fails>=3 && !st.solved && order===st.step){ const pu=.5+.5*Math.sin(tm*6); ctx.strokeStyle="rgba(175,232,255,"+(.55+.4*pu)+")"; ctx.lineWidth=2.5; ctx.beginPath(); ctx.ellipse(c.x,c.y,R*(1.25+.2*pu),R*(.68+.1*pu),0,0,6.2832); ctx.stroke(); // floorTextV1: the next plinth pulses pale blue
+            ctx.fillStyle="rgba(175,232,255,"+(.7+.3*pu)+")"; const by=c.y-R*1.4-pu*R*.25; ctx.beginPath(); ctx.moveTo(c.x-R*.3,by-R*.25); ctx.lineTo(c.x+R*.3,by-R*.25); ctx.lineTo(c.x,by+R*.15); ctx.closePath(); ctx.fill(); }
           if(st.zap&&st.zap.i===i){ ctx.strokeStyle="rgba(255,240,140,"+(st.zap.t*2)+")"; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(c.x,c.y); for(let k=1;k<=5;k++) ctx.lineTo(c.x+(Math.random()-0.5)*R*2.4,c.y-k*R*0.35); ctx.stroke(); } });
       }
     },
@@ -36907,7 +36928,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 938dab790e) */
+<script>/* phone app: offline cache (build aaf2734cf5) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
