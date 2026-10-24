@@ -2758,7 +2758,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     murk: { hp:1000, dmg:[18,27], atkEvery:1.7, r:24, color:"var(--arcane)", label:"Murk, the Drowned Warden",
              groundPhrase:"floods the ground beneath", groundIcon:"🌊",
              excludeFromCompletion:true,
-             phases:[ { at:0.5, tint:"#4fc3d9", everyMul:{}, ward:{ label:"Crushing Depths", hint:"Step on all four bell buoys!",
+             phases:[ { at:0.5, tint:"#4fc3d9", everyMul:{}, ward:{ label:"Crushing Depths", hint:"Four bell buoys hold the ward.",
        radiation:{ kind:"aura", base:3, ramp:0.4, r0:60, grow:9, max:220 },
        breaker:{ kind:"plates", count:4, radius:18, glyph:"🔔", noun:"buoys" },
        stagger:{ dur:4, mul:1.25 } } } ], // Round 103
@@ -2798,7 +2798,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     thornmother: { hp:1050, dmg:[16,24], atkEvery:1.9, r:25, color:"var(--moss)", label:"The Thornmother",
              groundPhrase:"brambles the ground beneath", groundIcon:"🥀",
              excludeFromCompletion:true,
-             phases:[ { at:0.5, tint:"#8bd46e", everyMul:{}, ward:{ label:"Bark Cocoon", hint:"Cut down the Sapling Wardens!",
+             phases:[ { at:0.5, tint:"#8bd46e", everyMul:{}, ward:{ label:"Bark Cocoon", hint:"Sapling Wardens feed the ward.",
        radiation:{ kind:"aura", base:3, ramp:0.4, r0:50, grow:8, max:220 },
        breaker:{ kind:"adds", addKind:"add", names:["Sapling Warden","Sapling Warden"], points:[{dx:-90,dy:-75},{dx:90,dy:75}], hp:160 },
        stagger:{ dur:4, mul:1.25 } } } ], // Round 103
@@ -2821,7 +2821,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
              groundPhrase:"cracks the ground beneath", groundIcon:"🪨",
              excludeFromCompletion:true,
              crystal:{ name:"Resonant Core", radius:38, dmg:6, tick:0.5, speed:26, blueRadius:48, blueSpeed:40, need:7, drain:0.5 },
-             phases:[ { at:0.5, tint:"#9fb4d6", everyMul:{}, ward:{ label:"Resonance Lock", hint:"Stand in the blue crystal's light!",
+             phases:[ { at:0.5, tint:"#9fb4d6", everyMul:{}, ward:{ label:"Resonance Lock", hint:"The ward draws on the blue crystal's light.",
                radiation:{ kind:"raid", base:2, ramp:0.5 }, breaker:{ kind:"crystal" }, stagger:{ dur:4, mul:1.25 } } } ], // Round 106
              mechanics:[
                { id:"resonantpeal", name:"Resonant Peal", kind:"raidCast", every:11, windup:2.8, dmg:[44,58], range:130,
@@ -2854,7 +2854,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
              ] },
     riftboundcustodian: { hp:1050, dmg:[20,30], atkEvery:1.8, r:25, color:"var(--corrosion)", label:"The Riftbound Custodian",
              excludeFromCompletion:true,
-             phases:[ { at:0.5, tint:"#57e0a8", everyMul:{}, ward:{ label:"Rift Overload", hint:"Destroy the Rift Shards!",
+             phases:[ { at:0.5, tint:"#57e0a8", everyMul:{}, ward:{ label:"Rift Overload", hint:"Rift Shards feed the ward.",
        radiation:{ kind:"raid", base:2, ramp:0.5 },
        breaker:{ kind:"adds", addKind:"add", names:["Rift Shard","Rift Shard"], points:[{dx:-95,dy:-70},{dx:95,dy:70}], hp:160 },
        stagger:{ dur:4, mul:1.25 } } } ], // Round 103
@@ -2951,7 +2951,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
              ] },
     karrick: { hp:1100, dmg:[21,31], atkEvery:1.7, r:24, color:"var(--slag)", label:"Karrick the Hollowed Smith",
              excludeFromCompletion:true,
-             phases:[ { at:0.5, tint:"#ff7a3a", everyMul:{}, ward:{ label:"Forge Overload", hint:"Step on all four forge valves!",
+             phases:[ { at:0.5, tint:"#ff7a3a", everyMul:{}, ward:{ label:"Forge Overload", hint:"Four forge valves hold the ward.",
        radiation:{ kind:"raid", base:2, ramp:0.5 },
        breaker:{ kind:"plates", count:4, radius:18, glyph:"🔥", noun:"valves" },
        stagger:{ dur:4, mul:1.25 } } } ], // Round 103
@@ -3011,7 +3011,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
                // fix, for riftboundcustodian's "platform" above.
                { id:"chokingcanopy", name:"Choking Canopy", kind:"zoneFlood", every:24, windup:3, tickDmg:16, tickInterval:0.75, duration:8,
                  safeRoomId:"roothollow", altSafeRoomId:"roothollowN", safeRoomStyle:"hollow", floodMsg:"Vines choke the chamber - reach the glowing hollow!",
-                 hintIcon:"🌿", hintText:"Head for the steady glowing hollow - the flickering one is a trap!",
+                 hintIcon:"🌿", hintText:"Vines are sealing the chamber. One hollow glows steady; the other flickers.",
                  beaconGlyph:"⬇", beaconColor:"var(--bloom)",
                  trigger:"Every ~24s, a canopy begins sealing off the chamber overhead. After a 3s warning, one of two root hollows (below or above the arena) glows steady while the other flickers dark. It alternates each time.",
                  counter:"Get the whole party into the steady glowing hollow before it seals. The flickering one is the trap (watch for the pulsing beacon arrow and the on-screen hint). Kessa, Rook/Vex, and Mira/Wren head there on their own, but you have to walk yourself. Anyone left outside takes heavy damage every tick for the ~8s it stays sealed." },
@@ -3064,7 +3064,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
              ] },
     brinecolossus: { hp:1050, dmg:[20,30], atkEvery:1.8, r:26, color:"var(--brine)", label:"The Brine Colossus",
              excludeFromCompletion:true,
-             phases:[ { at:0.5, tint:"#5cc8ff", everyMul:{}, ward:{ label:"Undertow Ward", hint:"Pop the Tide Wisps!",
+             phases:[ { at:0.5, tint:"#5cc8ff", everyMul:{}, ward:{ label:"Undertow Ward", hint:"Tide Wisps feed the ward.",
        radiation:{ kind:"healtax", base:1.5, ramp:0.25, rate:0.04, floor:0.4 },
        breaker:{ kind:"adds", addKind:"add", names:["Tide Wisp","Tide Wisp"], points:[{dx:-95,dy:-70},{dx:95,dy:70}], hp:160 },
        stagger:{ dur:4, mul:1.25 } } } ], // Round 103
@@ -3332,7 +3332,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function emAliveKeys(f){ return Object.keys(S.party).filter(k=>S.party[k] && S.party[k].alive && (!f || f(k))); }
   function emPick(a){ return a && a.length ? a[Math.floor(Math.random()*a.length)] : null; }
   // The first time each mechanic appears, name it over the boss (lesson 5: make a big deal of it).
-  function emFirst(e, mech){ const em = emOf(e); if(em.seen[mech.id]) return; em.seen[mech.id] = true; const v = mechVerb(mech); spawnFloatingText(e.x, e.y-76, mech.name.toUpperCase()+" · "+v.verb, v.color); }
+  function emFirst(e, mech){ const em = emOf(e); if(em.seen[mech.id]) return; em.seen[mech.id] = true; /* hintsV1: no "NAME · VERB" callout */ }
   function emHasWax(m){ return !!(m && (m.shields||[]).some(s=>s.source==="waxward" && s.amount>0)); }
   function emIsEncased(m){ return !!(m && m.debuffs && m.debuffs.length && m.debuffs.some(d=>d.id==="encased" || d.id==="caged" || d.id==="devoured")); }
   // rooted: can't move (Encased, Catalogued, Pinned); the pin tick also holds them against AI code that moves them directly
@@ -3882,20 +3882,20 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(k.arcane && typeof arcHint==="function"){ const ah = arcHint(e, k); if(ah) return ah; continue; }
       const em = emOf(e), M = id=>(kindMechs(k)||[]).find(m=>m.id===id), ST = id=>e.mech[id];
       const fixKey = (em.fix && em.fix.key) || (em.fixPending && em.fixPending.key);
-      if(fixKey && S.party[fixKey]) return `🎯 Misdirect ${displayName(S.party[fixKey])}: ${e.name} is fixated on them!`;
-      if(em.hollow && S.party[em.hollow.key]) return `❤ Heal ${displayName(S.party[em.hollow.key])==="you" ? "yourself" : displayName(S.party[em.hollow.key])} to full before the cinder sets!`;
+      if(fixKey && S.party[fixKey]) return `🎯 ${e.name} is fixated on ${displayName(S.party[fixKey])}.`;
+      if(em.hollow && S.party[em.hollow.key]) return `🔥 Cinder is hardening over ${displayName(S.party[em.hollow.key])}.`;
       const zone = ST("emberfall") && ST("emberfall").zone;
-      if(zone && dist(me.x, me.y, zone.x, zone.y) > zone.radius) return "🔥 Stand in the glowing circle with the party!";
+      if(zone && dist(me.x, me.y, zone.x, zone.y) > zone.radius) return "🔥 Embers are about to fall across the chamber.";
       const bl = M("bellows"), bst = ST("bellows");
-      if(bl && bst && bst.casting && bst.ox!=null && segmentDistance(me.x, me.y, bst.ox, bst.oy, bst.ex, bst.ey) <= bl.width) return "💨 Step out of the draft!";
-      if(ST("anvilstrike") && ST("anvilstrike").casting && tank.alive && !emHasWax(tank)) return "🛡 Wax Ward Kessa before the hammer lands!";
-      if(ST("pitshove") && ST("pitshove").casting && tank.alive && !emHasWax(tank)) return "🛡 Wax Ward Kessa to brace her against the shove!";
+      if(bl && bst && bst.casting && bst.ox!=null && segmentDistance(me.x, me.y, bst.ox, bst.oy, bst.ex, bst.ey) <= bl.width) return "💨 The bellows draft is aimed through you.";
+      if(ST("anvilstrike") && ST("anvilstrike").casting && tank.alive && !emHasWax(tank)) return "🔨 Brogar raises his hammer over Kessa.";
+      if(ST("pitshove") && ST("pitshove").casting && tank.alive && !emHasWax(tank)) return "🔨 Karrick winds up to shove Kessa toward the pit.";
       const two = emAliveKeys(kk=>(S.party[kk].debuffs||[]).filter(d=>d.id==="moltenEmber").length===2);
-      if(two.length) return `🔥 Cleanse ${displayName(S.party[two[0]])==="you" ? "yourself" : displayName(S.party[two[0]])} before a third ember lands!`;
-      const r = ST("forgeroar"); if(r && !r.casting && r.timer<=3) return `🔥 Roar in ${Math.max(1, Math.ceil(r.timer))}: top everyone off!`;
-      if(em.lit) return "🔥 The burning pillar won't shield you. Pick another!";
-      if(em.bannerUp) return "✨ Purge near Kestin to shatter the Pyre Banner!";
-      if(em.valves && em.pitGrow>0 && em.valves.some(v=>!(v.cd>0))) return "🔧 Step on a glowing valve to cool the pit!";
+      if(two.length) return `🔥 Molten embers are piling up on ${displayName(S.party[two[0]])}.`;
+      const r = ST("forgeroar"); if(r && !r.casting && r.timer<=3) return `🔥 Brogar is building to a roar.`;
+      if(em.lit) return "🔥 One of the pillars is burning.";
+      if(em.bannerUp) return "🚩 Kestin's Pyre Banner is up.";
+      if(em.valves && em.pitGrow>0 && em.valves.some(v=>!(v.cd>0))) return "🔧 The pit is growing. The valves glow.";
     }
     return null;
   }
@@ -3906,6 +3906,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // Built on the Ember module's script-mechanic engine (EMBER_MECH, emCast, emRamp*, emOf...).
 
   function arcName(m){ return displayName(m)==="you" ? "yourself" : displayName(m); }
+  function hintName(m){ return displayName(m); } // hintsV1
+  function hintIs(m){ const n = displayName(m); return n==="you" ? "You are" : n+" is"; }
+  function hintPoss(m){ const n = displayName(m); return n==="you" ? "Your" : n+"'s"; }
   function arcBossTick(e, kind, dt){
     if(kind.tide && typeof tideBossTick==="function"){ tideBossTick(e, kind, dt); return; }
     if(kind.thicket && typeof thkBossTick==="function"){ thkBossTick(e, kind, dt); return; }
@@ -4208,19 +4211,19 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(k.iron && typeof irnHint==="function") return irnHint(e, k);
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
     if(k.arcane==="custodian"){
-      if(em.cage && S.party[em.cage.key]) return `🔓 Step on the glyph to free ${displayName(S.party[em.cage.key])} before the next Tide!`;
+      if(em.cage && S.party[em.cage.key]) return `🔓 ${displayName(S.party[em.cage.key])} is sealed in a rune cell. A glyph glows beside it.`;
       const sil = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "silenced"));
-      if(sil.length) return `🔇 Cleanse ${arcName(S.party[sil[0]])}: their powers are sealed.`;
+      if(sil.length) return `🔇 ${hintPoss(S.party[sil[0]])} powers are sealed.`;
     } else if(k.arcane==="ysolt"){
-      if((e.buffs||[]).some(b=>b.id==="secondsight")) return "✨ Purge near Ysolt to strip her Second Sight!";
+      if((e.buffs||[]).some(b=>b.id==="secondsight")) return "👁 Ysolt foresees your blows.";
       const fk = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "fateswap"));
-      if(fk.length>=2) return `⚖ ${displayName(S.party[fk[0]])} and ${displayName(S.party[fk[1]])} swap health soon: cleanse one to stop it.`;
-      if(ST("lances") && ST("lances").casting) return "🔮 The lances fire in order: 1, then 2, then 3.";
+      if(fk.length>=2) return `⚖ ${displayName(S.party[fk[0]])} and ${displayName(S.party[fk[1]])} are bound. Their fates will exchange.`;
+      if(ST("lances") && ST("lances").casting) return "🔮 Three lances are drawn across the floor.";
     } else if(k.arcane==="cartographer"){
       const pin = ST("pin");
-      if(pin && pin.casting && pin.key && S.party[pin.key]) return `🛡 Wax Ward ${arcName(S.party[pin.key])}: pinned over a fissure!`;
-      if(PILLAR_DEFS.some(p=>p.inkWall) && emAliveKeys(kk=>kk!=="self" && !hasLineOfSight(me.x, me.y, S.party[kk].x, S.party[kk].y)).length) return "🖋 The ink wall blocks your heals. Walk around it!";
-      if((e._phase||0)>0 && S.groundPools.some(p=>p._arcRedraw && dist(p.x,p.y,me.x,me.y) < p.radius+40)) return "📜 The fissures are crawling toward you. Keep moving!";
+      if(pin && pin.casting && pin.key && S.party[pin.key]) return `🖋 ${hintIs(S.party[pin.key])} pinned over a fissure.`;
+      if(PILLAR_DEFS.some(p=>p.inkWall) && emAliveKeys(kk=>kk!=="self" && !hasLineOfSight(me.x, me.y, S.party[kk].x, S.party[kk].y)).length) return "🖋 An ink wall cuts across the chamber.";
+      if((e._phase||0)>0 && S.groundPools.some(p=>p._arcRedraw && dist(p.x,p.y,me.x,me.y) < p.radius+40)) return "📜 The fissures are crawling across the floor.";
     }
     return null;
   }
@@ -4245,7 +4248,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     C.mechanics = [
       { id:"corrosivetide", name:"Corrosive Tide", kind:"zoneFlood", every:25, first:14, windup:3, tickDmg:16, tickInterval:0.75, duration:8, safeRoomId:"platform", safeRoomStyle:"platform",
         safeW:240, safeH:100, ramp:0.12, invertP2:true,
-        invertHint:"The light pours from above. Get down to the floor!", invertMsg:"The gallery floods from above. Get down to the floor!",
+        invertHint:"The light pours from above.", invertMsg:"The gallery floods from above. Get down to the floor!",
         trigger:"Every ~25s, the Custodian floods the boss floor with corrosive light, with a 3s warning. Each person it catches adds Corrosion: +12% on the next Tide, up to 3.",
         counter:"Get up onto the raised gallery before the light rises; companions head up on their own. A Tide that catches nobody clears a Corrosion stack. In phase 2 every other Tide floods the gallery instead: follow the beacon." },
       { id:"sealofsilence", name:"Seal of Silence", kind:"debuffApply", every:14, first:6, debuff:"silenced", verb:"CLEANSE", color:"var(--arcane)",
@@ -4474,14 +4477,14 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function tideHint(e, k){
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id], M = id=>(kindMechs(k)||[]).find(m=>m.id===id);
     if(k.tide==="murk"){
-      if(em.held && S.party[em.held.key]) return `🫧 Wax Ward ${arcName(S.party[em.held.key])} to give them air!`;
-      if(em.whirl && ST("undertow") && ST("undertow").casting && dist(me.x, me.y, em.whirl.x, em.whirl.y) < em.whirl.radius+80) return "🌀 Get away from the whirlpool before the Undertow drags you in!";
+      if(em.held && S.party[em.held.key]) return `🫧 ${hintIs(S.party[em.held.key])} held under the water.`;
+      if(em.whirl && ST("undertow") && ST("undertow").casting && dist(me.x, me.y, em.whirl.x, em.whirl.y) < em.whirl.radius+80) return "🌀 The Undertow pulls toward the whirlpool.";
     } else if(k.tide==="colossus"){
       const sm = M("tidalsurge"), ss = ST("tidalsurge");
-      if(ss && ss.casting && sm && tideLandsShort(e, sm, ss, me.x, me.y)) return "🌊 Move: the surge will dash you against the rocks!";
-      const bs = ST("breaker"); if(bs && bs.casting && bs.dir && !tideSheltered(me.x, me.y, bs.dir)) return "🪨 Get behind a reef rock before the Breaker hits!";
+      if(ss && ss.casting && sm && tideLandsShort(e, sm, ss, me.x, me.y)) return "🌊 The Colossus rears back. The surge will throw you.";
+      const bs = ST("breaker"); if(bs && bs.casting && bs.dir && !tideSheltered(me.x, me.y, bs.dir)) return "🪨 A wall of water is rolling in.";
       const salted = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "saltcrust"));
-      if(salted.length && ss && (ss.casting || ss.timer < 6)) return `🧂 Cleanse ${arcName(S.party[salted[0]])} before the Surge shatters the crust!`;
+      if(salted.length && ss && (ss.casting || ss.timer < 6)) return `🧂 ${hintIs(S.party[salted[0]])} crusted with salt.`;
     }
     return null;
   }
@@ -4721,13 +4724,13 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function thkHint(e, k){
     const me = S.party.self, em = emOf(e);
     if(k.thicket==="thornmother"){
-      if(em.nurture) return "✨ Purge near the Thornmother: she's feeding on her brood!";
-      const tb = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "thornbind")); if(tb.length) return `✂ Cleanse ${arcName(S.party[tb[0]])} free of the thorns!`;
-      if(em.ring && dist(me.x, me.y, em.ring.x, em.ring.y) > em.ring.R - 20) return "🌿 Get inside the ring before the thorns close on you!";
-      if(thkBrood(e).length && S.groundPools.some(p=>p.srcName==="Thorned Bloom" && p.remaining<2.5)) return "🗡 Kill the Bramblings before their bloom hardens into a thicket!";
+      if(em.nurture) return "🌱 The Thornmother is feeding on her brood.";
+      const tb = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "thornbind")); if(tb.length) return `🌿 Thorns bind ${hintName(S.party[tb[0]])}.`;
+      if(em.ring && dist(me.x, me.y, em.ring.x, em.ring.y) > em.ring.R - 20) return "🌿 The thorns are closing in.";
+      if(thkBrood(e).length && S.groundPools.some(p=>p.srcName==="Thorned Bloom" && p.remaining<2.5)) return "🌱 The bloom is hardening around its Bramblings.";
     } else if(k.thicket==="verdantmaw"){
-      if(em.ripe) return `✨ Purge near the Maw before the spores burst (${Math.max(1, Math.ceil(em.ripe.t))}s)!`;
-      if(em.devour && S.party[em.devour.key]) return `❤ Keep ${displayName(S.party[em.devour.key])} alive while the party cuts them free!`;
+      if(em.ripe) return `🍄 Spores are swelling on the Maw's back.`;
+      if(em.devour && S.party[em.devour.key]) return `🦷 The Maw has swallowed ${displayName(S.party[em.devour.key])}.`;
     }
     return null;
   }
@@ -4758,7 +4761,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     VM.mechanics = [
       { id:"chokingcanopy", name:"Choking Canopy", kind:"zoneFlood", every:24, first:14, windup:3, tickDmg:16, tickInterval:0.75, duration:8,
         safeRoomId:"roothollow", altSafeRoomId:"roothollowN", safeRoomStyle:"hollow", safeW:220, safeH:110, thornsP2:true, floodMsg:"Vines choke the chamber - reach the glowing hollow!",
-        hintIcon:"🌿", hintText:"Head for the steady glowing hollow - the flickering one is a trap!",
+        hintIcon:"🌿", hintText:"Vines are sealing the chamber. One hollow glows steady; the other flickers.",
         beaconGlyph:"⬇", beaconColor:"var(--bloom)",
         trigger:"Every ~24s, a canopy begins sealing off the chamber. After a 3s warning, one of two root hollows (below or above the arena) glows steady while the other flickers dark. It alternates each time.",
         counter:"Get into the steady glowing hollow before it seals; the flickering one is the trap. Companions head there on their own. Anyone left outside takes heavy damage every tick for ~8s. In phase 2, half the hollow is thorns: use the clear half." },
@@ -5003,16 +5006,16 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function glmHint(e, k){
     const me = S.party.self, em = emOf(e), ST = id=>e.mech[id];
     if(k.gloom==="widow"){
-      if((e._group ? e._group.enemies : []).some(a=>a._spider && a.alive && a._forcedTargetKey==="self")) return "🕷 Spiderlings are on you: cast Misdirection on yourself!";
-      if(ST("witheringwail") && ST("witheringwail").casting && !glmInLight(e, me.x, me.y)) return "🕯 Get into a candle's light before the Wail!";
-      const unlit = glmCandles(e).filter(c=>!c.lit); if(unlit.length>=2) return "🕯 Stand in a dark candle for 2s to relight it.";
+      if((e._group ? e._group.enemies : []).some(a=>a._spider && a.alive && a._forcedTargetKey==="self")) return "🕷 Spiderlings are coming for you.";
+      if(ST("witheringwail") && ST("witheringwail").casting && !glmInLight(e, me.x, me.y)) return "🕯 The Widow draws breath for a wail.";
+      const unlit = glmCandles(e).filter(c=>!c.lit); if(unlit.length>=2) return "🕯 A candle has gone dark.";
     } else if(k.gloom==="ossric"){
-      const t = ST("tollone"); if(t && t.casting && t.key && S.party[t.key]) return `🔔 The bell tolls for ${arcName(S.party[t.key])}: Wax Ward them!`;
-      if((e._group ? e._group.enemies : []).some(a=>a._bell && a.alive)) return "🔔 Purge near a grave bell to silence it!";
-      if(em.echo) return "🔔 A second wave is coming from the bell: find a gap in both!";
+      const t = ST("tollone"); if(t && t.casting && t.key && S.party[t.key]) return `🔔 The bell tolls for ${hintName(S.party[t.key])}.`;
+      if((e._group ? e._group.enemies : []).some(a=>a._bell && a.alive)) return "🔔 Grave bells are ringing.";
+      if(em.echo) return "🔔 A second wave rolls out behind the first.";
     } else if(k.gloom==="knell"){
-      if(em.chorus) return "🎶 The Keening Chorus is building: keep everyone topped off!";
-      if(S.groundPools.some(p=>p._splinter && dist(me.x,me.y,p.x,p.y) <= p.radius)) return "💠 Step out of the humming splinter!";
+      if(em.chorus) return "🎶 The choir is keening, louder each moment.";
+      if(S.groundPools.some(p=>p._splinter && dist(me.x,me.y,p.x,p.y) <= p.radius)) return "💠 The splinters hum with resonance.";
     }
     return null;
   }
@@ -5195,13 +5198,13 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function irnHint(e, k){
     const em = emOf(e);
     if(k.iron==="sentinel"){
-      if((e.buffs||[]).some(b=>b.id==="ironclad")) return "✨ Purge near the Sentinel to strip Ironclad!";
-      const fp = e.mech.resonantpeal; if(fp && fp.casting && fp.face!=null && angleDiff(angleOf(S.party.self.x-e.x, S.party.self.y-e.y), fp.face) <= 90) return "⚙ Get behind the Sentinel before it fires!";
-      if(e.mech.ironsweep && e.mech.ironsweep.spin) return "⚙ Keep moving around it, ahead of the beam!";
+      if((e.buffs||[]).some(b=>b.id==="ironclad")) return "⚙ The Sentinel is plated in Ironclad.";
+      const fp = e.mech.resonantpeal; if(fp && fp.casting && fp.face!=null && angleDiff(angleOf(S.party.self.x-e.x, S.party.self.y-e.y), fp.face) <= 90) return "⚙ The Sentinel turns to blast everything in front of it.";
+      if(e.mech.ironsweep && e.mech.ironsweep.spin) return "⚙ A beam of force sweeps around the Sentinel.";
     } else if(k.iron==="choir"){
-      if((e.buffs||[]).some(b=>b.id==="harmony")) return (e._phase||0)>0 ? "✨ Purge the Harmony: it won't stop on its own!" : "✨ Purge the Harmony before it swells into a Crescendo!";
-      const fb = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "feedback")); if(fb.length) return `🔊 Cleanse ${arcName(S.party[fb[0]])} to break the Feedback!`;
-      if((e._group ? e._group.enemies : []).some(a=>a.alive && a.name==="Echo Fragment")) return "🎵 Echo Fragments are marching on the Choir: kill them first!";
+      if((e.buffs||[]).some(b=>b.id==="harmony")) return (e._phase||0)>0 ? "🎵 The Choir is in Harmony." : "🎵 The Harmony is swelling toward a Crescendo.";
+      const fb = emAliveKeys(kk=>partyHasDebuff(S.party[kk], "feedback")); if(fb.length) return `🔊 Feedback links ${hintName(S.party[fb[0]])} to an ally.`;
+      if((e._group ? e._group.enemies : []).some(a=>a.alive && a.name==="Echo Fragment")) return "🎵 Echo Fragments are marching on the Choir.";
     }
     return null;
   }
@@ -21259,7 +21262,7 @@ thrall(){return gs(14)+
   // safe room isn't an elevated platform (see the Verdant Maw's root
   // hollow, reached by going DOWN) overrides them on its own mechanic def.
   const ZONE_EVAC_DEFAULTS = {
-    hintIcon: "🌊", hintText: "Get to the platform. The floor is flooding!",
+    hintIcon: "🌊", hintText: "The floor is flooding.",
     beaconGlyph: "⬆", beaconColor: "var(--shield)",
   };
   function activeZoneEvacuation(){
@@ -25491,7 +25494,7 @@ thrall(){return gs(14)+
     // reading the on-map circle.
     { const soak = activeSoakZone();
       if(soak && dist(S.party.self.x, S.party.self.y, soak.x, soak.y) > soak.radius){
-        setHint(`🛡 Stack up on ${soak.srcName||"the soak zone"} to split the damage!`);
+        setHint(`🛡 ${soak.srcName||"Something"} is about to land on one spot.`); // hintsV1
         return;
       }
     }
@@ -25503,7 +25506,7 @@ thrall(){return gs(14)+
       const selfAngle = angleOf(S.party.self.x-ring.e.x, S.party.self.y-ring.e.y);
       const safe = ringGapAngles(ring.mech, ring.st).some(g => angleDiff(selfAngle,g) <= ring.mech.gapWidthDeg/2);
       if(!safe){
-        setHint("🔔 Dash through a gap between the glowing posts!");
+        setHint("🔔 A wave of sound rolls outward.");
         return;
       }
     }
@@ -25519,7 +25522,7 @@ thrall(){return gs(14)+
         const selfAngle = angleOf(S.party.self.x-conv.e.x, S.party.self.y-conv.e.y);
         const caught = angleBetweenShort(selfAngle, A, angleB) || angleBetweenShort(selfAngle, angleC, A);
         if(caught){
-          setHint("🎐 Get out of the glowing band, into the clear arc opposite the anchor!");
+          setHint("🎐 The crystals are converging on the anchor.");
           return;
         }
       }
@@ -25531,7 +25534,7 @@ thrall(){return gs(14)+
     if(gaze){
       const selfAngle = angleOf(S.party.self.x-gaze.e.x, S.party.self.y-gaze.e.y);
       if(quadrantAngleIndex(gaze.mech, gaze.st, selfAngle) !== gaze.st.safeQuadrant){
-        setHint("👁 Get to the pale blue safe wedge. The violet ones are burning!");
+        setHint("👁 Ysolt's gaze burns every wedge but one.");
         return;
       }
     }
@@ -25541,7 +25544,7 @@ thrall(){return gs(14)+
     // exactly where she'd land, this just backs it with words.
     { const brace = activeTidalBrace();
       if(brace && tidalLandingUnsafe(S.party.self, brace.e, brace.mech)){
-        setHint("🌊 Move clear. The tide will dash you against the rocks!");
+        setHint("🌊 The tide is about to slam.");
         return;
       }
     }
@@ -25553,7 +25556,7 @@ thrall(){return gs(14)+
     // behind at all.
     { const ember = activeEmberfallWindup();
       if(ember && hasLineOfSight(ember.e.x, ember.e.y, S.party.self.x, S.party.self.y) && nearestShelterPillar(ember.e)){
-        setHint(`🔥 A pillar could shield you from ${ember.mech.name}!`);
+        setHint(`🔥 ${ember.mech.name} will strike everything it can see.`);
         return;
       }
     }
@@ -25720,11 +25723,11 @@ thrall(){return gs(14)+
   // the Unbanked Hearth's instructions, in the hint bar instead of on the floor
   function ftRaidHint(low){ const r = S.arena && S.arena.raid, k = r && r.k; if(!k) return "";
     const f = k.intro && k.intro.st==="wait" ? (S.features||[]).find(q=>q.type==="raidIntro" && !q.used && (q.id==="kindleHearth" || /^ashWell/.test(q.id))) : null;
-    if(!low){ if(f) return f.id==="kindleHearth" ? "🔥 Stand in the glowing ring at the Cold Hearth and use it to rouse her." : "🔥 Stand in each glowing ring and use it to light the Ember Wells.";
-    if(k.bank) return "🔥 He is banking the hall's light. Relight two of the pale blue wells to break it!"; return ""; }
-    if(k.win && !k.win.taken) return "🔥 Stand in the gold ring to steal his embers before the ring runs out.";
-    if(k.hearts && k.hearts.some(h=>!h.done && h.prog>0 && !h.inside)) return "🔥 Get back in the ring. The Cinder Heart is losing progress!";
-    if(k.hearts && k.hearts.some(h=>!h.done)) return "🔥 Stand in a Cinder Heart's ring to carry it home.";
+    if(!low){ if(f) return f.id==="kindleHearth" ? "🔥 The Cold Hearth waits in the ash." : "🔥 The Ember Wells are dark.";
+    if(k.bank) return "🔥 He is banking the hall's light."; return ""; }
+    if(k.win && !k.win.taken) return "🔥 He has fallen. His embers glow at his body.";
+    if(k.hearts && k.hearts.some(h=>!h.done && h.prog>0 && !h.inside)) return "🔥 A Cinder Heart is losing its warmth.";
+    if(k.hearts && k.hearts.some(h=>!h.done)) return "🔥 A Cinder Heart waits to be carried home.";
     return ""; }
   function setHint(t){
     if(t===lastHint) return; lastHint=t;
@@ -29211,9 +29214,9 @@ thrall(){return gs(14)+
       const _mr = mfChipFor(e, m.name); // mechFxV1
       if(_mr && !st.casting){ out.push({ id:m.id, name:m.name, verb:m.name.toUpperCase(), color:_mr.ok ? MF_OK : MF_BAD, now:true, secs:-1, mf:_mr.ok ? "ok" : "fail" }); return; }
       if(st.casting && m.windup>0){
-        out.push({ id:m.id, name:m.name, verb:v.verb, color:v.color, now:true, secs:Math.max(0, m.windup-st.castT) });
+        out.push({ id:m.id, name:m.name, verb:m.name.toUpperCase(), color:v.color, now:true, secs:Math.max(0, m.windup-st.castT) }); // hintsV1: the name, not the answer
       } else if(!st.casting){
-        out.push({ id:m.id, name:m.name, verb:v.verb, color:v.color, now:false, secs:Math.max(0, st.timer) });
+        out.push({ id:m.id, name:m.name, verb:m.name.toUpperCase(), color:v.color, now:false, secs:Math.max(0, st.timer) }); // hintsV1
       }
     });
     out.sort((a,b)=> (a.now===b.now) ? a.secs-b.secs : (a.now?-1:1));
@@ -29256,7 +29259,7 @@ thrall(){return gs(14)+
       el.innerHTML = `<div class="bbName">${boss.name}${mythName ? ` · <span class="bbMyth">${mythName}</span>` : ph>0?` · PHASE ${ph+1}`:""}</div>
         <div class="bbBar"><div class="bbFill"></div>${notches}</div>
         <div class="bbNext">${boss._desp?`<div class="bbChip now" style="color:${resolveColor("var(--blood)")}"><span>DESPERATION</span></div>`:""}${(!wd && boss._wardSealed) ? `<div class="bbChip now" style="color:${resolveColor(boss._gateFall?"var(--accent)":"var(--blood)")}"><span>${boss._gateFall?"FALLEN · STEAL HIS EMBERS":"SEALED · IMMUNE"}</span></div>` : wd ? `<div class="bbChip now" style="color:${resolveColor("var(--blood)")}"><span>SEALED · IMMUNE · ${wd.def.breaker.kind==="plates"?wd.def.breaker.noun:wd.def.breaker.kind==="crystal"?"crystal":"adds"} ${wd.progressText||""}</span></div>` : chips.map(c=>c.now
-          ? (c.mf ? `<div class="bbChip mfRes" style="color:${resolveColor(c.color)}"><span>${c.verb}</span></div>` : `<div class="bbChip now" style="color:${resolveColor(c.color)}"><span>${c.verb} NOW</span></div>`)
+          ? (c.mf ? `<div class="bbChip mfRes" style="color:${resolveColor(c.color)}"><span>${c.verb}</span></div>` : `<div class="bbChip now" style="color:${resolveColor(c.color)}"><span>${c.verb}${c.secs>0.05 ? " "+Math.ceil(c.secs)+"s" : ""}</span></div>`) /* hintsV1: name + wind-up timer */
           : c.keep ? `<div class="bbChip" style="color:${resolveColor(c.color)}">${c.verb}</div>` : `<div class="bbChip" style="color:${resolveColor(c.color)}">${c.verb} ${Math.ceil(c.secs)}s</div>`).join("")}</div>`;
     }
     const pct = Math.max(0, Math.min(100, Math.round(boss.hp/boss.maxHp*200)/2));
@@ -29286,7 +29289,7 @@ thrall(){return gs(14)+
         else if(m.kind==="terrainShift" && st.pending && st.pending[0]){ x = st.pending[0].x; y = st.pending[0].y; }
         else if(m.kind==="lineCast" && typeof st.targetX==="number"){ x = st.targetX; y = st.targetY; }
         else if(m.kind==="leap" && typeof st.landX==="number"){ x = st.landX; y = st.landY; }
-        spawnFloatingText(x, y - (kind.r||20), v.verb + "!", v.color);
+        // hintsV1: no "VERB!" callout over each cast
       });
     }));
   }
@@ -36928,7 +36931,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build aaf2734cf5) */
+<script>/* phone app: offline cache (build 513ba79136) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
