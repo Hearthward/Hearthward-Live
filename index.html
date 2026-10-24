@@ -2008,6 +2008,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     <div class="dRow"><span>Render quality</span>
       <div class="dSeg" id="dRQ"><button type="button" data-v="auto">Auto (sharp)</button><button type="button" data-v="std">Standard</button><button type="button" data-v="perf">Performance</button></div>
       <span class="dNote" id="dRQnote"></span></div>
+    <div class="dRow"><span>Numbers</span>
+      <div class="dSeg" id="dNum"><button type="button" data-v="all">All</button><button type="button" data-v="imp">Important</button><button type="button" data-v="off">Off</button></div>
+      <span class="dNote">Important: big hits on the party and the healing that lands. All: every hit, including on enemies.</span></div>
     <div class="dRow"><span>UI size: <b id="dUIv">100%</b></span><input type="range" id="dUI" min="75" max="150" step="5" value="100"><span class="dNote">Scales text, party frames and bars; the map keeps its size.</span></div>
     <div class="dRow dDesk"><span>Layout</span><div class="dBtns"><button type="button" class="dBtn" id="dEdit">Edit layout</button><button type="button" class="dBtn" id="dResetLayout">Reset layout</button></div>
       <span class="dNote">Move and resize the party frames, abilities, cast bar, zoom controls and log — even over the map.</span></div>
@@ -12510,7 +12513,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(S.arena) arenaRec("heal", "self", name||"Heal", t.hp-hpBeforeHeal);
     overflowWarmth(t, hpBeforeHeal+amount-t.maxHp);
     pushLog("heal", `${name} → ${displayName(t)} for ${amount}.`);
-    spawnFloatingText(t.x, t.y, `+${amount}`, "var(--accent)"); // Round 40
+    if(t.hp > hpBeforeHeal) spawnFloatingText(t.x, t.y, `+${t.hp-hpBeforeHeal}`, "var(--accent)"); // Round 40; numbersV1: no overheal
     echoHeal(targetKey, amount);
   }
   // Round 151 — healer stats applied to every heal she casts and every HoT tick she owns:
@@ -13264,7 +13267,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       // when known, so the recoil/facing points away from the actual
       // attacker) and a floating "-N" over the party member that got hit.
       triggerHitReaction(m, sourceEnemy ? sourceEnemy.x : undefined, sourceEnemy ? sourceEnemy.y : undefined);
-      spawnFloatingText(m.x, m.y, `-${dmg}`, "var(--blood)");
+      S._ftHit = !isDot && dmg >= m.maxHp*0.08; spawnFloatingText(m.x, m.y, `-${dmg}`, "var(--blood)"); S._ftHit = false; // numbersV1
       // Sanguine (keystone modifier): the enemy that actually landed the hit
       // heals back a slice of the real (post-mitigation, post-shield) damage.
       if(S.mods.includes("sanguine") && sourceEnemy && sourceEnemy.alive){
@@ -13579,7 +13582,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(S.arena){ const _k2 = Object.keys(S.party).find(k=>S.party[k]===attacker); if(_k2) arenaRec("heal", _k2, "Leech", attacker.hp-_lh); } } // Leech: heals for this % of the damage dealt by each hit or tick
     if(dealt>0){
       triggerHitReaction(e, attacker ? attacker.x : undefined, attacker ? attacker.y : undefined);
-      spawnFloatingText(e.x, e.y, `-${dealt}`, "var(--ember)");
+      S._ftFoe = true; spawnFloatingText(e.x, e.y, `-${dealt}`, "var(--ember)"); S._ftFoe = false; // numbersV1
     }
     return dealt;
   }
@@ -16027,7 +16030,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- compFxV1: companion spell signatures ----
   const CFK_G = "255,212,120", CFK_C = "255,246,214", CFK_S = "214,222,232";
   let _sfxTop = false;
-  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); cfxDoomMark(); tgPartyMarks(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
+  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); cfxDoomMark(); tgPartyMarks(); tgDebuffMarks(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
   function cfxShells(){ const now = (S.tPrev||0)/1000, r = sfxR();
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key], fs = m && m._sfxFam; if(!m || !m.alive || !fs || !(fs.wax > 0 || fs.plate > 0)) return; const b = sfxAt(m, 1.35);
       if(fs.wax > 0) cfxWaxShell(b, r, now, fs.waxF, key); if(fs.plate > 0) cfxPlateShell(b, r, now, fs.plateF); }); }
@@ -16578,6 +16581,35 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         ctx.save(); ctx.translate(x, y); ctx.rotate((i-4)*.2); ctx.fillStyle = "rgba(244,248,252,.9)"; ctx.strokeStyle = "rgba(100,120,140,.95)"; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(r*.15, 0); ctx.lineTo(-r*.15, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
       ctx.save(); ctx.globalCompositeOperation = "lighter"; const gl = .5 + .5*Math.sin(now*3 + k.length); ctx.fillStyle = `rgba(255,255,255,${.6*gl})`; ctx.beginPath(); ctx.arc(b.fx + r*.3, b.fy - r*.5, Math.max(1, r*.07), 0, Math.PI*2); ctx.fill(); ctx.restore(); }); }
+
+  // ---- telegraphV3: debuff marks
+  function tgDebuffMarks(){ const r = sfxR(), now = (S.tPrev||0)/1000;
+    Object.keys(S.party||{}).forEach(k=>{ const m = S.party[k]; if(!m || !m.alive || !(m.debuffs||[]).length) return; const ds = m.debuffs;
+      const coal = ds.find(d=>d.id==="fallingCoal");
+      if(coal){ const b = sfxAt(m, 3.1), left = Math.max(0, debuffRemaining(coal)), u = 1 - Math.min(1, left/5); // a coal hanging over them, its fuse burning down
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*(1 + .5*u), "255,120,40", .45 + .3*u); ctx.restore();
+        ctx.save(); ctx.fillStyle = "#2a1a14"; ctx.strokeStyle = `rgba(255,150,60,${.7 + .3*Math.sin(now*10)})`; ctx.lineWidth = 1.4; ctx.beginPath();
+        for(let i=0;i<7;i++){ const a = i*Math.PI*2/7, rr = r*.62*(.85 + .15*((i*3)%2)); ctx[i?"lineTo":"moveTo"](b.x + Math.cos(a)*rr, b.y + Math.sin(a)*rr); } ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "rgba(255,170,80,.95)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(b.x, b.y, r*.9, -Math.PI/2, -Math.PI/2 + Math.PI*2*(1-u)); ctx.stroke(); ctx.restore(); }
+      const emb = ds.filter(d=>d.id==="moltenEmber").length;
+      if(emb){ const b = sfxAt(m, 1.4); // one orbiting ember per stack; at two, the eruption's reach
+        for(let i=0;i<emb;i++){ const a = now*2.4 + i*Math.PI*2/emb, x = b.x + Math.cos(a)*r*1.2, y = b.y + Math.sin(a)*r*.5; ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x, y, r*.7, "255,130,50", .9); ctx.restore();
+          ctx.save(); ctx.fillStyle = "rgba(255,220,150,.95)"; ctx.beginPath(); ctx.arc(x, y, Math.max(2, r*.2), 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+        if(emb >= 2){ const p = VIEW.project(m.x, m.y), R = 80*VIEW.scale; ctx.save(); ctx.strokeStyle = `rgba(255,120,50,${.35 + .2*Math.sin(now*6)})`; ctx.lineWidth = 2; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.ellipse(p.x, p.y, R, R*.62, 0, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } }
+      if(ds.some(d=>d.id==="thornbind")){ const b = sfxAt(m, 0); ctx.save(); ctx.strokeStyle = "rgba(70,110,40,.95)"; ctx.lineWidth = Math.max(2.5, r*.22); ctx.lineCap = "round"; // vines wrapping the legs
+        for(let i=0;i<3;i++){ ctx.beginPath(); const y0 = b.fy - i*r*.32; ctx.moveTo(b.fx - r*.85, y0); ctx.quadraticCurveTo(b.fx, y0 - r*.4, b.fx + r*.85, y0 - r*.12); ctx.stroke(); }
+        ctx.fillStyle = "rgba(150,190,90,.95)"; for(let i=0;i<5;i++){ const x = b.fx + (i-2)*r*.3, y = b.fy - r*(.2 + (i%2)*.4); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + r*.1, y - r*.18); ctx.lineTo(x - r*.04, y - r*.06); ctx.fill(); } ctx.restore(); }
+      if(ds.some(d=>d.id==="silenced")){ const b = sfxAt(m, 3.0); ctx.save(); ctx.strokeStyle = "rgba(200,230,140,.95)"; ctx.fillStyle = "rgba(20,30,20,.8)"; ctx.lineWidth = 1.6; // a seal over the head
+        ctx.beginPath(); ctx.arc(b.x, b.y, r*.65, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); for(let i=0;i<5;i++){ const a = -Math.PI/2 + i*Math.PI*4/5; ctx[i?"lineTo":"moveTo"](b.x + Math.cos(a)*r*.45, b.y + Math.sin(a)*r*.45); } ctx.closePath(); ctx.stroke();
+        ctx.strokeStyle = "rgba(200,230,140,.6)"; ctx.beginPath(); ctx.moveTo(b.x - r*.8, b.y + r*.8); ctx.lineTo(b.x + r*.8, b.y - r*.8); ctx.stroke(); ctx.restore(); }
+    }); }
+  // ---- telegraphV3: which floating words may still appear
+  const FT_KEEP = new Set(["RECLAIMED", "FIZZLE", "Zap!", "Well's Grace", "DISTORTED", "+MANA"]);
+  function ftAllowed(text){ const t = String(text);
+    if(S.arena && (S.arena.tut || (S.arena.raid && RAID_STAGES[S.arena.raid.stage] && RAID_STAGES[S.arena.raid.stage].raid==="seal"))) return true; // tutorial; Seal raid is WIP
+    if(/^\d+\/\d+$/.test(t)) return false; // ward progress counts (the hint bar carries them)
+    if(/^[+\-−]?\d/.test(t) || /^[☠✹]/.test(t)) return true; // damage, healing, gold, stack counters
+    return FT_KEEP.has(t); }
   try{ if(typeof window!=="undefined") window.__cfx = { cfxCast, CFX_DRAW }; }catch(_){}
 
 
@@ -17037,6 +17069,17 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   const FLOATING_TEXT_DURATION = 0.9;
   const FLOATING_TEXT_RISE = 26; // world units over its whole lifetime
   function spawnFloatingText(x, y, text, color){
+    try{ if(!ftAllowed(text)) return; }catch(_){} // telegraphV3: no words on the battlefield
+    if(typeof text==="string" || typeof text==="number") text = String(text).replace(/\d+\.\d+/g, n=>String(Math.round(+n))); // whole numbers only
+    { const mode = (typeof DISP!=="undefined" && DISP.nums) || "imp", t = String(text), num = /^[+\-−]\d+$/.test(t); // numbersV1
+      if(num && mode==="off") return;
+      if(num && mode==="imp"){
+        if(t[0]!=="+"){ if(S._ftFoe || !S._ftHit) return; } // enemies: none; party: big single hits only
+        else if(color==="var(--accent)"){ // heals: merge per target for 0.5s
+          const now = (S.tPrev||0)/1000, key = Object.keys(S.party||{}).find(k=>{ const m = S.party[k]; return m && Math.abs(m.x-x) < 0.5 && Math.abs(m.y-y) < 0.5; });
+          if(key){ S._ftHeal = S._ftHeal || {}; const h = S._ftHeal[key];
+            if(h && now - h.t < 0.5 && (S.floatingText||[]).includes(h.e)){ h.sum += +t.slice(1); h.e.text = "+" + h.sum; h.e.ttl = h.e.ttlTotal; return; }
+            if(!S.floatingText) S.floatingText = []; const e = { x, y, text:t, color, ttl: FLOATING_TEXT_DURATION, ttlTotal: FLOATING_TEXT_DURATION }; S.floatingText.push(e); S._ftHeal[key] = { e, t:now, sum:+t.slice(1) }; return; } } } }
     if(!S.floatingText) S.floatingText = [];
     S.floatingText.push({ x, y, text, color, ttl: FLOATING_TEXT_DURATION, ttlTotal: FLOATING_TEXT_DURATION });
   }
@@ -36068,8 +36111,8 @@ thrall(){return gs(14)+
 
   // ===== Display settings (render quality, UI size) + movable-widget layout editor =====
   const DISP_KEY = "hearthward_display_v1";
-  const DISP = { rq:"auto", ui:1, layout:{} };
-  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
+  const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp" }; // numbersV1: nums = all | imp | off
+  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
   function dispSave(){ try{ localStorage.setItem(DISP_KEY, JSON.stringify(DISP)); }catch(e){} }
   function computeRS(){ const dpr = window.devicePixelRatio||1; return DISP.rq==="std" ? 1 : DISP.rq==="perf" ? 0.75 : Math.max(1, Math.min(2, dpr)); }
   RS = computeRS();
@@ -36185,12 +36228,14 @@ thrall(){return gs(14)+
   // --- panel ---
   function dispSync(){
     document.querySelectorAll("#dRQ button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.rq));
+    document.querySelectorAll("#dNum button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.nums)); // numbersV1
     document.getElementById("dUI").value = Math.round(DISP.ui*100); document.getElementById("dUIv").textContent = Math.round(DISP.ui*100)+"%";
     document.getElementById("dRQnote").textContent = "Rendering at " + (Math.round(RS*100)/100) + "× (screen is " + (Math.round((window.devicePixelRatio||1)*100)/100) + "×)";
   }
   document.getElementById("dispBtn").addEventListener("click", e=>{ e.stopPropagation(); const p = document.getElementById("dispPanel"); p.classList.toggle("open"); dispSync(); });
   document.addEventListener("pointerdown", e=>{ const p = document.getElementById("dispPanel"); if(p.classList.contains("open") && !p.contains(e.target) && e.target.id!=="dispBtn") p.classList.remove("open"); });
   document.querySelectorAll("#dRQ button").forEach(b=> b.addEventListener("click", ()=>{ DISP.rq = b.dataset.v; dispSave(); fitApp(); dispSync(); }));
+  document.querySelectorAll("#dNum button").forEach(b=> b.addEventListener("click", ()=>{ DISP.nums = b.dataset.v; dispSave(); dispSync(); })); // numbersV1
   document.getElementById("dUI").addEventListener("input", e=>{ DISP.ui = (+e.target.value)/100; dispSave(); applyDisplay(); fitApp(); dispSync(); });
   document.getElementById("dEdit").addEventListener("click", hwEnter);
   document.getElementById("dResetLayout").addEventListener("click", hwReset);
@@ -37009,7 +37054,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 9888c4f089) */
+<script>/* phone app: offline cache (build 726d3fa55c) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
