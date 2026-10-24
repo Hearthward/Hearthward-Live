@@ -3486,24 +3486,24 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     tick(e, mech, st, dt){
       const tank = S.party.tank;
       const r = emCast(e, mech, st, dt, ()=>{
-        if(!tank.alive) return false;
-        spawnFloatingText(tank.x, tank.y-34, "WAX WARD KESSA", "var(--shield)");
+        if(!tank.alive) return false; // telegraphV1: the hammer over her is the warning
       });
       if(r==="fire" && tank.alive){
         const warded = emHasWax(tank);
         let d = Math.round(scaledEnemyDmg(mech.dmg[0], mech.dmg[1]));
-        if(warded){ d = Math.round(d*(mech.wardMul||0.4)); spawnFloatingText(tank.x, tank.y-30, "WARDED", "var(--shield)"); }
+        if(warded){ d = Math.round(d*(mech.wardMul||0.4)); }
         damageMember("tank", d, mech.name, e);
         if(warded) emRampAdd(e, "heat", -1, "Heat", "var(--ember)");
         else if(tank.alive){
-          applyDebuff("tank", "dented"); spawnFloatingText(tank.x, tank.y-30, "DENTED", "var(--blood)");
+          applyDebuff("tank", "dented");
           emRampAdd(e, "heat", 1, "Heat", "var(--ember)");
         }
         emSparks(tank.x, tank.y);
       }
       return !!st.casting || r==="fire";
     },
-    draw(e, mech, st, progress){ const t = S.party.tank; if(t && t.alive) drawGroundTelegraph(t.x, t.y, 24, progress, "var(--shield)"); },
+    draw(e, mech, st, progress){ tgAnvilFloor(e, mech, st); }, // telegraphV1: the hammer's shadow
+    top(e, mech, st){ tgAnvilTop(e, mech, st); },
   };
   function emBrogarTick(e, kind, dt){
     // Molten: three Ember stacks erupt on the bearer and everyone near them.
@@ -3582,7 +3582,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         h.t -= dt;
         const clear = ()=>{ m.debuffs = (m.debuffs||[]).filter(d=>d.id!=="hollowing"); em.hollow = null; };
         if(!m || !m.alive){ em.hollow = null; }
-        else if(m.hp >= m.maxHp*0.95){ clear(); spawnFloatingText(m.x, m.y-22, "RESTORED", "var(--moss)"); }
+        else if(m.hp >= m.maxHp*0.95){ clear(); } // telegraphV1: the crust falls away (drawn), no word
         else if(h.t<=0){
           clear(); applyDebuff(h.key, "encased");
           if(h.key==="self" && m.casting) m.casting = null;
@@ -3602,9 +3602,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(!m.alive) return false;
       applyDebuff(key, "hollowing");
       em.hollow = { key, t: mech.dur||6 };
-      spawnFloatingText(m.x, m.y-32, "HEAL TO FULL", "var(--shield)");
-      return false;
+      return false; // telegraphV1: the creeping crust is the warning
     },
+    top(e){ tgHollowTop(e); }, // telegraphV1
   };
   EMBER_MECH.bellows = {
     tick(e, mech, st, dt){
@@ -4161,7 +4161,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
         if(!key) return false;
         const m = S.party[key]; st.key = key; st.px = m.x; st.py = m.y;
         applyDebuff(key, "pinned"); m._pin = { x:m.x, y:m.y };
-        spawnFloatingText(m.x, m.y-30, key==="self" ? "PINNED · WARD YOURSELF" : "PINNED · WAX WARD", "var(--shield)");
+        // telegraphV2: the quills and the cracking floor are the warning
       });
       if(r==="fire" && st.px!=null){
         S.groundPools.push({ x:st.px, y:st.py, radius:mech.radius, tickDmg:Math.round(mech.tickDmg*(S.keystoneDmgMul||1)), tickInterval:mech.tickInterval, tickT:0,
@@ -4170,7 +4170,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       }
       return false; // he keeps fighting while the quill holds
     },
-    draw(e, mech, st, progress, kind){ if(st.px!=null) drawGroundTelegraph(st.px, st.py, mech.radius, progress, "var(--ink)"); },
+    draw(e, mech, st, progress, kind){ tgPinFloor(e, mech, st); }, // telegraphV2: cracks spreading, not a circle to step out of
+    top(e, mech, st){ tgPinTop(e, mech, st); },
     hazards(e, mech, st){ return (st.casting && st.px!=null) ? [{ x:st.px, y:st.py, radius:mech.radius+HAZARD_SAFE_MARGIN }] : []; },
   };
 
@@ -4284,8 +4285,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       { id:"inkwall", name:"Ink Wall", kind:"script", fn:"inkwall", every:18, first:11, windup:1.5, dur:10, verb:"GO AROUND", color:"var(--ink)",
         trigger:"Every ~18s, he draws a wall of ink across most of the chamber. For 10s it blocks movement and line of sight.",
         counter:"If it cuts you off from someone you can't heal them: walk round the open end. The dashed line during the wind-up shows where it will stand." },
-      { id:"pin", name:"Pinned", kind:"script", fn:"pin", hazard:true, every:17, first:14, windup:2.0, radius:40, tickDmg:12, tickInterval:0.5, duration:5, verb:"WAX WARD", color:"var(--shield)",
-        trigger:"Every ~17s, he pins a party member (never Kessa) to the floor for 4s and draws a fissure under them, which opens 2s later.",
+      { id:"pin", name:"Pinned", kind:"script", fn:"pin", hazard:true, every:17, first:14, windup:3.0, /* telegraphV2: was 2.0 */ radius:40, tickDmg:12, tickInterval:0.5, duration:5, verb:"WAX WARD", color:"var(--shield)",
+        trigger:"Every ~17s, he pins a party member (never Kessa) to the floor for 4s and draws a fissure under them, which opens 3s later.",
         counter:"Wax Ward the pinned one before the fissure opens, then heal them through it. It can't be cleansed." },
     ];
   })();
@@ -4645,8 +4646,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       e.buffs = (e.buffs||[]).filter(b=>b.id!=="ripening");
       e.buffs.push({ id:"ripening", label:"Ripening", purgeable:true, remaining:(mech.dur||6)+0.5 });
       em.ripe = { t:mech.dur||6, tot:mech.dur||6, dmg:mech.dmg };
-      spawnFloatingText(e.x, e.y-60, "RIPENING · PURGE IT", "var(--shield)");
-      return false;
+      return false; // telegraphV2: the swelling pod is the warning
     },
   };
   EMBER_MECH.devour = {
@@ -4708,9 +4708,13 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       ctx.save(); ctx.strokeStyle = resolveColor("var(--moss)"); ctx.lineWidth = 2; ctx.globalAlpha = 0.5+0.3*pulse; ctx.setLineDash([4,5]);
       ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.restore(); }); }
     if(em.ripe){ const p = VIEW.project(e.x, e.y), s = VIEW.scale, f = 1 - em.ripe.t/em.ripe.tot;
-      ctx.save(); ctx.fillStyle = resolveColor("var(--bloom)"); ctx.globalAlpha = 0.35+0.4*f;
-      ctx.beginPath(); ctx.arc(p.x, p.y-46*s, (10+16*f)*s*(1+0.08*pulse), 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = resolveColor("var(--shield)"); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y-46*s, 30*s, -Math.PI/2, -Math.PI/2 + Math.PI*2*f); ctx.stroke(); ctx.restore(); }
+      const bc = resolveColor("var(--bloom)"), R0 = (12 + 22*f)*s*(1 + 0.06*pulse), cy = p.y - 50*s; ctx.save(); // telegraphV2: a spore pod swelling on its back
+      for(let i=0;i<6;i++){ const a = i*Math.PI/3 + f*.6, op = .3 + .7*f; ctx.save(); ctx.translate(p.x, cy); ctx.rotate(a); ctx.globalAlpha = .55 + .35*f; ctx.fillStyle = bc; ctx.strokeStyle = "rgba(30,40,20,.8)"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(R0*.55, -R0*.35*op, R0*1.15*op + R0*.2, 0); ctx.quadraticCurveTo(R0*.55, R0*.35*op, 0, 0); ctx.fill(); ctx.stroke(); ctx.restore(); }
+      ctx.globalAlpha = 1; ctx.fillStyle = "rgba(255,240,200,.9)"; ctx.beginPath(); ctx.arc(p.x, cy, R0*.35, 0, Math.PI*2); ctx.fill();
+      if(f > .6){ ctx.globalCompositeOperation = "lighter"; const k2 = (f - .6)/.4; for(let i=0;i<12;i++){ const v = ((S.tPrev||0)/1000*.6 + i/12) % 1, a = i*2.4; ctx.fillStyle = `rgba(230,255,190,${.8*k2*(1-v)})`;
+        ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*(R0 + v*60*s), cy + Math.sin(a)*(R0*.6 + v*36*s) - v*20*s, Math.max(1.2, 2.6*s*(1-v*.5)), 0, Math.PI*2); ctx.fill(); } }
+      ctx.restore(); }
     if(em.devour){ const p = VIEW.project(e.x, e.y), s = VIEW.scale, v = em.devour, f = Math.min(1, (v.hp0-e.hp)/(e.maxHp*v.breakPct));
       ctx.save(); ctx.strokeStyle = resolveColor("var(--bloom)"); ctx.lineWidth = 4; ctx.globalAlpha = 0.8;
       ctx.beginPath(); ctx.arc(p.x, p.y, 40*s, -Math.PI/2, -Math.PI/2 + Math.PI*2*f); ctx.stroke();
@@ -4844,23 +4848,23 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     tick(e, mech, st, dt){
       const r = emCast(e, mech, st, dt, ()=>{
         const key = emPick(emAliveKeys()); if(!key) return false;
-        st.key = key; st.n = 3;
-        spawnFloatingText(S.party[key].x, S.party[key].y-34, "THE BELL TOLLS · WAX WARD", "var(--shield)");
+        st.key = key; st.n = 3; // telegraphV1: the bell over them is the warning
       });
-      if(st.casting && st.key){ const left = Math.ceil((mech.windup - st.castT)/(mech.windup/3)); if(left < st.n && left>0){ st.n = left; const m = S.party[st.key]; if(m) spawnFloatingText(m.x, m.y-30, String(left), "var(--toll)"); } }
+      // telegraphV1: the bell's three tolls replace the floating 3, 2, 1
       if(r==="fire" && st.key){
         const m = S.party[st.key];
         if(m && m.alive){
           const warded = emHasWax(m);
           let d = scaledEnemyDmg(mech.dmg[0], mech.dmg[1]); if(warded) d *= (mech.wardMul||0.25);
           damageMember(st.key, Math.round(d), mech.name, e);
-          spawnFloatingText(m.x, m.y-30, warded ? "WARDED" : "TOLLED", warded ? "var(--shield)" : "var(--toll)"); emSparks(m.x, m.y);
+          emSparks(m.x, m.y); try{ sfxSpawn({ k:"c_bellfall", at:st.key, dur:0.5, top:true }); }catch(_){} // telegraphV1
         }
         st.key = null;
       }
       return false;
     },
-    draw(e, mech, st, progress){ const m = st.key && S.party[st.key]; if(m && m.alive) drawGroundTelegraph(m.x, m.y, 22, progress, "var(--toll)"); },
+    draw(e, mech, st, progress){ tgTollFloor(e, mech, st); }, // telegraphV1: the bell's shadow, not a ring to step out of
+    top(e, mech, st){ tgTollTop(e, mech, st); },
   };
   EMBER_MECH.gravebells = {
     tick(e, mech, st, dt){
@@ -4934,11 +4938,11 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       st.timer -= dt; if(st.timer>0) return false;
       const cv = e.mech.shardconverge; if(cv && (cv.casting || cv.active)){ st.timer = 1; return false; }
       st.timer = mechEvery(e, mech); emFirst(e, mech);
-      em.chorus = { t:0, tick:1, i:0 };
-      spawnFloatingText(e.x, e.y-60, "KEENING CHORUS · TOP OFF", "var(--dirge)");
-      pushLog("event", "The choir begins to keen. It grows louder for 6s.");
+      em.chorus = { t:-1.5, tick:2.5, i:0 }; // telegraphV1: 1.5s inhale first; beats at the same 1s spacing after it
+      pushLog("event", "The choir draws breath, then keens. It grows louder for 6s.");
       return false;
     },
+    top(e){ tgChorusTop(e); }, // telegraphV1
   };
   function glmConvergeEnd(e, mech, st){
     const kind = ENEMY_KINDS[e.kind]; if(!kind || kind.gloom!=="knell") return;
@@ -5188,6 +5192,11 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 
   function irnBossTick(e, kind, dt){ if(kind.iron==="choir") irnChoirTick(e, kind, dt); }
   function irnDrawWorld(e, k, em, now, pulse){
+    if(k.iron==="choir"){ const hb = (e.buffs||[]).find(b=>b.id==="harmony"); if(hb){ const p = VIEW.project(e.x, e.y), sc = VIEW.scale, p2 = (e._phase||0)>0, end = !p2 && hb.remaining < 2 ? 1 - hb.remaining/2 : 0; // telegraphV2
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; const R = (46 + 30*end)*sc*(1 + .05*Math.sin(now*(4 + 10*end)));
+      const g = ctx.createRadialGradient(p.x, p.y - 30*sc, R*.2, p.x, p.y - 30*sc, R*1.4); g.addColorStop(0, `rgba(255,220,150,${.35 + .4*end})`); g.addColorStop(1, "rgba(255,200,120,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y - 30*sc, R*1.4, 0, Math.PI*2); ctx.fill();
+      for(let i=0;i<3;i++){ const v = ((now*(.6 + 1.4*end)) + i/3) % 1; ctx.strokeStyle = `rgba(255,226,170,${(.25 + .55*end)*(1-v)})`; ctx.lineWidth = 1.5 + 2.5*end; ctx.beginPath(); ctx.ellipse(p.x, p.y - 30*sc, R*(.6 + .9*v), R*(.6 + .9*v)*.7, 0, 0, Math.PI*2); ctx.stroke(); }
+      ctx.restore(); } }
     if(k.iron==="sentinel"){ const st = e.mech.ironsweep, mech = (kindMechs(k)||[]).find(m=>m.id==="ironsweep");
       if(st && st.spin && mech) irnBeams(e, mech, st).forEach(b=>{ const a = VIEW.project(e.x, e.y), c = VIEW.project(b.x2, b.y2);
         ctx.save(); ctx.strokeStyle = resolveColor("var(--blood)"); ctx.globalAlpha = 0.75; ctx.lineWidth = mech.width*2*VIEW.scale*0.6; ctx.lineCap = "round";
@@ -16018,7 +16027,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- compFxV1: companion spell signatures ----
   const CFK_G = "255,212,120", CFK_C = "255,246,214", CFK_S = "214,222,232";
   let _sfxTop = false;
-  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); cfxDoomMark(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
+  function sfxDrawTop(){ try{ cfxShells(); cfxEnemyMarks(); cfxDoomMark(); tgPartyMarks(); }catch(_){} if(!SFX.length) return; _sfxTop = true; try{ sfxDraw(); } finally { _sfxTop = false; } }
   function cfxShells(){ const now = (S.tPrev||0)/1000, r = sfxR();
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key], fs = m && m._sfxFam; if(!m || !m.alive || !fs || !(fs.wax > 0 || fs.plate > 0)) return; const b = sfxAt(m, 1.35);
       if(fs.wax > 0) cfxWaxShell(b, r, now, fs.waxF, key); if(fs.plate > 0) cfxPlateShell(b, r, now, fs.plateF); }); }
@@ -16499,6 +16508,76 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // Purge rank V (Exposed): each purged enemy's guard visibly cracks
   function cfxExposed(x, y, r, v){ ctx.save(); ctx.strokeStyle = `rgba(${SC},${1 - v})`; ctx.lineWidth = 1.4; const R = r*(.7 + .3*sfxEase(v));
     for(let i=0;i<6;i++){ const a = i*Math.PI/3 + .3; ctx.beginPath(); ctx.moveTo(x + Math.cos(a)*R*.35, y + Math.sin(a)*R*.35); ctx.lineTo(x + Math.cos(a + .25)*R*.7, y + Math.sin(a + .25)*R*.7); ctx.lineTo(x + Math.cos(a - .1)*R, y + Math.sin(a - .1)*R); ctx.stroke(); } ctx.restore(); }
+
+  // ---- telegraphV1 drawing helpers (EMBER_MECH tops call these)
+  CFX_DRAW.c_bellfall = function(f, u, r, now){ const m = S.party[f.at], b0 = m && sfxAt(m, 3.9), b1 = m && sfxAt(m, 1.2); if(!b0) return;
+    const k = Math.min(1, u/.3), y = b0.y + (b1.y - b0.y)*k*k; if(u < .45) tgBell(b0.x, y, r*1.5, 1 - Math.max(0, (u - .3)/.15), 0);
+    if(u >= .3){ const v = (u - .3)/.7; ctx.save(); ctx.strokeStyle = `rgba(232,246,250,${1-v})`; ctx.lineWidth = 3*(1-v) + .5; ctx.beginPath(); ctx.ellipse(b1.x, b1.y + r*.6, r*(1 + 2.2*v), r*(.45 + .9*v), 0, 0, Math.PI*2); ctx.stroke(); ctx.restore(); } };
+  const TG_TOLL = "143,196,209", TG_TOLLW = "232,246,250", TG_DIRGE = "169,166,214", TG_EMB = "255,140,60";
+  function tgBell(x, y, s, a, swing){ ctx.save(); ctx.translate(x, y); ctx.rotate(swing); ctx.globalAlpha = a;
+    const g = ctx.createLinearGradient(0, -s, 0, s*.9); g.addColorStop(0, `rgba(${TG_TOLLW},.85)`); g.addColorStop(1, `rgba(${TG_TOLL},.55)`);
+    ctx.fillStyle = g; ctx.strokeStyle = `rgba(${TG_TOLLW},.95)`; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-s*.18, -s); ctx.quadraticCurveTo(-s*.55, -s*.95, -s*.58, -s*.2); ctx.quadraticCurveTo(-s*.62, s*.5, -s*.95, s*.75); ctx.lineTo(s*.95, s*.75);
+    ctx.quadraticCurveTo(s*.62, s*.5, s*.58, -s*.2); ctx.quadraticCurveTo(s*.55, -s*.95, s*.18, -s); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = `rgba(${TG_TOLL},.9)`; ctx.beginPath(); ctx.arc(0, s*.82, s*.16, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  function tgTollTop(e, mech, st){ const m = st.key && S.party[st.key]; if(!st.casting || !m || !m.alive) return;
+    const r = sfxR(), u = Math.max(0, Math.min(1, st.castT/mech.windup)), now = (S.tPrev||0)/1000, tolls = Math.min(3, Math.floor(u*3 + 1e-6)), f = (u*3) % 1;
+    const b = sfxAt(m, 3.9), size = r*(1.15 + .35*Math.min(1, u*2)), swing = Math.sin(now*5)*.18*(tolls < 3 ? 1 : .4);
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(b.x, b.y, r*2*(.6 + .4*u), TG_TOLL, .35 + .25*u); ctx.restore();
+    tgBell(b.x, b.y, size, Math.min(1, .25 + u*1.5), swing);
+    if(tolls >= 1 && f < .35){ const v = f/.35; ctx.save(); ctx.strokeStyle = `rgba(${TG_TOLLW},${.9*(1-v)})`; ctx.lineWidth = 2.5*(1-v) + .5; ctx.beginPath(); ctx.ellipse(b.x, b.y + size*.4, size*(1.1 + 1.6*v), size*(.5 + .7*v), 0, 0, Math.PI*2); ctx.stroke(); ctx.restore(); }
+    for(let i=0;i<3;i++){ const on = i < tolls, px = b.x + (i-1)*r*.6, py = b.y - size*1.35; ctx.save(); ctx.fillStyle = on ? `rgba(${TG_TOLLW},.95)` : "rgba(20,30,36,.7)"; ctx.strokeStyle = `rgba(${TG_TOLLW},.9)`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(px, py, Math.max(2.5, r*.2), 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore(); } }
+  function tgTollFloor(e, mech, st){ const m = st.key && S.party[st.key]; if(!st.casting || !m || !m.alive) return; const u = Math.max(0, Math.min(1, st.castT/mech.windup)), p = sfxAt(m, 0), r = sfxR();
+    ctx.save(); ctx.fillStyle = `rgba(10,18,24,${.15 + .35*u})`; ctx.beginPath(); ctx.ellipse(p.fx, p.fy, r*(.6 + .7*u), r*(.25 + .3*u), 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  function tgChorusTop(e){ const c = emOf(e).chorus; if(!c) return; const p = VIEW.project(e.x, e.y), sc = VIEW.scale, now = (S.tPrev||0)/1000, cy = p.y - 40*sc;
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    if(c.t < 0){ const u = 1 + c.t/1.5; // the inhale: motes drawn in, the choir's glow gathering
+      for(let i=0;i<18;i++){ const a = i*.349 + now*.6, k = ((u*1.3) + i/18) % 1, R = (220*(1-k) + 12)*sc; ctx.fillStyle = `rgba(${TG_DIRGE},${.85*k})`; ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*R, cy + Math.sin(a)*R*.6, Math.max(1.2, 2.6*sc*k), 0, Math.PI*2); ctx.fill(); }
+      sfxGlow(p.x, cy, 60*sc*(.5 + .5*u), TG_DIRGE, .5*u);
+    } else { const lv = Math.min(1, (c.i||0)/6), fr = 1 - Math.max(0, Math.min(1, c.tick)); // the keen: a ring per beat, louder each beat
+      for(let j=0;j<2;j++){ const v = (fr + j*.5) % 1, R = (40 + 320*v)*sc; ctx.strokeStyle = `rgba(${TG_DIRGE},${(.35 + .5*lv)*(1-v)})`; ctx.lineWidth = (2 + 6*lv)*(1-v) + .5; ctx.beginPath(); ctx.ellipse(p.x, p.y, R, R*.62, 0, 0, Math.PI*2); ctx.stroke(); }
+      sfxGlow(p.x, cy, (50 + 40*lv)*sc, TG_DIRGE, .35 + .35*lv); }
+    ctx.restore(); }
+  function tgHollowTop(e){ const h = emOf(e).hollow, m = h && S.party[h.key]; if(!m || !m.alive) return; const r = sfxR(), now = (S.tPrev||0)/1000;
+    const def = Math.max(0, Math.min(1, (0.95 - m.hp/m.maxHp)/0.2)), el = 1 - Math.max(0, h.t)/6, lvl = def*(.35 + .65*el); if(lvl <= .02) return;
+    const b = sfxAt(m, 0), H = r*2.7*lvl, W = r*.95, x0 = b.fx, y0 = b.fy; ctx.save();
+    ctx.beginPath(); ctx.moveTo(x0 - W, y0); for(let i=0;i<=8;i++){ const x = x0 - W + i*W/4, j = (i%2 ? .14 : -.06)*r + Math.sin(i*2.3 + now*2)*r*.04; ctx.lineTo(x, y0 - H + j); } ctx.lineTo(x0 + W, y0); ctx.closePath();
+    ctx.fillStyle = "rgba(34,26,24,.82)"; ctx.fill(); ctx.save(); ctx.clip();
+    ctx.strokeStyle = `rgba(${TG_EMB},${.8 + .2*Math.sin(now*8)})`; ctx.lineWidth = 2.2; ctx.beginPath(); for(let i=0;i<=8;i++){ const x = x0 - W + i*W/4, j = (i%2 ? .14 : -.06)*r + Math.sin(i*2.3 + now*2)*r*.04; ctx[i?"lineTo":"moveTo"](x, y0 - H + j); } ctx.stroke(); ctx.restore(); ctx.clip();
+    ctx.strokeStyle = `rgba(${TG_EMB},.8)`; ctx.lineWidth = 1.1; for(let i=0;i<5;i++){ const x = x0 - W*.8 + i*W*.4; ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x + r*.15, y0 - H*.4); ctx.lineTo(x - r*.08, y0 - H*.75); ctx.stroke(); }
+    ctx.restore(); ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x0, y0 - H, r*.9, TG_EMB, .45); ctx.restore(); }
+  function tgAnvilTop(e, mech, st){ const t = S.party.tank; if(!st.casting || !t || !t.alive) return; const r = sfxR(), u = Math.max(0, Math.min(1, st.castT/mech.windup)), now = (S.tPrev||0)/1000;
+    const b = sfxAt(t, 0), hy = b.fy - r*(5.2 - 2.4*u*u), sh = u > .75 ? Math.sin(now*60)*r*.07 : 0, x = b.fx + sh, s = r*1.5;
+    ctx.save(); ctx.globalAlpha = .45 + .55*u; ctx.translate(x, hy); ctx.rotate(-.12 + .12*u); // a forge hammer, face down, tilting into the swing
+    ctx.fillStyle = "#5a3a22"; ctx.strokeStyle = "rgba(20,12,8,.9)"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.rect(-s*.09, -s*1.9, s*.18, s*1.55); ctx.fill(); ctx.stroke(); // haft
+    const hg = ctx.createLinearGradient(0, -s*.5, 0, s*.5); hg.addColorStop(0, "#8a8480"); hg.addColorStop(.5, "#4e4844"); hg.addColorStop(1, "#2e2a28");
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.moveTo(-s*.95, -s*.42); ctx.lineTo(s*.95, -s*.42); ctx.lineTo(s*.85, s*.42); ctx.lineTo(-s*.85, s*.42); ctx.closePath(); ctx.fill(); ctx.stroke(); // head
+    ctx.fillStyle = `rgba(${TG_EMB},${.55 + .45*u})`; ctx.fillRect(-s*.85, s*.3, s*1.7, s*.12); // the glowing striking face
+    ctx.strokeStyle = "rgba(200,190,180,.7)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-s*.88, -s*.36); ctx.lineTo(s*.88, -s*.36); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; sfxGlow(x, hy + s*.4, r*(.6 + .9*u), TG_EMB, .3 + .5*u);
+    for(let i=0;i<6;i++){ const a = i*1.05 + now*3, d = r*(1.2 - u*.9); ctx.fillStyle = `rgba(255,210,140,${.8*u})`; ctx.beginPath(); ctx.arc(x + Math.cos(a)*d, hy + s*.45 + Math.sin(a)*d*.4, Math.max(1, r*.07), 0, Math.PI*2); ctx.fill(); }
+    ctx.restore(); }
+  function tgAnvilFloor(e, mech, st){ const t = S.party.tank; if(!st.casting || !t || !t.alive) return; const u = Math.max(0, Math.min(1, st.castT/mech.windup)), p = sfxAt(t, 0), r = sfxR();
+    ctx.save(); ctx.fillStyle = `rgba(14,8,6,${.15 + .45*u})`; ctx.beginPath(); ctx.ellipse(p.fx, p.fy, r*(1.6 - .7*u), r*(.6 - .25*u), 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+
+  // ---- telegraphV2 helpers
+  function tgShadowUnder(m, u){ if(!m || !m.alive) return; const p = sfxAt(m, 0), r = sfxR(); ctx.save(); ctx.fillStyle = `rgba(14,8,6,${.15 + .45*u})`; ctx.beginPath(); ctx.ellipse(p.fx, p.fy, r*(1.6 - .7*u), r*(.6 - .25*u), 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  function tgPinFloor(e, mech, st){ if(!st.casting || st.px==null) return; const u = Math.max(0, Math.min(1, st.castT/mech.windup)), p = VIEW.project(st.px, st.py), sc = VIEW.scale, R = mech.radius*sc;
+    ctx.save(); ctx.strokeStyle = `rgba(30,18,44,${.55 + .4*u})`; ctx.lineCap = "round";
+    for(let i=0;i<7;i++){ const a = i*.9 + .4, L = R*(.25 + .75*u)*(.75 + .25*((i*7)%3)/2); ctx.lineWidth = Math.max(1.5, (3.5 - i*.2)*sc*.6); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a)*L*.5 + Math.sin(i)*4*sc, p.y + Math.sin(a)*L*.5*.6); ctx.lineTo(p.x + Math.cos(a)*L, p.y + Math.sin(a)*L*.6); ctx.stroke(); }
+    ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = `rgba(190,120,255,${.25 + .5*u})`; ctx.lineWidth = 1.2;
+    for(let i=0;i<7;i++){ const a = i*.9 + .4, L = R*(.25 + .75*u)*.9; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a)*L, p.y + Math.sin(a)*L*.6); ctx.stroke(); } ctx.restore(); }
+  function tgPinTop(e, mech, st){ if(!st.casting || !st.key) return; const m = S.party[st.key]; if(!m || !m.alive) return; const r = sfxR(), b = sfxAt(m, 0);
+    for(let i=0;i<3;i++){ const a = -Math.PI/2 + (i-1)*1.9, x = b.fx + Math.cos(a)*r*.95, y = b.fy + Math.sin(a)*r*.38; const Q = 1.7; // three quills driven into the floor around them
+      ctx.save(); ctx.translate(x, y); ctx.rotate((i-1)*.35); ctx.fillStyle = "#e8e0f0"; ctx.strokeStyle = "rgba(20,12,30,.85)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-r*.13*Q, -r*.9*Q); ctx.quadraticCurveTo(0, -r*1.3*Q, r*.13*Q, -r*.9*Q); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#2a1838"; ctx.fillRect(-r*.06*Q, -r*.28*Q, r*.12*Q, r*.28*Q); ctx.restore(); } }
+  function tgPartyMarks(){ const r = sfxR(), now = (S.tPrev||0)/1000;
+    Object.keys(S.party||{}).forEach(k=>{ const m = S.party[k]; if(!m || !m.alive || !(m.debuffs||[]).some(d=>d.id==="saltcrust")) return; const b = sfxAt(m, 0);
+      for(let i=0;i<9;i++){ const x = b.fx + (i-4)*r*.24, h = r*(.6 + .6*((i*5)%3)/2), y = b.fy - r*.1 - (4-Math.abs(i-4))*r*.18; // salt crystals crusting up the legs
+        ctx.save(); ctx.translate(x, y); ctx.rotate((i-4)*.2); ctx.fillStyle = "rgba(244,248,252,.9)"; ctx.strokeStyle = "rgba(100,120,140,.95)"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(r*.15, 0); ctx.lineTo(-r*.15, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; const gl = .5 + .5*Math.sin(now*3 + k.length); ctx.fillStyle = `rgba(255,255,255,${.6*gl})`; ctx.beginPath(); ctx.arc(b.fx + r*.3, b.fy - r*.5, Math.max(1, r*.07), 0, Math.PI*2); ctx.fill(); ctx.restore(); }); }
   try{ if(typeof window!=="undefined") window.__cfx = { cfxCast, CFX_DRAW }; }catch(_){}
 
 
@@ -22343,7 +22422,7 @@ thrall(){return gs(14)+
       on:(e,m,st)=>!!emOf(e).ripe,
       hit:()=>null, noReticle:true,
       prog:(e,m,st)=>{ const r = emOf(e).ripe; return r ? 1 - r.t/r.tot : 0; },
-      shade:(e,m,st,selfHit,p)=>mpShadeCircle(e.x, e.y, 34 + bossReach(e), ELITE_BAD, p),
+      shade:()=>{}, // telegraphV2: the burst hits everyone; no zone
     },
     "Snuffing Wail": {
       on:(e,m,st)=>!!st.casting,
@@ -22353,7 +22432,7 @@ thrall(){return gs(14)+
     "Toll for One": {
       on:(e,m,st)=>!!st.casting && !!st.key,
       hit:(e,m,st,key)=> key===st.key ? !emHasWax(S.party[key]) : null,
-      shade:(e,m,st,selfHit,p)=>{ const t = S.party[st.key]; if(t && t.alive) mpShadeCircle(t.x, t.y, 22, emHasWax(t) ? ELITE_GOOD : ELITE_BAD, p); },
+      shade:()=>{}, // telegraphV1: the bell over them is the warning
       noReticle:true, bracketSafe:true,
     },
     "Tolling Wave": {
@@ -22391,7 +22470,7 @@ thrall(){return gs(14)+
       on:(e,m,st)=>(e.buffs||[]).some(b=>b.id==="harmony"),
       hit:()=>null, noReticle:true,
       prog:(e,m,st)=>{ const b = (e.buffs||[]).find(x=>x.id==="harmony"); return (b && (e._phase||0)===0 && m.dur) ? Math.max(0, Math.min(1, 1 - b.remaining/m.dur)) : 1; },
-      shade:(e,m,st,selfHit,p)=>mpShadeCircle(e.x, e.y, 34 + bossReach(e), ELITE_BAD, p),
+      shade:()=>{}, // telegraphV2: the aura on the Choir carries it
     },
     "Fourfold Gaze": {
       on:(e,m,st)=>!!st.active,
@@ -22414,13 +22493,12 @@ thrall(){return gs(14)+
     "Pinned": { // Wax Ward frees the pinned ally; the fissure opens where they were pinned
       on:(e,m,st)=>!!st.casting && st.px!=null,
       hit:(e,m,st,key)=>{ const pm = S.party[key]; return dist(pm.x, pm.y, st.px, st.py) <= m.radius; },
-      shade:(e,m,st,selfHit,p)=>{ const anyIn = Object.keys(S.party).some(k=>{ const pm = S.party[k]; return pm.alive && dist(pm.x, pm.y, st.px, st.py) <= m.radius; });
-        mpShadeCircle(st.px, st.py, m.radius, anyIn ? ELITE_BAD : ELITE_GOOD, p); },
+      shade:()=>{}, // telegraphV2: the pinned ally can't step out; the cracks carry it
     },
     "Anvil Strike": { // the answer is Wax Ward on Kessa, not where you stand
       on:(e,m,st)=>!!st.casting,
       hit:(e,m,st,key)=> key==="tank" ? !emHasWax(S.party.tank) : null,
-      shade:(e,m,st)=>{ const t = S.party.tank; if(t && t.alive) mpShadeCircle(t.x, t.y, 24, emHasWax(t) ? ELITE_GOOD : ELITE_BAD, mpProg(m, st)); },
+      shade:()=>{}, // telegraphV1: the hammer over her is the warning
       noReticle:true, bracketSafe:true,
     },
   };
@@ -33673,7 +33751,7 @@ thrall(){return gs(14)+
           rfxAdd({ shape:"rect", x:x0, y:20, w:x1-x0, h:st.H, warn:3, act:4.5, tickDmg:160, label:"Floodgate", color:"#ff5a1a" }); pushLog("event","A floodgate grinds open!"); }
       }
     },
-    floor(r){ const st = RAID_STAGES[1]; drawRaidChannels(st); drawSlagForge(r); drawSlagSelfFloor(r); },
+    floor(r){ const st = RAID_STAGES[1]; drawRaidChannels(st); drawSlagForge(r); drawSlagSelfFloor(r); { const hf = r.k && r.k.hf; if(hf && !hf.line) tgShadowUnder(S.party.tank, Math.min(1, hf.t/hf.wind)); } }, // telegraphV2
     over(r){ drawSlagOver(r); },
     top(r){ drawSlagIntroHammer(r); drawSlagSelf(r); },
   };
@@ -36931,7 +37009,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 513ba79136) */
+<script>/* phone app: offline cache (build 9888c4f089) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
