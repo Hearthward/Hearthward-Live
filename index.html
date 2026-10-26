@@ -2081,7 +2081,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     <div class="dRow"><span>Sound: <b id="dSndV">60%</b></span>
       <div class="dSndRow"><input type="range" id="dSnd" min="0" max="100" step="5" value="60"><button type="button" class="dBtn" id="dSndMute">Mute</button></div>
       <span class="dNote">Spells, warnings for boss mechanics, and rewards.</span></div>
+    <div class="dRow"><span>Combat: <b id="dCmbV">100%</b></span><input type="range" id="dCmb" min="0" max="100" step="5" value="100"><span class="dNote">Your companions' abilities, big hits and enemy deaths. Always kept under your spells and warnings.</span></div>
     <div class="dRow"><span>Ambience: <b id="dAmbV">100%</b></span><input type="range" id="dAmb" min="0" max="100" step="5" value="100"><span class="dNote">The background of each dungeon, relative to the sound volume.</span></div>
+    <div class="dRow"><span>Music: <b id="dMusV">50%</b></span><input type="range" id="dMus" min="0" max="100" step="5" value="50"><span class="dNote">Plays in fights only: quietly on pulls, fuller on the boss. At 0% it is off.</span></div>
     <div class="dRow"><span>UI size: <b id="dUIv">100%</b></span><input type="range" id="dUI" min="75" max="150" step="5" value="100"><span class="dNote">Scales text, party frames and bars; the map keeps its size.</span></div>
     <div class="dRow dDesk"><span>Layout</span><div class="dBtns"><button type="button" class="dBtn" id="dEdit">Edit layout</button><button type="button" class="dBtn" id="dResetLayout">Reset layout</button></div>
       <span class="dNote">Move and resize the party frames, abilities, cast bar, zoom controls and log — even over the map.</span></div>
@@ -2500,6 +2502,32 @@ const HWSND = (()=>{
     loot3:(M,t)=>{ harp(M,[N.D5,N.Fs5,N.A5,N.D6],t,0.06,{ g:0.06 }); [N.D6,N.A5].forEach((f,i)=>bell(M,f,t+0.2+i*0.03,0.07,1.6,{ pan:(i-0.5)*0.6, wet:0.6 })); choir(M,[N.D5,N.A5],t+0.18,0.3,{ g:0.08, a:0.08, wet:0.75, rel:0.8 }); },
     loot4:(M,t)=>{ nz(M,{ t, a:0.2, d:0.5, g:0.1, ft:"lowpass", f0:400, f1:5000, glide:0.25, wet:0.4 }); harp(M,[N.D5,N.Fs5,N.A5,N.D6,N.Fs6,N.A6],t+0.15,0.05,{ g:0.07, width:1.6 });
       choir(M,[N.D4,N.A4,N.D5,N.Fs5],t+0.4,0.6,{ g:0.16, a:0.1, wet:0.8, rel:1.3 }); [N.D6,N.Fs6,N.A5].forEach((f,i)=>bell(M,f,t+0.42+i*0.03,0.07,2,{ pan:(i-1)*0.5, wet:0.7 })); crackle(M,t,1.2,30,0.05,53,0.3); },
+    // ================= COMBAT: your companions' abilities, big hits on the party, enemy deaths =================
+    // short (<0.3 s), dry (no hall), mid-range (300 Hz - 3 kHz): the space spells (bright, reverberant) and threats (low, sustained) leave free
+    cSlam:(M,t)=>{ osc(M,{ f:220, f1:110, glide:0.06, t, a:0.002, d:0.12, g:0.3, wet:0 }); bell(M,820,t,0.08,0.18,{ ratio:2.41, index:3, wet:0, drive:1.4 }); },
+    cShout:(M,t)=>{ [0,0.11].forEach(dt=>{ bell(M,700,t+dt,0.09,0.12,{ ratio:2.41, index:3, wet:0, drive:1.5 }); osc(M,{ f:260, f1:150, glide:0.05, t:t+dt, a:0.002, d:0.08, g:0.18, wet:0 }); }); },
+    cGuard:(M,t)=>{ bell(M,1400,t,0.06,0.25,{ ratio:2.0, index:1.4, wet:0.05 }); nz(M,{ t, a:0.03, d:0.1, g:0.05, f0:1500, f1:3000, glide:0.1, q:2, wet:0 }); },
+    cBulwark:(M,t)=>{ osc(M,{ f:160, f1:80, glide:0.08, t, a:0.002, d:0.2, g:0.35, wet:0 }); nz(M,{ t, a:0.001, d:0.08, g:0.1, ft:"lowpass", f0:1500, wet:0 }); bell(M,520,t+0.02,0.08,0.3,{ ratio:2.41, index:3, wet:0.05, drive:1.4 }); },
+    cSwipe:(M,t)=>{ [0,0.09].forEach((dt,i)=>nz(M,{ t:t+dt, a:0.02, d:0.07, g:0.12, f0:i?2400:1400, f1:i?900:3200, glide:0.08, q:2.5, wet:0, pan:i?0.3:-0.3 })); },
+    cFalcon:(M,t)=>{ osc(M,{ f:2600, f1:1700, glide:0.12, t, a:0.01, d:0.12, g:0.03, type:"triangle", wet:0 }); nz(M,{ t:t+0.08, a:0.01, d:0.07, g:0.14, f0:1600, f1:3500, glide:0.07, q:2.5, wet:0 }); osc(M,{ f:300, f1:140, glide:0.05, t:t+0.15, a:0.002, d:0.08, g:0.2, wet:0 }); },
+    cLeap:(M,t)=>{ nz(M,{ t, a:0.12, d:0.03, g:0.08, f0:500, f1:2500, glide:0.15, q:2, wet:0 }); osc(M,{ f:340, f1:170, glide:0.06, t:t+0.16, a:0.002, d:0.1, g:0.32, wet:0 }); nz(M,{ t:t+0.16, a:0.001, d:0.06, g:0.08, ft:"lowpass", f0:1800, wet:0 }); },
+    cFocus:(M,t)=>{ bell(M,1900,t,0.05,0.2,{ ratio:3.9, index:1.6, wet:0.02 }); nz(M,{ t, a:0.005, d:0.05, g:0.06, f0:3000, q:4, wet:0 }); },
+    cNova:(M,t)=>{ nz(M,{ t, a:0.01, d:0.22, g:0.16, ft:"lowpass", f0:600, f1:2600, glide:0.06, wet:0.05 }); crackle(M,t+0.02,0.18,50,0.05,151,0); },
+    cLance:(M,t)=>{ nz(M,{ t, a:0.08, d:0.04, g:0.1, f0:800, f1:3000, glide:0.1, q:1.5, wet:0 }); osc(M,{ f:320, f1:150, glide:0.06, t:t+0.12, a:0.002, d:0.12, g:0.25, wet:0 }); nz(M,{ t:t+0.12, a:0.002, d:0.15, g:0.12, ft:"lowpass", f0:2200, f1:600, wet:0.05 }); },
+    cBrand:(M,t)=>{ nz(M,{ t, a:0.01, d:0.22, g:0.07, ft:"highpass", f0:2500, wet:0 }); crackle(M,t,0.2,40,0.04,157,0); },
+    cPop:(M,t)=>{ nz(M,{ t, a:0.002, d:0.08, g:0.12, ft:"lowpass", f0:1800, wet:0 }); osc(M,{ f:260, f1:130, glide:0.04, t, a:0.002, d:0.06, g:0.16, wet:0 }); },
+    cImpact:(M,t)=>{ osc(M,{ f:300, f1:140, glide:0.1, t, a:0.002, d:0.18, g:0.38, wet:0, drive:1.3 }); nz(M,{ t, a:0.002, d:0.2, g:0.14, ft:"lowpass", f0:2600, f1:500, wet:0.05 }); crackle(M,t+0.03,0.2,40,0.05,163,0); },
+    cSpray:(M,t)=>{ nz(M,{ t, a:0.02, h:0.08, d:0.12, g:0.08, ft:"bandpass", f0:3200, q:1.2, wet:0 }); },
+    cFang:(M,t)=>{ nz(M,{ t, a:0.002, d:0.06, g:0.14, f0:1400, q:2, wet:0 }); osc(M,{ f:420, f1:200, glide:0.04, t:t+0.01, a:0.002, d:0.07, g:0.18, type:"triangle", wet:0 }); },
+    cBite:(M,t)=>{ [0,0.05].forEach(dt=>nz(M,{ t:t+dt, a:0.001, d:0.04, g:0.12, f0:1800, q:3, wet:0 })); },
+    cBloom:(M,t)=>{ nz(M,{ t, a:0.01, d:0.2, g:0.12, ft:"lowpass", f0:900, f1:300, glide:0.2, q:2, wet:0.05 }); const r = rng(167); for(let i=0;i<4;i++){ const f = 300+r()*300; osc(M,{ f, f1:f*1.6, glide:0.03, t:t+r()*0.15, a:0.002, d:0.04, g:0.06, wet:0 }); } },
+    cBlight:(M,t)=>{ nz(M,{ t, a:0.04, d:0.2, g:0.12, f0:500, f1:1400, glide:0.2, q:1.5, wet:0.05 }); osc(M,{ f:220, f1:180, glide:0.2, t, a:0.03, d:0.18, g:0.05, type:"sawtooth", lp:800, wet:0 }); },
+    cRend:(M,t)=>{ nz(M,{ t, a:0.005, d:0.18, g:0.14, f0:1800, f1:500, glide:0.18, q:1.5, wet:0 }); osc(M,{ f:180, f1:120, glide:0.1, t, a:0.002, d:0.12, g:0.14, type:"sawtooth", lp:900, wet:0 }); },
+    cGrasp:(M,t)=>{ osc(M,{ f:260, f1:170, glide:0.2, t, a:0.03, d:0.2, g:0.25, wet:0 }); nz(M,{ t, a:0.03, d:0.18, g:0.06, f0:700, q:2, wet:0 }); },
+    cDoom:(M,t)=>{ osc(M,{ f:330, f1:311, glide:0.25, t, a:0.02, d:0.25, g:0.08, type:"triangle", wet:0.05 }); osc(M,{ f:466, t, a:0.02, d:0.22, g:0.04, type:"triangle", wet:0.05 }); },
+    hurt:(M,t,p)=>{ const k = Math.min(1.6, 0.6 + (p.sev||0)); osc(M,{ f:260, f1:140, glide:0.06, t, a:0.002, d:0.12, g:0.3*k, wet:0, drive:1.4 }); nz(M,{ t, a:0.001, d:0.06, g:0.12*k, ft:"bandpass", f0:900, q:1.5, wet:0 }); },
+    cDeath:(M,t)=>{ osc(M,{ f:240, f1:120, glide:0.12, t, a:0.002, d:0.18, g:0.2, wet:0 }); nz(M,{ t:t+0.03, a:0.02, d:0.2, g:0.05, ft:"lowpass", f0:900, wet:0 }); },
+    cDeathBig:(M,t)=>{ osc(M,{ f:210, f1:95, glide:0.2, t, a:0.002, d:0.3, g:0.35, wet:0, drive:1.3 }); nz(M,{ t, a:0.01, d:0.35, g:0.1, ft:"lowpass", f0:1200, f1:300, wet:0.05 }); bell(M,330,t+0.02,0.06,0.5,{ ratio:2.41, index:2.5, wet:0.05 }); },
     // ================= WORLD: things you touch (physical, mid-range, a little room sound) =================
     lever:(M,t)=>{ [0,0.035,0.07].forEach((dt,i)=>nz(M,{ t:t+dt, a:0.001, d:0.02, g:0.08, ft:"bandpass", f0:3000+i*400, q:3, wet:0.1 }));
       osc(M,{ f:180, f1:85, glide:0.12, t:t+0.1, a:0.002, d:0.2, g:0.3, wet:0.15 }); bell(M,560,t+0.1,0.1,0.35,{ ratio:2.41, index:3, wet:0.2, drive:1.5 }); },
@@ -2549,6 +2577,145 @@ const HWSND = (()=>{
     iron:(M,t)=>{ bell(M,640,t,0.08,0.9,{ ratio:2.41, index:3, wet:0.25, drive:1.6 }); nz(M,{ t:t+0.05, a:0.03, d:0.35, g:0.05, ft:"highpass", f0:4500, wet:0.2 }); },
     arcane:(M,t)=>{ osc(M,{ f:1200, f1:2600, glide:0.2, t, a:0.02, d:0.3, g:0.035, wet:0.5 }); [1975.5,2637].forEach((f,i)=>bell(M,f,t+0.04+i*0.05,0.04,0.7,{ ratio:3.01, index:1.4, wet:0.6, pan:i?0.4:-0.4 })); },
   };
+
+  // ================= MUSIC: generative fight music per family, in layers =================
+  // Level 0 silent (exploring), 1 a pull, 2 a boss, 3 boss phase 2. Each layer has its own gain and fades in (1 s) / out (3 s).
+  // No choir, war drums or horns: those belong to spells and warnings.
+  const mtof = m=>440*Math.pow(2,(m-69)/12);
+  const MI = { // instruments: (M, freq, t, dur, g)
+    bass:(M,f,t,d,g)=>osc(M,{ f, t, a:0.004, d:Math.min(0.32,d), g, type:"sawtooth", n:2, spread:6, lp:1400, f2:220, fg:0.12, q:2, wet:0.05 }),
+    pad:(M,f,t,d,g)=>osc(M,{ f, t, a:0.35, h:Math.max(0,d-0.6), d:0.5, g, type:"sawtooth", n:3, spread:12, lp:700, q:0.7, wet:0.35 }),
+    kick:(M,f,t,d,g)=>osc(M,{ f:72, f1:44, glide:0.1, t, a:0.002, d:0.14, g, wet:0 }),
+    shaker:(M,f,t,d,g)=>nz(M,{ t, a:0.003, d:0.035, g, ft:"highpass", f0:6500, wet:0.05 }),
+    anvil:(M,f,t,d,g)=>bell(M,f,t,g,0.35,{ ratio:3.5, index:1.3, wet:0.2 }),
+    lead:(M,f,t,d,g)=>osc(M,{ f, t, a:0.06, h:Math.max(0,d-0.2), d:0.22, g, type:"sawtooth", n:3, spread:9, lp:500, f2:1500, fg:0.09, f3:650, q:1.4, drive:1.6, wet:0.3 }), // low brass: the filter swells open on each note
+    leadHi:(M,f,t,d,g)=>osc(M,{ f:f*2, t, a:0.05, h:Math.max(0,d-0.2), d:0.2, g, type:"sawtooth", n:2, spread:12, lp:1900, q:0.9, wet:0.45 }), // the melody an octave up, strings-like
+    taiko:(M,f,t,d,g)=>drum(M, t, { f:105, f1:40, d:0.55, g, drive:1.8, wet:0.25 }),
+    saw16:(M,f,t,d,g)=>osc(M,{ f, t, a:0.004, d:0.09, g, type:"sawtooth", n:2, spread:8, lp:1100, q:1.5, wet:0.12 }), // low strings, driving 16ths
+    // tide: swelling pad, round bass, muted plucks, soft low toms, bowed cello lead, harp arpeggios (no water: that is tide's warning colour)
+    padSwell:(M,f,t,d,g)=>osc(M,{ f, t, a:1.2, h:Math.max(0,d-2), d:0.8, g, type:"sawtooth", n:3, spread:14, lp:350, f2:1100, fg:d*0.5, f3:400, q:0.8, wet:0.5 }),
+    bassRound:(M,f,t,d,g)=>osc(M,{ f, t, a:0.01, d:Math.min(0.4,d), g, type:"triangle", lp:700, wet:0.08 }),
+    pluckLow:(M,f,t,d,g)=>osc(M,{ f, t, a:0.003, d:0.18, g, type:"triangle", lp:1200, f2:400, fg:0.1, wet:0.2 }),
+    lowTom:(M,f,t,d,g)=>drum(M, t, { f:90, f1:55, d:0.6, g, drive:1.01, wet:0.3 }),
+    cello:(M,f,t,d,g)=>osc(M,{ f, t, a:0.12, h:Math.max(0,d-0.25), d:0.25, g, type:"sawtooth", n:2, spread:6, lp:900, q:1.1, vib:4.5, wet:0.35 }),
+    celloHi:(M,f,t,d,g)=>osc(M,{ f:f*2, t, a:0.1, h:Math.max(0,d-0.2), d:0.25, g, type:"sawtooth", n:2, spread:10, lp:2200, vib:4.5, wet:0.5 }),
+    harpArp:(M,f,t,d,g)=>osc(M,{ f, t, a:0.002, d:0.5, g, type:"triangle", lp:f*4, wet:0.45 }),
+    // thicket: dark pad, seed shaker, hand drum, reedy lead, plucked strings (no wood knock: that is thicket's warning colour)
+    padDark:(M,f,t,d,g)=>osc(M,{ f, t, a:0.5, h:Math.max(0,d-0.8), d:0.6, g, type:"sawtooth", n:3, spread:10, lp:500, q:0.7, wet:0.35 }),
+    seedShake:(M,f,t,d,g)=>nz(M,{ t, a:0.004, d:0.05, g, ft:"bandpass", f0:3200, q:1.5, wet:0.05 }),
+    frame:(M,f,t,d,g)=>{ osc(M,{ f:190, f1:120, glide:0.06, t, a:0.002, d:0.16, g, wet:0.12 }); nz(M,{ t, a:0.001, d:0.04, g:g*0.5, ft:"bandpass", f0:900, q:1.2, wet:0.08 }); },
+    reed:(M,f,t,d,g)=>osc(M,{ f, t, a:0.03, h:Math.max(0,d-0.12), d:0.12, g, type:"square", bp:1100, q:1.6, vib:6, wet:0.25 }),
+    reedHi:(M,f,t,d,g)=>osc(M,{ f:f*2, t, a:0.03, h:Math.max(0,d-0.12), d:0.12, g, type:"square", bp:2000, q:1.4, vib:6, wet:0.35 }),
+    pluck:(M,f,t,d,g)=>osc(M,{ f, t, a:0.002, d:0.16, g, type:"sawtooth", lp:2200, f2:500, fg:0.08, q:1.5, wet:0.15 }),
+    // gloom: organ, sub bass, a ticking clock, a music box, tremolo strings (no low bell or choir: gloom's warning colour)
+    organ:(M,f,t,d,g)=>{ osc(M,{ f, t, a:0.6, h:Math.max(0,d-1), d:0.6, g, type:"square", lp:900, wet:0.5 }); osc(M,{ f:f/2, t, a:0.6, h:Math.max(0,d-1), d:0.6, g:g*0.7, wet:0.5 }); },
+    bassSub:(M,f,t,d,g)=>osc(M,{ f, t, a:0.05, h:0.3, d:0.5, g, type:"triangle", lp:400, wet:0.1 }),
+    clock:(M,f,t,d,g)=>nz(M,{ t, a:0.001, d:0.02, g, ft:"bandpass", f0:1400, q:6, wet:0.3 }),
+    musicBox:(M,f,t,d,g)=>bell(M, f, t, g, 0.6, { ratio:4.0, index:0.7, wet:0.55 }),
+    boxHi:(M,f,t,d,g)=>bell(M, f*4, t, g, 0.7, { ratio:4.0, index:0.7, wet:0.6 }),
+    organLead:(M,f,t,d,g)=>osc(M,{ f, t, a:0.08, h:Math.max(0,d-0.2), d:0.25, g, type:"square", n:2, spread:5, lp:1300, vib:3.5, wet:0.45 }),
+    tremolo:(M,f,t,d,g)=>osc(M,{ f, t, a:0.005, d:0.07, g, type:"sawtooth", n:2, spread:10, lp:2600, wet:0.4 }),
+    // iron: a sequenced bass, ticking hats, a stamping piston, gear ticks, marcato strings (no clang: iron's warning colour)
+    bassSeq:(M,f,t,d,g)=>osc(M,{ f, t, a:0.003, d:0.11, g, type:"square", lp:900, f2:250, fg:0.08, q:2, wet:0.03 }),
+    hat:(M,f,t,d,g)=>nz(M,{ t, a:0.001, d:0.025, g, ft:"highpass", f0:8500, wet:0.03 }),
+    piston:(M,f,t,d,g)=>{ osc(M,{ f:65, f1:40, glide:0.08, t, a:0.002, d:0.18, g, wet:0.05 }); nz(M,{ t, a:0.002, d:0.08, g:g*0.4, ft:"lowpass", f0:1200, wet:0.05 }); },
+    gearTick:(M,f,t,d,g)=>{ nz(M,{ t, a:0.001, d:0.012, g, ft:"bandpass", f0:5200, q:4, wet:0.1 }); nz(M,{ t:t+0.045, a:0.001, d:0.012, g:g*0.7, ft:"bandpass", f0:4300, q:4, wet:0.1 }); },
+    marcato:(M,f,t,d,g)=>osc(M,{ f, t, a:0.012, h:Math.max(0,Math.min(d,0.5)-0.1), d:0.15, g, type:"sawtooth", n:3, spread:8, lp:1300, q:1, wet:0.25 }),
+    marcatoHi:(M,f,t,d,g)=>osc(M,{ f:f*2, t, a:0.012, h:Math.max(0,Math.min(d,0.5)-0.1), d:0.15, g, type:"sawtooth", n:2, spread:10, lp:2400, wet:0.35 }),
+    seq16:(M,f,t,d,g)=>osc(M,{ f, t, a:0.002, d:0.08, g, type:"square", lp:1600, wet:0.1 }),
+    // arcane: glassy pad, soft pulse, sine chimes, a glass lead (no high FM bells or rising tones: arcane's warning colour)
+    padGlass:(M,f,t,d,g)=>osc(M,{ f:f*2, t, a:0.8, h:Math.max(0,d-1.4), d:0.8, g, type:"triangle", n:3, spread:8, vib:3, wet:0.6 }),
+    bassTri:(M,f,t,d,g)=>osc(M,{ f, t, a:0.01, d:Math.min(0.3,d), g, type:"triangle", lp:600, wet:0.05 }),
+    chime:(M,f,t,d,g)=>osc(M,{ f, t, a:0.002, d:0.35, g, type:"sine", wet:0.6 }),
+    pulse:(M,f,t,d,g)=>osc(M,{ f:80, f1:48, glide:0.15, t, a:0.004, d:0.3, g, type:"sine", wet:0.15 }),
+    glassLead:(M,f,t,d,g)=>osc(M,{ f, t, a:0.07, h:Math.max(0,d-0.2), d:0.3, g, type:"triangle", lp:2500, vib:4, wet:0.55 }),
+    glassHi:(M,f,t,d,g)=>osc(M,{ f:f*2, t, a:0.07, h:Math.max(0,d-0.2), d:0.3, g, type:"sine", vib:4, wet:0.65 }),
+  };
+  const DORIAN = [0,2,3,5,7,9,10], PHRYGIAN = [0,1,3,5,7,8,10], HMINOR = [0,2,3,5,7,8,11], AEOLIAN = [0,2,3,5,7,8,10];
+  function deg(root, scale, d){ const o = Math.floor(d/scale.length), i = ((d%scale.length)+scale.length)%scale.length; return root + o*12 + scale[i]; }
+  const MUSIC = {
+    ember:{ bpm:112, root:50, scale:PHRYGIAN, // D phrygian (the flat 2nd, Eb -> D, is the menace); Dm Bb Cm Eb, two bars each, Eb falling back into Dm
+      chords:[ { bass:38, deg:0, notes:[50,53,57] }, { bass:34, deg:-2, notes:[50,53,58] }, { bass:36, deg:-1, notes:[48,51,55] }, { bass:39, deg:1, notes:[51,55,58] } ],
+      bass:[ [0,0,12,0,0,0,7,0,0,0,12,0,0,0,7,0], [0,0,0,0,12,0,0,0,0,0,0,0,12,0,7,0] ], // semitones over the chord's bass note: root, octave and fifth only
+      bassOn:[ [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], [1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0] ],
+      motifs:[ [[0,0,6],[6,1,2],[8,0,8],[16,-1,4],[20,0,12]], // grinding: D Eb D, C D
+               [[0,4,4],[4,5,4],[8,4,4],[12,1,4],[16,0,16]], // A Bb A, Eb, down to D
+               [[0,0,2],[2,0,2],[4,0,2],[6,1,6],[16,-1,2],[18,-1,2],[20,0,12]], // stabs
+               [[0,7,8],[8,5,4],[12,4,4],[16,1,4],[20,0,12]], // falling from the top
+               [[0,0,3],[3,1,3],[6,2,2],[8,4,8],[16,5,4],[20,4,12]] ], // rising threat
+      anvilSteps:[4,12], taikoSteps:{0:0.04,3:0.017,8:0.032,10:0.022}, fillSteps:{12:0.018,13:0.02,14:0.025,15:0.03} },
+    tide:{ lt:[0,1.25,1.75,1.07], bpm:96, root:52, scale:HMINOR, // E harmonic minor; Em C Am B, the major B pulling hard back to Em
+      ins:{ pad:"padSwell", bass:"bassRound", tick:"pluckLow", drum:"lowTom", ring:null, lead:"cello", hi:"celloHi", ost:"harpArp" }, tick:{2:0.02,6:0.03,10:0.02,14:0.03}, tickOct:0, ost:"arp", ostEvery:2, ostOct:12,
+      chords:[ { bass:40, deg:0, notes:[52,55,59] }, { bass:36, deg:-2, notes:[52,55,60] }, { bass:45, deg:3, notes:[52,57,60] }, { bass:35, deg:4, notes:[51,54,59] } ],
+      bass:[ [0,0,7,0,12,0,7,0,0,0,7,0,12,0,7,0], [0,0,0,0,7,0,0,0,12,0,0,0,7,0,0,0] ], bassOn:[ [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0] ],
+      motifs:[ [[0,0,8],[8,2,4],[12,1,4],[16,0,16]], [[0,4,6],[6,5,2],[8,4,8],[16,2,8],[24,1,8]], [[0,2,4],[4,3,4],[8,4,12],[20,3,4],[24,2,8]], [[0,7,4],[4,6,4],[8,4,8],[16,5,6],[22,4,10]], [[0,0,4],[4,-1,4],[8,0,8],[16,2,4],[20,1,12]] ],
+      ringSteps:[], drumSteps:{0:0.05,8:0.035}, fillSteps:{12:0.02,14:0.03} },
+    thicket:{ lt:[0,1.03,3.07,1.64], bpm:124, root:54, scale:AEOLIAN, // F# minor; F#m D Bm C#m, a restless hunted pulse
+      ins:{ pad:"padDark", bass:"bassSeq", tick:"seedShake", drum:"frame", ring:null, lead:"reed", hi:"reedHi", ost:"pluck" }, tick:{0:0.02,3:0.03,6:0.02,8:0.02,11:0.03,14:0.02}, ost:"arp", ostEvery:2, ostOct:0,
+      chords:[ { bass:42, deg:0, notes:[54,57,61] }, { bass:38, deg:-2, notes:[54,57,62] }, { bass:47, deg:3, notes:[54,59,62] }, { bass:37, deg:4, notes:[56,61,64] } ],
+      bass:[ [0,0,0,12,0,0,7,0,0,0,0,12,0,0,7,0], [0,0,12,0,0,7,0,0,0,0,12,0,0,7,0,0] ], bassOn:[ [1,0,0,1,0,0,1,0,1,0,0,1,0,0,1,0], [1,0,1,1,0,1,1,0,1,0,1,1,0,1,1,0] ],
+      motifs:[ [[0,0,3],[3,2,3],[6,3,2],[8,4,6],[14,3,2],[16,2,4],[20,0,12]], [[0,4,2],[2,4,2],[4,5,4],[8,4,4],[12,2,4],[16,3,16]], [[0,7,6],[6,6,2],[8,4,8],[16,5,3],[19,4,3],[22,2,10]], [[0,0,2],[2,0,2],[4,2,2],[6,0,2],[8,-1,8],[16,0,16]], [[0,2,4],[4,4,4],[8,5,8],[16,4,4],[20,3,12]] ],
+      ringSteps:[], drumSteps:{0:0.05,3:0.03,6:0.04,10:0.03,12:0.04}, fillSteps:{13:0.03,14:0.035,15:0.04} },
+    gloom:{ lt:[0,0.51,1.09,2.47], bpm:84, root:48, scale:HMINOR, // C harmonic minor; Cm Ab Fm G, slow, with a ticking clock and a music box
+      ins:{ pad:"organ", bass:"bassSub", tick:"clock", drum:"lowTom", ring:"musicBox", lead:"organLead", hi:"boxHi", ost:"tremolo" }, tick:{0:0.03,4:0.02,8:0.03,12:0.02}, ost:"arp", ostEvery:1, ostOct:12, ringOct:24,
+      chords:[ { bass:36, deg:0, notes:[48,51,55] }, { bass:32, deg:-2, notes:[48,51,56] }, { bass:41, deg:3, notes:[48,53,56] }, { bass:43, deg:4, notes:[50,55,59] } ],
+      bass:[ [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0] ], bassOn:[ [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], [1,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0] ],
+      motifs:[ [[0,0,8],[8,-1,8],[16,0,16]], [[0,4,8],[8,5,8],[16,4,12],[28,3,4]], [[0,2,6],[6,1,2],[8,0,8],[16,-1,6],[22,-3,10]], [[0,7,4],[4,6,4],[8,5,8],[16,4,16]], [[0,0,4],[4,2,4],[8,4,4],[12,5,4],[16,-1,16]] ],
+      ringSteps:[2,7,11], drumSteps:{0:0.05,10:0.03}, fillSteps:{14:0.03} },
+    iron:{ lt:[0,1.08,2.21,1.39], bpm:120, root:55, scale:HMINOR, // G harmonic minor; Gm Eb Cm D, mechanical
+      ins:{ pad:"padDark", bass:"bassSeq", tick:"hat", drum:"piston", ring:"gearTick", lead:"marcato", hi:"marcatoHi", ost:"seq16" }, tick:{0:0.012,2:0.012,4:0.02,6:0.012,8:0.012,10:0.012,12:0.02,14:0.012}, ost:"arp", ostEvery:1, ostOct:12,
+      chords:[ { bass:43, deg:0, notes:[55,58,62] }, { bass:39, deg:-2, notes:[55,58,63] }, { bass:36, deg:3, notes:[55,60,63] }, { bass:38, deg:4, notes:[54,57,62] } ],
+      bass:[ [0,0,12,0,0,0,12,0,0,0,12,0,7,0,12,0], [0,0,12,0,0,0,12,0,0,0,12,0,0,0,12,0] ], bassOn:[ [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], [1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1] ],
+      motifs:[ [[0,0,2],[2,0,2],[4,2,4],[8,0,2],[10,0,2],[12,3,4],[16,2,8],[24,1,8]], [[0,4,4],[4,4,2],[6,5,2],[8,4,8],[16,0,16]], [[0,7,2],[2,6,2],[4,5,2],[6,4,2],[8,3,8],[16,4,16]], [[0,0,6],[6,1,2],[8,2,6],[14,3,2],[16,4,16]], [[0,4,3],[3,3,3],[6,2,2],[8,1,8],[16,0,8],[24,-1,8]] ],
+      ringSteps:[3,11], drumSteps:{0:0.06,6:0.03,8:0.05,14:0.03}, fillSteps:{12:0.03,13:0.03,15:0.04} },
+    arcane:{ lt:[0,1.05,1.46,0.86], bpm:104, root:59, scale:HMINOR, // B harmonic minor; Bm G Em F#, glassy and floating
+      ins:{ pad:"padGlass", bass:"bassTri", tick:"chime", drum:"pulse", ring:null, lead:"glassLead", hi:"glassHi", ost:"chime" }, tick:{2:0.015,7:0.012,10:0.015,13:0.012}, tickOct:12, ost:"arp", ostEvery:2, ostOct:12,
+      chords:[ { bass:47, deg:0, notes:[59,62,66] }, { bass:43, deg:-2, notes:[59,62,67] }, { bass:40, deg:3, notes:[59,64,67] }, { bass:42, deg:4, notes:[58,61,66] } ],
+      bass:[ [0,0,12,0,0,0,12,0,0,0,12,0,0,0,12,0], [0,0,0,7,0,0,12,0,0,0,0,7,0,0,12,0] ], bassOn:[ [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], [1,0,0,1,0,0,1,0,1,0,0,1,0,0,1,0] ],
+      motifs:[ [[0,4,8],[8,3,4],[12,2,4],[16,1,16]], [[0,0,4],[4,4,4],[8,7,8],[16,6,8],[24,4,8]], [[0,2,6],[6,3,2],[8,6,8],[16,4,16]], [[0,7,4],[4,4,4],[8,5,4],[12,2,4],[16,3,16]], [[0,0,2],[2,2,2],[4,4,2],[6,6,2],[8,7,8],[16,6,4],[20,4,12]] ],
+      ringSteps:[], drumSteps:{0:0.06,8:0.04}, fillSteps:{} },
+  };
+  const MUS_ROLE = { pad:"pad", bass:"bass", tick:"shaker", drum:"taiko", ring:"anvil", lead:"lead", hi:"leadHi", ost:"saw16" }; // Ember's, the defaults
+  function musicStep(st, M, t){ // schedule one 16th step
+    const D = st.def, step = st.step, bar16 = step % 16, barN = Math.floor(step/16), chordI = Math.floor(barN/2) % D.chords.length, ch = D.chords[chordI], L = st.lv, r = st.r;
+    const half = Math.floor(barN) % 2; // first or second bar of the chord
+    const I = k=>{ const n = D.ins && (k in D.ins) ? D.ins[k] : MUS_ROLE[k]; return n ? MI[n] : null; };
+    const motifAt = fn=>(st.motif||[]).forEach(([s0,dg,len])=>{ if(s0===bar16 + (half?16:0)) fn(mtof(deg(D.root, D.scale, dg + ch.deg)), len*st.spb); });
+    if(L[1] > 0.001){ const Mv = st.layer(1);
+      const pad = I("pad"); if(pad && bar16===0 && half===0) ch.notes.forEach(n=>pad(Mv, mtof(n), t, st.spb*32, 0.028));
+      const bass = I("bass"), bp = st.bassPat; if(bass && D.bassOn[bp][bar16]) bass(Mv, mtof(ch.bass + D.bass[bp][bar16]), t, st.spb*2, 0.055);
+      const tick = I("tick"), tg = D.tick ? D.tick[bar16] : (bar16 % 2 === 0 ? (bar16 % 8 === 4 ? 0.04 : 0.02) : 0);
+      if(tick && tg) tick(Mv, mtof(ch.notes[bar16 % ch.notes.length] + (D.tickOct||0)), t, st.spb, tg); }
+    if(L[2] > 0.001){ const Mv = st.layer(2);
+      const drum = I("drum"), dk = (D.drumSteps||D.taikoSteps||{})[bar16]; if(drum && dk) drum(Mv, 0, t, 0, dk);
+      const ring = I("ring"); if(ring && (D.ringSteps||D.anvilSteps||[]).includes(bar16)) ring(Mv, mtof(ch.notes[(barN+bar16)%3] + (D.ringOct==null?24:D.ringOct)), t, 0, 0.03);
+      if(bar16===0 && half===0){ // a shuffled bag: every motif once per round, never the same one twice in a row
+        if(!st.bag || !st.bag.length){ const b = D.motifs.map((_,i)=>i); for(let i=b.length-1;i>0;i--){ const j = Math.floor(r()*(i+1)); [b[i],b[j]] = [b[j],b[i]]; }
+          if(st.motifI != null && b[b.length-1] === st.motifI) [b[0], b[b.length-1]] = [b[b.length-1], b[0]]; st.bag = b; }
+        st.motifI = st.bag.pop(); st.motif = D.motifs[st.motifI]; st.motifLog = (st.motifLog||[]).concat([st.motifI]); }
+      const lead = I("lead"); if(lead) motifAt((f, d)=>lead(Mv, f, t, d, 0.018)); }
+    if(L[3] > 0.001){ const Mv = st.layer(3);
+      const hi = I("hi"); if(hi) motifAt((f, d)=>hi(Mv, f, t, d, 0.016));
+      const ost = I("ost"), oe = D.ostEvery||1;
+      if(ost && bar16 % oe === 0){ const f = D.ost === "arp" ? mtof(ch.notes[(bar16/oe) % ch.notes.length] + (D.ostOct==null?12:D.ostOct)) : mtof(ch.bass + 12); ost(Mv, f, t, 0, bar16 % 4 === 0 ? 0.03 : 0.018); }
+      const drum = I("drum"), fl = half === 1 && D.fillSteps && D.fillSteps[bar16]; if(drum && fl) drum(Mv, 0, t, 0, fl); }
+    if(bar16===15 && half===1){ st.bassPat = r() < 0.5 ? 0 : 1; }
+    st.step++; }
+  function musicNew(c, out, wet, fam, t0, seed){ const def = MUSIC[fam]; if(!def) return null; const lg = [null,1,2,3].map(()=>{ const g = c.createGain(), w = c.createGain(); g.gain.value = 0; w.gain.value = 0; g.connect(out); w.connect(wet); return { g, w }; });
+    const st = { fam, def, c, step:0, t:t0 + 0.1, spb:60/def.bpm/4, r:rng(seed||321), lv:[0,0,0,0], lg, bassPat:0, motif:null,
+      layer:i=>({ c, dry:lg[i].g, wet:lg[i].w }) }; return st; }
+  const MUS_LAYER = [0, 0.7, 1, 1]; // the pull layer sits under the boss layers
+  function musicLevel(st, level, when){ for(let i=1;i<=3;i++){ const on = level>=i ? MUS_LAYER[i]*((st.def.lt||[])[i]||1) : 0, gg = [st.lg[i].g.gain, st.lg[i].w.gain];
+      gg.forEach(p=>{ p.cancelScheduledValues(when); p.setValueAtTime(p.value, when); p.linearRampToValueAtTime(on, when + (on ? 1 : 3)); });
+      if(on) st.lv[i] = 1; else setTimeout(()=>{ if(st.target < i) st.lv[i] = 0; }, 3200); } st.target = level; }
+  function musicPump(st, until){ while(st.t < until){ musicStep(st, null, st.t); st.t += st.spb; } }
+  let mus = null, musTimer = null;
+  function music(fam, level){ fam = fam || null; level = level|0; const c = (fam && level) ? ensure() : ctx; if(!c) return;
+    if(mus && (mus.fam !== fam || !level)){ const old = mus; musicLevel(old, 0, c.currentTime); setTimeout(()=>{ old.lg.forEach(x=>{ if(x){ try{ x.g.disconnect(); x.w.disconnect(); }catch(_){} } }); }, 3500); mus = null; }
+    if(!fam || !level) return;
+    if(!mus){ mus = musicNew(c, mix.mus, mix.verbIn, fam, c.currentTime, (Date.now() & 0xffff) + 7); mus.target = 0;
+      if(!musTimer) musTimer = setInterval(()=>{ if(mus && ctx && ctx.state === "running") musicPump(mus, ctx.currentTime + 0.4); }, 100); }
+    if(mus.target !== level) musicLevel(mus, level, c.currentTime); }
   // ================= AMBIENCE: a quiet bed per dungeon family, with sparse random events =================
   // bed(M, t) builds the never-ending layers and returns the sources to stop; ev = [[minGap, maxGap, fn(M, t, r)]]
   function lfo(c, t, rate, depth, param, type){ const l = c.createOscillator(), g = c.createGain(); l.type = type||"sine"; l.frequency.value = rate; g.gain.value = depth; l.connect(g); g.connect(param); l.start(t); return l; }
@@ -2592,17 +2759,33 @@ const HWSND = (()=>{
       ev:[ [1.5,4,(M,t,r)=>bell(M,pick(r,[1760,1975.5,2637,2960]),t,0.015,1.6,{ ratio:3.01, index:1, wet:0.9, pan:(r()-0.5)*1.6 })],
            [9,15,(M,t,r)=>nz(M,{ t, a:0.08, d:0.25, g:0.02, f0:900, f1:3000, glide:0.25, q:1.5, wet:0.4, pan:(r()-0.5)*1.2 })] ] },
   };
+  AMB.hub = { // the hearth at home: a crackling fire, a warm major pad, wind outside, a log settling, a far-off chime
+    bed:(M,t)=>[ ...bed(M,t,{ ft:"bandpass", f:1000, q:0.7, g:0.012, am:0.3, amD:0.6 }), ...bed(M,t,{ f:260, g:0.035, am:0.05, amD:0.4, off:0.4 }),
+      ...drone(M,146.83,t,0.018,{ trem:0.07, tremD:0.5, lp:900, wet:0.5 }), ...drone(M,220,t,0.012,{ trem:0.05, tremD:0.6, lp:900, wet:0.5, pan:-0.3 }), ...drone(M,369.99,t,0.007,{ trem:0.09, tremD:0.7, lp:1200, wet:0.6, pan:0.3 }),
+      ...bed(M,t,{ ft:"bandpass", f:600, q:1.2, g:0.012, am:0.04, amD:0.8, fm:0.03, fmD:250, off:1.1 }) ],
+    ev:[ [0.2,0.8,(M,t,r)=>crackle(M,t,0.1,20,0.025,Math.floor(r()*1e6),0.2)],
+         [12,25,(M,t,r)=>{ osc(M,{ f:180, f1:110, glide:0.08, t, a:0.004, d:0.16, g:0.06, type:"triangle", lp:900, wet:0.3 }); crackle(M,t+0.05,0.5,40,0.035,Math.floor(r()*1e6),0.2); }],
+         [15,26,(M,t)=>nz(M,{ t, a:1.5, d:2, g:0.03, ft:"bandpass", f0:500, f1:900, glide:2.5, q:1.2, wet:0.3 })],
+         [20,35,(M,t,r)=>bell(M,pick(r,[N.A5,N.D6,N.Fs5]),t,0.012,2.5,{ ratio:3.01, index:1, wet:0.9, pan:(r()-0.5)*1.2 })] ] };
   AMB.unknown = AMB.ember;
-  const AMB_TRIM = { ember:0.5, gloom:0.6, thicket:0.85 };
+  const AMB_TRIM = { ember:0.5, gloom:0.6, thicket:0.85, hub:1.25 };
   // loudness per sound (re-measured after each change): threats loudest, then boss moments,
   // landings and pass/fail, held casts under their own landing, rewards, menus quietest
   const LEVEL = { castWind:0.7, wind:1.4, hearth:1.4, misdirect:1.6, purge:1.6, cleanse:1.3, fizzle:1.8, pass:1.3, lowMana:1.3, revived:1.4, defeated:1.6,
     warnDodge:0.85, warnShelter:0.6, warnSpread:0.85, warnDispel:1.1, warnBrace:0.6, warnAttention:1.1, fail:0.75, downed:0.9, phase:0.6, killBoom:0.65,
     loot2:1.1, loot3:1.2, loot4:1.1, xpFill:1.5, click:2, tab:2,
+    cSlam:0.57, cShout:0.42, cGuard:1.5, cBulwark:0.43, cSwipe:4, cFalcon:0.56, cLeap:0.4, cFocus:2.1, cNova:2.6, cLance:0.38, cBrand:2, cPop:1.15, cImpact:0.45,
+    cSpray:1.3, cFang:1.1, cBite:5, cBloom:1.25, cBlight:2.1, cRend:1.6, cGrasp:0.5, cDoom:1.2, hurt:0.7, cDeath:0.9, cDeathBig:0.4,
     doorOpen:0.6, zap:0.6, mimic:0.6, button:1.2, fountain:1.6, shrine:1.7, ignite:1.7, shatter:1.6, chestLatch:2.5, chestOpen:2, coins:1.7, puzzleMiss:1.5, reveal:2.5, interact:1.8, crumble:1.1 };
   function trim(c, out, name){ const g = c.createGain(); g.gain.value = LEVEL[name]||1; g.connect(out); return g; }
   const SPELL = { mend:{ cast:"castMend", done:"mend" }, flicker:{ cast:"castSurge", done:"surge" }, wind:{ cast:"castWind", done:"wind" },
     hearth:{ done:"hearth" }, ward:{ done:"ward" }, cleanse:{ done:"cleanse" }, misdirect:{ done:"misdirect" }, purge:{ done:"purge" } };
+  const CFX_SND = { slam:"cSlam", rally:"cShout", gward:"cGuard", rward:"cGuard", bulwark:"cBulwark",
+    wildcut:"cSwipe", falcon:"cFalcon", leap:"cLeap", focus:"cFocus",
+    nova:"cNova", lance:"cLance", brand:"cBrand", brandpop:"cPop", meteor:"cImpact", combust:"cPop", chain:"cLance", spiral:"cNova",
+    spray:"cSpray", fang:"cFang", bite:"cBite", bloom:"cBloom",
+    wnova:"cBlight", blight:"cBlight", rend:"cRend", grasp:"cGrasp", doom:"cDoom", doompop:"cPop", harvest:"cBlight" };
+  const COMBAT = new Set([...Object.values(CFX_SND), "hurt", "cDeath", "cDeathBig"]);
   const WARN_GROUPS = { warnDodge:["MOVE","SIDESTEP","DODGE","GO AROUND","BACK OFF","BREAK AWAY","NAVIGATE","POSITION","SNARED","REELING","STAGGERED"],
     warnShelter:["HIDE","GET IN","STEP IN","CLOSE IN","GET IN LIGHT","HIGH GROUND","GET BEHIND","SHELTER","CLOTH FALL"],
     warnSpread:["SPREAD","FIND SPACE"],
@@ -2616,26 +2799,40 @@ const HWSND = (()=>{
     const master = c.createGain(); master.connect(comp); const sfx = c.createGain(); sfx.connect(master);
     const duck = c.createGain(); duck.connect(sfx); // everything that isn't a threat; dips while a warning plays
     const amb = c.createGain(); amb.connect(duck); // ambience, under everything, with its own volume
+    const cmb = c.createGain(); cmb.connect(duck); const cmbDip = c.createGain(); cmbDip.connect(cmb); // combat: own volume, plus a dip under your spell landings
+    const musV = c.createGain(); musV.connect(duck); const mus = c.createGain(); mus.connect(musV); // music: own volume (musV), plus an extra dip under warnings and landings (mus)
     const verb = c.createConvolver(); verb.buffer = impulse(c); const vret = c.createGain(); vret.gain.value = 0.55; verb.connect(vret); vret.connect(duck);
     const pre = c.createBiquadFilter(); pre.type = "highpass"; pre.frequency.value = 220; pre.connect(verb); // keep lows out of the hall
-    return { master, sfx, duck, amb, verbIn:pre }; }
+    return { master, sfx, duck, amb, cmb, cmbDip, mus, musV, verbIn:pre }; }
   // threats and boss moments win: they skip the voice cap, and dip everything else by about 7 dB for a moment
   const THREAT = new Set(["warnDodge","warnShelter","warnSpread","warnDispel","warnBrace","warnAttention","fail","downed","phase","killBoom","mimic","doorSlam"]);
-  const COOLDOWN = { pass:0.25, fail:0.25, click:0.04, tab:0.04, lowMana:3 }; const DEF_CD = 0.08;
-  const MAX_VOICES = 8, last = {}; let voices = [];
+  const COOLDOWN = { pass:0.25, fail:0.25, click:0.04, tab:0.04, lowMana:3, hurt:0.25, cDeath:0.4 }; const DEF_CD = 0.08;
+  const MAX_VOICES = 8, last = {}; let voices = [], cVoices = []; const cLast = {};
+  const SPELL_DONE = new Set(['mend','surge','wind','hearth','ward','cleanse','misdirect','purge']);
   let ctx = null, mix = null;
-  const VOL = { master:0.6, sfx:1, amb:1, mute:false };
+  const VOL = { master:0.6, sfx:1, amb:1, cmb:1, mus:0.5, mute:false };
   function ensure(){ try{ if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null; ctx = new AC(); mix = buildMix(ctx, ctx.destination); apply(); }
       if(ctx.state === "suspended" && !paused) ctx.resume(); return ctx; }catch(_){ return null; } }
   let paused = false;
   function setPaused(p){ paused = !!p; try{ if(ctx){ if(paused && ctx.state === "running") ctx.suspend(); else if(!paused && ctx.state === "suspended") ctx.resume(); } }catch(_){} }
-  function apply(){ if(!mix) return; mix.master.gain.value = VOL.mute ? 0 : VOL.master; mix.sfx.gain.value = VOL.sfx; mix.amb.gain.value = VOL.amb * AMB_LEVEL; }
-  function play(name, opts){ const r = R[name]; if(!r) return null; const c = ensure(); if(!c || VOL.mute || !(VOL.master>0)) return null;
-    const now = c.currentTime, threat = THREAT.has(name);
+  function apply(){ if(!mix) return; mix.master.gain.value = VOL.mute ? 0 : VOL.master; mix.sfx.gain.value = VOL.sfx; mix.amb.gain.value = VOL.amb * AMB_LEVEL; mix.cmb.gain.value = VOL.cmb; mix.musV.gain.value = VOL.mus * MUS_LEVEL; }
+  const MUS_LEVEL = 1;
+  function play(name, opts){ if(!R[name]) return null; const c = ensure(); if(!c || VOL.mute || !(VOL.master>0)) return null; return playAt(c, name, opts, c.currentTime); }
+  function playAt(c, name, opts, now){ const r = R[name];
+    const threat = THREAT.has(name), combat = COMBAT.has(name);
     if(now - (last[name]||-9) < (COOLDOWN[name]==null ? DEF_CD : COOLDOWN[name])) return null; last[name] = now;
+    if(combat){ // clarity rules: 3 at a time, one per source every 0.6 s, quieter with distance, panned to where it happens
+      cVoices = cVoices.filter(v=>v > now); if(cVoices.length >= 3) return null;
+      if(opts && opts.src){ if(now - (cLast[opts.src]||-9) < 0.6) return null; cLast[opts.src] = now; }
+      cVoices.push(now + 0.35);
+      const g = c.createGain(); g.gain.value = (LEVEL[name]||1) * (opts && opts.dist!=null ? opts.dist : 1); let head = g;
+      if(opts && opts.pan && c.createStereoPanner){ const p = c.createStereoPanner(); p.pan.value = Math.max(-0.8, Math.min(0.8, opts.pan)); g.connect(p); p.connect(mix.cmbDip); } else g.connect(mix.cmbDip);
+      try{ R[name]({ c, dry:g, wet:trim(c, mix.verbIn, name) }, now + 0.01, opts||{}); }catch(_){} return null; }
+    if(SPELL_DONE.has(name)){ const d = mix.cmbDip.gain; d.cancelScheduledValues(now); d.setValueAtTime(d.value, now); d.linearRampToValueAtTime(0.4, now+0.02); d.setValueAtTime(0.4, now+0.35); d.linearRampToValueAtTime(1, now+0.7); }
     voices = voices.filter(v=>v > now);
     if(!threat && voices.length >= MAX_VOICES) return null;
     voices.push(now + ((opts && opts.dur) || 0) + 1.2);
+    if(threat || SPELL_DONE.has(name)){ const g = mix.mus.gain, lo = threat ? 0.35 : 0.7; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(lo, now+0.03); g.setValueAtTime(lo, now+0.55); g.linearRampToValueAtTime(1, now+1.1); } // music dips (with the duck under it: ~-16 dB under warnings)
     if(threat){ const g = mix.duck.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.45, now+0.03); g.setValueAtTime(0.45, now+0.5); g.linearRampToValueAtTime(1, now+0.9); }
     try{ const M = { c, dry:trim(c, threat ? mix.sfx : mix.duck, name), wet:trim(c, mix.verbIn, name) }, h = r(M, now + 0.01, opts||{}) || null;
       const fam = (opts && opts.fam!==undefined) ? opts.fam : famNow; if(fam && FAMC[fam] && WARN_HIT[name]!=null) famLayer(M, fam, now + 0.01 + WARN_HIT[name]); // family colour on warnings
@@ -2656,12 +2853,29 @@ const HWSND = (()=>{
     if(ambCur){ ambStopNode(ambCur, c, 2.0); ambCur = null; }
     if(name){ ambCur = ambStart(c, mix.amb, mix.verbIn, name, c.currentTime + 0.05, (Date.now() & 0xffff) + 1);
       if(!ambTimer) ambTimer = setInterval(()=>{ if(ambCur && ctx && ctx.state === "running") ambPump(ambCur, ctx.currentTime + 1); }, 250); } }
+  // a scripted scene through the real rules (cap, cooldowns, ducking, combat dip): events = [[time, name, opts]]
+  function renderScene(events, dur, sr){ const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const c = new OC(2, Math.ceil((sr||44100)*dur), sr||44100);
+    const saved = { mix, last:Object.assign({}, last), voices, cVoices, cLast:Object.assign({}, cLast) }; mix = buildMix(c, c.destination); mix.master.gain.value = 0.6; mix.amb.gain.value = AMB_LEVEL; mix.cmb.gain.value = 1;
+    Object.keys(last).forEach(k=>delete last[k]); Object.keys(cLast).forEach(k=>delete cLast[k]); voices = []; cVoices = [];
+    events.slice().sort((a,b)=>a[0]-b[0]).forEach(([t, n, o])=>{ try{ playAt(c, n, o||{}, t); }catch(_){} });
+    mix = saved.mix; Object.keys(last).forEach(k=>delete last[k]); Object.assign(last, saved.last); voices = saved.voices; cVoices = saved.cVoices; Object.keys(cLast).forEach(k=>delete cLast[k]); Object.assign(cLast, saved.cLast);
+    return c.startRendering(); }
+  // offline music: timeline [[t, level]], plus optional sound events (through the live rules) for masking checks
+  function renderMusic(fam, timeline, dur, events, sr){ const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const c = new OC(2, Math.ceil((sr||44100)*dur), sr||44100);
+    const saved = { mix, last:Object.assign({}, last), voices, cVoices, cLast:Object.assign({}, cLast) }; mix = buildMix(c, c.destination); mix.master.gain.value = 0.6; mix.musV.gain.value = 0.5*MUS_LEVEL; mix.cmb.gain.value = 1;
+    Object.keys(last).forEach(k=>delete last[k]); Object.keys(cLast).forEach(k=>delete cLast[k]); voices = []; cVoices = [];
+    const st = musicNew(c, mix.mus, mix.verbIn, fam, 0, 4242); st.lv = [0,1,1,1];
+    timeline.forEach(([t, level])=>{ for(let i=1;i<=3;i++){ const on = level>=i ? MUS_LAYER[i]*((st.def.lt||[])[i]||1) : 0; [st.lg[i].g.gain, st.lg[i].w.gain].forEach(p=>{ p.linearRampToValueAtTime(p._v==null?0:p._v, t); p.linearRampToValueAtTime(on, t + (on ? 1 : 3)); p._v = on; }); } });
+    (events||[]).slice().sort((a,b)=>a[0]-b[0]).forEach(([t, n, o])=>{ try{ playAt(c, n, o||{}, t); }catch(_){} });
+    musicPump(st, dur); const motifs = st.motifLog;
+    mix = saved.mix; Object.keys(last).forEach(k=>delete last[k]); Object.assign(last, saved.last); voices = saved.voices; cVoices = saved.cVoices; Object.keys(cLast).forEach(k=>delete cLast[k]); Object.assign(cLast, saved.cLast);
+    return c.startRendering().then(buf=>({ buf, motifs })); }
   function renderAmb(name, dur, sr){ const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const c = new OC(2, Math.ceil((sr||44100)*dur), sr||44100), m = buildMix(c, c.destination);
     m.master.gain.value = 0.6; m.amb.gain.value = AMB_LEVEL; const a = ambStart(c, m.amb, m.verbIn, name, 0, 99); ambPump(a, dur); return c.startRendering(); }
   function render(name, opts, sr, vol){ const r = R[name], len = (opts && opts.dur ? opts.dur : 0) + 4.5; const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const c = new OC(2, Math.ceil((sr||44100)*len), sr||44100), m = buildMix(c, c.destination); m.master.gain.value = vol==null ? 0.6 : vol;
     const M = { c, dry:trim(c, m.sfx, name), wet:trim(c, m.verbIn, name) }; r(M, 0.01, opts||{}); if(opts && opts.fam && FAMC[opts.fam] && WARN_HIT[name]!=null) famLayer(M, opts.fam, 0.01 + WARN_HIT[name]); return c.startRendering(); }
-  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, AMB, warnFor, VOL, ensure, apply, play, render, renderAmb, amb, setPaused, get ambName(){ return ambCur ? ambCur.name : null; }, get fam(){ return famNow; }, set fam(v){ famNow = v || null; }, get ctx(){ return ctx; } };
+  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, AMB, CFX_SND, COMBAT, warnFor, VOL, ensure, apply, play, render, renderAmb, renderScene, renderMusic, music, MUSIC, amb, setPaused, get ambName(){ return ambCur ? ambCur.name : null; }, get musicState(){ return mus ? { fam:mus.fam, level:mus.target } : null; }, get fam(){ return famNow; }, set fam(v){ famNow = v || null; }, get ctx(){ return ctx; } };
 })();
 if(typeof window !== "undefined") window.HWSND = HWSND;
 
@@ -13327,7 +13541,7 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
     "Tolling Wave":[0.25], "Snuffing Wail":[0.25], "Ripening":[0.25], "Double Toll":[0.25,"r"], "Crescendo":[0.25,"r"],
     "Scorched Earth":[0.05,"z"], "Bilge Surge":[0.05,"z"], "Thorned Bloom":[0.05,"z"], "Choking Canopy":[0.08,"z"], "Corrosive Tide":[0.08,"z"], /* tune1V1: was 5% */
     "Fourfold Gaze":[0.05,"z"], "Redraw":[0.05,"z"], "Pinned":[0.06,"z"], "Held Under":[0.06,"z"], "Grinding Gears":[0.06,"z"],
-    "Grave Bell":[0.05,"rz"], "Endless Harmony":[0.05,"rz"], "Thorn thicket":[0.03,"rz"],
+    "Grave Bell":[0.05,"rz"], "Converging Shards":[0,"rz"], /* shardsFailV1: failure via balMechFail, not damage */ "Endless Harmony":[0.05,"rz"], "Thorn thicket":[0.03,"rz"],
   };
   const BAL_ALIAS = { "Dashed against the reef":"Tidal Surge" }; // mpTideV1: damage name -> the mechanic it belongs to
   const ZONE_FAIL_PER_SEC = 0.12; // tune3V1: a 2 s slip in any zone costs about as much as a missed blast
@@ -13394,6 +13608,18 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
   function mfEid(e){ return e._mfId || (e._mfId = (S._mfSeq = (S._mfSeq||0) + 1)); }
   function mfPulse(key, col){ (S._mfFx || (S._mfFx = [])).push({ key, col, t:0, dur:0.7 }); }
   function mfVignette(){ try{ const v = document.getElementById("mfVig"); if(!v) return; v.classList.remove("on"); void v.offsetWidth; v.classList.add("on"); }catch(_){} }
+  // shardsFailV1: a failure that isn't a damage hit (Converging Shards' Resonance): record it, pulse red, build Strain
+  function balMechFail(key, name){
+    if(S.arena) return; const m = S.party[key]; if(!m || !m.alive) return;
+    const now = S.runTimer||0, ST = S.strain || (S.strain = { n:0, last:-99, hitAt:{} });
+    (S._mfFails || (S._mfFails = [])).push({ src:name, key, t:now }); if(S._mfFails.length > 60) S._mfFails.splice(0, 30);
+    const lp = (S._mfLastPulse || (S._mfLastPulse = {}))[key] || -99; if(now - lp > 0.9){ S._mfLastPulse[key] = now; mfPulse(key, MF_BAD); if(key==="self") mfVignette(); }
+    if(S.level>0 && now - (ST.hitAt[name]==null ? -99 : ST.hitAt[name]) > 4){
+      ST.hitAt[name] = now; ST.n++; ST.last = now; ST.dir = 1; if(S._simStrainLog) S._simStrainLog.push(name+'|'+key+'|100');
+      spawnFloatingText(m.x, m.y-34, "STRAIN ×"+ST.n, "var(--blood)");
+      pushLog("event", `${name} catches ${key==="self"?"you":m.label}: Strain builds (×${ST.n}). Each stack makes failed mechanics and the boss's blows hit harder.`);
+    }
+  }
   function mfFailedSince(names, t0){ return (S._mfFails||[]).some(r=>r.t >= t0 && names.indexOf(r.src)>=0); }
   function balStrainEase(){ const ST = S.strain; if(!ST || !(ST.n>0)) return; ST.n--; ST.last = S.runTimer||0; ST.dir = -1; /* rampPipsV1 */
     spawnFloatingText(S.party.self.x, S.party.self.y-40, ST.n ? "STRAIN ×"+ST.n : "STRAIN EASES", "var(--moss)"); if(S._simStrainLog) S._simStrainLog.push("EASE|-|0"); }
@@ -13657,6 +13883,7 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
       // attacker) and a floating "-N" over the party member that got hit.
       triggerHitReaction(m, sourceEnemy ? sourceEnemy.x : undefined, sourceEnemy ? sourceEnemy.y : undefined);
       S._ftHit = !isDot && dmg >= m.maxHp*0.08; spawnFloatingText(m.x, m.y, `-${dmg}`, "var(--blood)"); S._ftHit = false; // numbersV1
+      if(!isDot && dmg >= m.maxHp*0.08) sndAt("hurt", m.x, m.y, { sev:dmg/m.maxHp, src:"hurt"+key }); // soundHookV1
       // Sanguine (keystone modifier): the enemy that actually landed the hit
       // heals back a slice of the real (post-mitigation, post-shield) damage.
       if(S.mods.includes("sanguine") && sourceEnemy && sourceEnemy.alive){
@@ -14032,6 +14259,7 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
   function killEnemy(enemy, group){
     if(enemy._mythicHold){ enemy.hp = Math.max(1, enemy.hp||0); enemy._mythicDue = true; return; } // Mythic: the boss's final phase begins instead
     enemy.alive=false;
+    if(!FAMILY_BY_BOSS[enemy.kind]) sndAt(enemy.elite ? "cDeathBig" : "cDeath", enemy.x, enemy.y, {}); // soundHookV1 (bosses get the kill beat)
     // Rook kill hooks (melee tree v2): Endless Hunt / Adrenaline / Relentless Assault resets, Bloodfrenzy's kill
     // window, Marked Prey (affix), Blood in the Water's Mark spread. Any kill source counts.
     if(S.meleeSpec!=="dot" && S.party.dps && S.party.dps.ccds){ const rk = S.party.dps;
@@ -16426,7 +16654,7 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
     Object.keys(S.party||{}).forEach(key=>{ const m = S.party[key], fs = m && m._sfxFam; if(!m || !m.alive || !fs || !(fs.wax > 0 || fs.plate > 0)) return; const b = sfxAt(m, 1.35);
       if(fs.wax > 0) cfxWaxShell(b, r, now, fs.waxF, key); if(fs.plate > 0) cfxPlateShell(b, r, now, fs.plateF); }); }
   const CFX_PASS = { rally:"top", slam:"top", gward:"top", bulwark:"both" };
-  function cfxCast(id, o){ try{ o = o || {}; o.k = "c_" + id; o.dur = o.dur || CFX_DUR[id] || 0.6; const ps = CFX_PASS[id]; if(ps==="top") o.top = true; else if(ps==="both") o.both = true; sfxSpawn(o); }catch(_){} }
+  function cfxCast(id, o){ sndCfx(id, o); try{ o = o || {}; o.k = "c_" + id; o.dur = o.dur || CFX_DUR[id] || 0.6; const ps = CFX_PASS[id]; if(ps==="top") o.top = true; else if(ps==="both") o.both = true; sfxSpawn(o); }catch(_){} }
   const CFX_DUR = { rally:0.75, slam:0.6, gward:0.8, bulwark:0.9 };
   function cfxFace(m){ return m && m._hr ? (m._hr.faceK || m._hr.face || 1) : 1; }
   // a small kite shield (Kessa's crest) centred at x,y
@@ -23835,7 +24063,7 @@ thrall(){return gs(14)+
                     if(r < mech.orbitRadius - mech.bandWidth || r > mech.orbitRadius + mech.bandWidth) return;
                     const angleDeg = angleOf(m.x-e.x, m.y-e.y);
                     const caught = angleBetweenShort(angleDeg, A, angleB) || angleBetweenShort(angleDeg, angleC, A);
-                    if(caught){ addDebuffStack(key, mech.debuff); st._caught = (st._caught||0) + 1; }
+                    if(caught){ addDebuffStack(key, mech.debuff); st._caught = (st._caught||0) + 1; if(mech.name==="Converging Shards") balMechFail(key, mech.name); } // shardsFailV1
                   });
                 }
               }
@@ -29825,6 +30053,15 @@ thrall(){return gs(14)+
   function sndLater(name, ms){ try{ if(ms>0) setTimeout(()=>HWSND.play(name), ms); else HWSND.play(name); }catch(_){} }
   const SND_FEATURE = { lever:"lever", shrine:"shrine", well:"fountain", torch:"ignite", brazier:"ignite", crack:"crumble", mirror:"shatter", raidIntro:"ignite", raidEmber:"ignite", raidChain:"chain" };
   function sndFeature(f){ if(f.trigger==="enter") return; sndLater(SND_FEATURE[f.type] || "interact", 0); }
+  // combat sounds: pan by screen side relative to the healer, fade with distance (full within 120, a quarter by 700)
+  function sndAt(name, x, y, o){ try{ const me = S.party.self; if(!me || typeof x!=="number") { HWSND.play(name, o); return; }
+      const dx = x - me.x, d = Math.hypot(dx, y - me.y); o = Object.assign({ pan:Math.max(-1, Math.min(1, dx/400)), dist:Math.max(0.25, Math.min(1, 1 - (d-120)/780)) }, o||{}); HWSND.play(name, o); }catch(_){} }
+  const CFX_SEAT = { slam:"tank", rally:"tank", gward:"tank", rward:"tank", bulwark:"tank", wildcut:"dps", falcon:"dps", leap:"dps", focus:"dps", spray:"dps", fang:"dps", bite:"dps", bloom:"dps",
+    nova:"dpsCaster", lance:"dpsCaster", brand:"dpsCaster", brandpop:"dpsCaster", meteor:"dpsCaster", combust:"dpsCaster", chain:"dpsCaster", spiral:"dpsCaster", wnova:"dpsCaster", blight:"dpsCaster", rend:"dpsCaster", grasp:"dpsCaster", doom:"dpsCaster", doompop:"dpsCaster", harvest:"dpsCaster" };
+  function sndCfx(id, o){ try{ const snd = HWSND.CFX_SND[id]; if(!snd || !S.started || S.over) return; o = o || {};
+      const tgt = o.e || (o.es && o.es[0]) || (o.to && S.party[o.to]) || (o.at && S.party[o.at]) || o.from || S.party[CFX_SEAT[id]] || null;
+      const go = ()=>sndAt(snd, tgt ? tgt.x : undefined, tgt ? tgt.y : undefined, { src:CFX_SEAT[id]||id });
+      if(o.delay > 0) setTimeout(go, o.delay*1000); else go(); }catch(_){} }
   function sndSpell(id){ try{ const sp = HWSND.SPELL[id]; if(sp && sp.done) HWSND.play(sp.done); }catch(_){} }
   const _sndNow = new Map();
   function sndChips(boss, chips){ try{ const seen = new Set(), kind = ENEMY_KINDS[boss.kind];
@@ -29836,7 +30073,11 @@ thrall(){return gs(14)+
       if(drops.length){ const best = Math.max(...drops.map(d=>RARITY_ORDER[d.rarity]||0)); setTimeout(()=>HWSND.play("loot"+Math.min(4, best)), up ? 2300 : 1300); } }catch(_){} }
   function sndTick(){ if(typeof HWSND==="undefined") return; try{
     HWSND.setPaused(!!(S.started && !S.over && S.paused));
-    { const want = (S.started && !S.over && !(S.arena && (S.arena.tut || !S.arena.raid))) ? currentFamily() : null; if(HWSND.ambName !== want) HWSND.amb(want); HWSND.fam = (S.started && !S.over) ? currentFamily() : null; } // family colour on warnings // the dungeon's ambience; silent in the hub, results, tutorial and testing arena
+    { const want = (S.started && !S.over && !(S.arena && (S.arena.tut || !S.arena.raid))) ? currentFamily() : (!S.started ? "hub" : null); /* the hearth on the menu screens */ if(HWSND.ambName !== want) HWSND.amb(want); HWSND.fam = (S.started && !S.over) ? currentFamily() : null; } // family colour on warnings // the dungeon's ambience; silent in the hub, results, tutorial and testing arena
+    { let lv = 0; const fam = currentFamily(), SN = DISP.snd; /* musicHookV1: 0 exploring, 1 a pull, 2 the boss, 3 boss phase 2 */
+      if(S.started && !S.over && !S.arena && !S._killBeat && HWSND.MUSIC[fam] && SN.mus > 0 && SN.v > 0 && !SN.mute && S.engagedGroups && S.engagedGroups.size){
+        lv = 1; if(S.boss && S.engagedGroups.has(S.boss)){ const be = activeBossEnemy(); lv = be && (be._phase||0) >= 1 ? 3 : 2; } }
+      const ms = HWSND.musicState; if(lv){ if(!ms || ms.fam !== fam || ms.level !== lv) HWSND.music(fam, lv); } else if(ms) HWSND.music(null, 0); }
     const me = S.party && S.party.self; if(!me) return;
     if(me._sndCast && !me.casting){ const h = me._sndCast; me._sndCast = null; h.stop(true); if(S.started && !S.over) HWSND.play("fizzle"); } // a cast cut off by a mechanic, a stun or a pin
     if(!S.started || S.over) return;
@@ -36701,8 +36942,8 @@ thrall(){return gs(14)+
 
   // ===== Display settings (render quality, UI size) + movable-widget layout editor =====
   const DISP_KEY = "hearthward_display_v1";
-  const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp", snd:{ v:60, amb:100, mute:false } }; // numbersV1: nums = all | imp | off; soundHookV1: snd
-  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), amb:typeof o.snd.amb==="number" ? Math.max(0, Math.min(100, o.snd.amb)) : 100, mute:!!o.snd.mute }; if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
+  const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp", snd:{ v:60, amb:100, cmb:100, mus:50, mute:false } }; // numbersV1: nums = all | imp | off; soundHookV1: snd
+  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), amb:typeof o.snd.amb==="number" ? Math.max(0, Math.min(100, o.snd.amb)) : 100, cmb:typeof o.snd.cmb==="number" ? Math.max(0, Math.min(100, o.snd.cmb)) : 100, mus:typeof o.snd.mus==="number" ? Math.max(0, Math.min(100, o.snd.mus)) : 50, mute:!!o.snd.mute }; /* musicHookV1: mus */ if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
   // soundHookV1: browsers only start audio from a tap or key; menu buttons tick
   document.addEventListener("pointerdown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
   document.addEventListener("keydown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
@@ -36824,7 +37065,7 @@ thrall(){return gs(14)+
   function dispSync(){
     document.querySelectorAll("#dRQ button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.rq));
     document.querySelectorAll("#dNum button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.nums)); // numbersV1
-    { const sv = document.getElementById("dSnd"); if(sv){ sv.value = DISP.snd.v; document.getElementById("dSndV").textContent = DISP.snd.mute ? "Muted" : DISP.snd.v+"%"; const mb = document.getElementById("dSndMute"); mb.textContent = DISP.snd.mute ? "Unmute" : "Mute"; mb.classList.toggle("on", DISP.snd.mute); const av = document.getElementById("dAmb"); av.value = DISP.snd.amb; document.getElementById("dAmbV").textContent = DISP.snd.amb+"%"; } } // soundHookV1
+    { const sv = document.getElementById("dSnd"); if(sv){ sv.value = DISP.snd.v; document.getElementById("dSndV").textContent = DISP.snd.mute ? "Muted" : DISP.snd.v+"%"; const mb = document.getElementById("dSndMute"); mb.textContent = DISP.snd.mute ? "Unmute" : "Mute"; mb.classList.toggle("on", DISP.snd.mute); const av = document.getElementById("dAmb"); av.value = DISP.snd.amb; document.getElementById("dAmbV").textContent = DISP.snd.amb+"%"; const cv = document.getElementById("dCmb"); cv.value = DISP.snd.cmb; document.getElementById("dCmbV").textContent = DISP.snd.cmb+"%"; const mv = document.getElementById("dMus"); mv.value = DISP.snd.mus; document.getElementById("dMusV").textContent = DISP.snd.mus ? DISP.snd.mus+"%" : "Off"; } } // soundHookV1 + musicHookV1
     document.getElementById("dUI").value = Math.round(DISP.ui*100); document.getElementById("dUIv").textContent = Math.round(DISP.ui*100)+"%";
     document.getElementById("dRQnote").textContent = "Rendering at " + (Math.round(RS*100)/100) + "× (screen is " + (Math.round((window.devicePixelRatio||1)*100)/100) + "×)";
   }
@@ -36832,12 +37073,16 @@ thrall(){return gs(14)+
   document.addEventListener("pointerdown", e=>{ const p = document.getElementById("dispPanel"); if(p.classList.contains("open") && !p.contains(e.target) && e.target.id!=="dispBtn") p.classList.remove("open"); });
   document.querySelectorAll("#dRQ button").forEach(b=> b.addEventListener("click", ()=>{ DISP.rq = b.dataset.v; dispSave(); fitApp(); dispSync(); }));
   document.querySelectorAll("#dNum button").forEach(b=> b.addEventListener("click", ()=>{ DISP.nums = b.dataset.v; dispSave(); dispSync(); })); // numbersV1
-  function sndApply(){ try{ HWSND.VOL.master = DISP.snd.v/100; HWSND.VOL.amb = DISP.snd.amb/100; HWSND.VOL.mute = !!DISP.snd.mute; HWSND.apply(); }catch(_){} } // soundHookV1
+  function sndApply(){ try{ HWSND.VOL.master = DISP.snd.v/100; HWSND.VOL.amb = DISP.snd.amb/100; HWSND.VOL.cmb = DISP.snd.cmb/100; HWSND.VOL.mus = DISP.snd.mus/100; HWSND.VOL.mute = !!DISP.snd.mute; HWSND.apply(); }catch(_){} } // soundHookV1
   sndApply();
   document.getElementById("dSnd").addEventListener("input", e=>{ DISP.snd.v = +e.target.value; DISP.snd.mute = false; sndApply(); dispSync(); });
   document.getElementById("dSnd").addEventListener("change", ()=>{ dispSave(); try{ HWSND.play("mend"); }catch(_){} });
+  document.getElementById("dCmb").addEventListener("input", e=>{ DISP.snd.cmb = +e.target.value; sndApply(); dispSync(); });
+  document.getElementById("dCmb").addEventListener("change", ()=>{ dispSave(); try{ HWSND.play("cSlam"); }catch(_){} });
   document.getElementById("dAmb").addEventListener("input", e=>{ DISP.snd.amb = +e.target.value; sndApply(); dispSync(); });
   document.getElementById("dAmb").addEventListener("change", ()=>dispSave());
+  document.getElementById("dMus").addEventListener("input", e=>{ DISP.snd.mus = +e.target.value; sndApply(); dispSync(); }); /* musicHookV1 */
+  document.getElementById("dMus").addEventListener("change", ()=>dispSave());
   document.getElementById("dSndMute").addEventListener("click", ()=>{ DISP.snd.mute = !DISP.snd.mute; sndApply(); dispSave(); dispSync(); });
   document.getElementById("dUI").addEventListener("input", e=>{ DISP.ui = (+e.target.value)/100; dispSave(); applyDisplay(); fitApp(); dispSync(); });
   document.getElementById("dEdit").addEventListener("click", hwEnter);
@@ -37660,7 +37905,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 8955cd57e1) */
+<script>/* phone app: offline cache (build 27332af93a) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
