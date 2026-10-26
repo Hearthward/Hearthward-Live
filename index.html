@@ -455,6 +455,7 @@
   #dispPanel .dSeg button.on{ border-color:var(--accent-strong); color:var(--accent-strong); background:var(--accent-soft); }
   #dispPanel .dNote{ color:var(--text-dim); font-size:.64rem; }
   #dispPanel input[type=range]{ width:100%; }
+  #dispPanel .dSndRow{ display:flex; gap:8px; align-items:center; } #dispPanel .dSndRow input{ flex:1; min-width:0; } #dispPanel #dSndMute.on{ background:var(--accent-strong); color:var(--bg); } /* soundHookV1 */
   #dispPanel .dBtns{ display:flex; gap:6px; flex-wrap:wrap; }
   @media (max-width: 899px), (max-height: 559px){ #dispPanel .dDesk{ display:none; } }
   #raidTitle{ position:fixed; left:0; right:0; top:20%; text-align:center; pointer-events:none; z-index:70; opacity:0; font-family:Cinzel,serif; color:#ffe6b8; }
@@ -2077,6 +2078,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     <div class="dRow"><span>Numbers</span>
       <div class="dSeg" id="dNum"><button type="button" data-v="all">All</button><button type="button" data-v="imp">Important</button><button type="button" data-v="off">Off</button></div>
       <span class="dNote">Important: big hits on the party and the healing that lands. All: every hit, including on enemies.</span></div>
+    <div class="dRow"><span>Sound: <b id="dSndV">60%</b></span>
+      <div class="dSndRow"><input type="range" id="dSnd" min="0" max="100" step="5" value="60"><button type="button" class="dBtn" id="dSndMute">Mute</button></div>
+      <span class="dNote">Spells, warnings for boss mechanics, and rewards.</span></div>
     <div class="dRow"><span>UI size: <b id="dUIv">100%</b></span><input type="range" id="dUI" min="75" max="150" step="5" value="100"><span class="dNote">Scales text, party frames and bars; the map keeps its size.</span></div>
     <div class="dRow dDesk"><span>Layout</span><div class="dBtns"><button type="button" class="dBtn" id="dEdit">Edit layout</button><button type="button" class="dBtn" id="dResetLayout">Reset layout</button></div>
       <span class="dNote">Move and resize the party frames, abilities, cast bar, zoom controls and log — even over the map.</span></div>
@@ -2351,6 +2355,236 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
 
 <div class="tooltip" id="abilityTip" hidden></div>
 
+<script>/* soundHookV1: hw/sound/hwsnd.js */
+// Hearthward sound (soundV2): synthesized with Web Audio, no files.
+// Two separate palettes so they can never be confused:
+//   SPELLS  - high, bright, consonant, wide, in a reverb hall: choir pads, FM bells, harp runs, ember crackle.
+//   THREATS - low, dark, dissonant (minor seconds, tritones), dry and close, distorted: war horns, drums,
+//             metal clangs, risers into impacts.
+// HWSND.play(name, opts) -> handle. Held casts take opts.dur and return { stop(fast) }.
+const HWSND = (()=>{
+  const N = { D2:73.42, Eb2:77.78, Gs2:103.83, D3:146.83, Eb3:155.56, Gs3:207.65, A3:220, D4:293.66, E4:329.63, Fs4:369.99, Gs4:415.30, A4:440, As4:466.16, B4:493.88, C5:523.25, Cs5:554.37, D5:587.33, E5:659.25, Fs5:739.99, A5:880, B5:987.77, Cs6:1108.73, D6:1174.66, E6:1318.51, Fs6:1479.98, A6:1760 };
+  const E = 0.0001;
+  const cache = new WeakMap(); // per context: noise buffer, impulse response, drive curves
+  function C(c){ let k = cache.get(c); if(!k){ k = {}; cache.set(c, k); } return k; }
+  function rng(seed){ let s = (seed|0) || 1; return ()=>{ s = (s*16807) % 2147483647; return (s-1)/2147483646; }; }
+  function noise(c){ const k = C(c); if(k.nb) return k.nb; const b = c.createBuffer(1, c.sampleRate*2, c.sampleRate), d = b.getChannelData(0), r = rng(12345); for(let i=0;i<d.length;i++) d[i] = r()*2-1; return k.nb = b; }
+  function impulse(c){ const k = C(c); if(k.ir) return k.ir; const len = Math.floor(c.sampleRate*2.8), b = c.createBuffer(2, len, c.sampleRate);
+    for(let ch=0; ch<2; ch++){ const d = b.getChannelData(ch), r = rng(ch?777:333); let lp = 0;
+      for(let i=0;i<len;i++){ const x = i/len, damp = 0.15 + 0.8*x; lp += (r()*2-1 - lp)*(1-damp); d[i] = lp*Math.pow(1-x, 2.4)*(i < c.sampleRate*0.012 ? i/(c.sampleRate*0.012) : 1); } }
+    return k.ir = b; }
+  function driveCurve(c, amt){ const k = C(c), key = "dr"+amt; if(k[key]) return k[key]; const n = 1024, cv = new Float32Array(n); for(let i=0;i<n;i++){ const x = i/(n-1)*2-1; cv[i] = Math.tanh(x*amt)/Math.tanh(amt); } return k[key] = cv; }
+  // M = { c, dry, wet }: every voice sends to the dry path and, by its own amount, to the shared hall
+  function route(M, o){ const c = M.c, g = c.createGain(); g.gain.value = 1; let head = g;
+    if(o.pan && c.createStereoPanner){ const p = c.createStereoPanner(); p.pan.value = o.pan; head.connect(p); head = p; }
+    head.connect(M.dry); if(o.wet>0){ const w = c.createGain(); w.gain.value = o.wet; head.connect(w); w.connect(M.wet); }
+    let inp = g; if(o.drive){ const ws = c.createWaveShaper(); ws.curve = driveCurve(c, o.drive); ws.oversample = "2x"; ws.connect(inp); inp = ws; }
+    return inp; }
+  function env(gp, t, a, h, d, g){ gp.setValueAtTime(E, t); gp.exponentialRampToValueAtTime(g, t+a); if(h) gp.setValueAtTime(g, t+a+h); gp.exponentialRampToValueAtTime(E, t+a+(h||0)+d); return t+a+(h||0)+d; }
+  // oscillator voice(s): unison spread, pitch glide, optional filter with its own sweep
+  function osc(M, o){ const c = M.c, t = o.t, a = o.a||0.005, d = o.d||0.3, end = t+a+(o.h||0)+d;
+    const out = route(M, o), amp = c.createGain(); env(amp.gain, t, a, o.h, d, o.g||0.2); amp.connect(out);
+    let dst = amp; if(o.lp || o.bp || o.hp){ const f = c.createBiquadFilter(); f.type = o.lp ? "lowpass" : o.bp ? "bandpass" : "highpass"; const f0 = o.lp||o.bp||o.hp; f.Q.value = o.q||0.8;
+      f.frequency.setValueAtTime(f0, t); if(o.f2){ f.frequency.exponentialRampToValueAtTime(o.f2, t+(o.fg||a+d*0.3)); if(o.f3) f.frequency.exponentialRampToValueAtTime(o.f3, end); } f.connect(amp); dst = f; }
+    const n = o.n||1;
+    for(let i=0;i<n;i++){ const os = c.createOscillator(); os.type = o.type||"sine"; const det = n>1 ? (i/(n-1)-0.5)*2*(o.spread||10) : 0; os.detune.value = det;
+      os.frequency.setValueAtTime(o.f, t); if(o.f1) os.frequency.exponentialRampToValueAtTime(o.f1, t+(o.glide||a+d));
+      if(o.vib){ const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = o.vib + i*0.13; lg.gain.value = o.f*0.005; l.connect(lg); lg.connect(os.frequency); l.start(t); l.stop(end+0.05); }
+      const vg = c.createGain(); vg.gain.value = 1/Math.sqrt(n); os.connect(vg); vg.connect(dst); os.start(t); os.stop(end+0.05); }
+    return amp; }
+  function nz(M, o){ const c = M.c, t = o.t, a = o.a||0.005, d = o.d||0.2, end = t+a+(o.h||0)+d;
+    const src = c.createBufferSource(); src.buffer = noise(c); src.loop = true; const f = c.createBiquadFilter(); f.type = o.ft||"bandpass"; f.Q.value = o.q||1;
+    f.frequency.setValueAtTime(o.f0||2000, t); if(o.f1) f.frequency.exponentialRampToValueAtTime(o.f1, t+(o.glide||a+d));
+    const amp = c.createGain(); env(amp.gain, t, a, o.h, d, o.g||0.15); src.connect(f); f.connect(amp); amp.connect(route(M, o)); src.start(t, (o.off||0)%1.5); src.stop(end+0.05); return amp; }
+  // FM bell: a modulator at a non-integer ratio gives the metallic, struck partials of a real bell
+  function bell(M, f, t, g, d, o){ o = o||{}; const c = M.c, out = route(M, { pan:o.pan, wet:o.wet==null?0.5:o.wet, drive:o.drive });
+    const car = c.createOscillator(), mod = c.createOscillator(), mg = c.createGain(), amp = c.createGain();
+    car.frequency.value = f; mod.frequency.value = f*(o.ratio||3.5); mg.gain.setValueAtTime(f*(o.index||2.2), t); mg.gain.exponentialRampToValueAtTime(f*0.05, t+d*0.6);
+    mod.connect(mg); mg.connect(car.frequency); env(amp.gain, t, 0.002, 0, d, g); car.connect(amp); amp.connect(out);
+    car.start(t); mod.start(t); car.stop(t+d+0.05); mod.stop(t+d+0.05); }
+  // choir pad: detuned saws through vowel formants, with vibrato
+  const VOWEL = { ah:[[730,1],[1090,0.5],[2440,0.22]], oo:[[300,1],[870,0.35],[2240,0.12]], eh:[[530,1],[1840,0.45],[2480,0.2]] };
+  function choir(M, notes, t, dur, o){ const c = M.c, out = route(M, { pan:o.pan, wet:o.wet==null?0.6:o.wet }), amp = c.createGain(), end = t+dur+(o.rel||0.5);
+    amp.gain.setValueAtTime(E, t); amp.gain.exponentialRampToValueAtTime(o.g, t+(o.a||0.3)); if(o.swell) amp.gain.linearRampToValueAtTime(o.g*o.swell, t+dur); else amp.gain.setValueAtTime(o.g, t+dur);
+    amp.gain.exponentialRampToValueAtTime(E, end); amp.connect(out);
+    const form = c.createGain(); form.gain.value = 1; (VOWEL[o.vowel||"ah"]).forEach(([fr, gg])=>{ const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = fr; bp.Q.value = 7; const fg = c.createGain(); fg.gain.value = gg*3; form.connect(bp); bp.connect(fg); fg.connect(amp); });
+    notes.forEach((f, i)=>{ for(let v=0; v<3; v++){ const os = c.createOscillator(); os.type = "sawtooth"; os.frequency.setValueAtTime(f, t); if(o.rise) os.frequency.exponentialRampToValueAtTime(f*o.rise, t+dur); os.detune.value = (v-1)*9 + i*1.3;
+      const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 5.2 + v*0.31 + i*0.17; lg.gain.value = f*0.006; l.connect(lg); lg.connect(os.frequency); l.start(t); l.stop(end+0.05);
+      const vg = c.createGain(); vg.gain.value = 0.25/notes.length; os.connect(vg); vg.connect(form); os.start(t); os.stop(end+0.05); } }); }
+  function harp(M, notes, t, step, o){ notes.forEach((f, i)=>osc(M, { f, t:t+i*step, a:0.002, d:o.d||0.7, g:o.g||0.06, type:"triangle", lp:f*4, pan:((i/(Math.max(1,notes.length-1)))-0.5)*(o.width||1.2), wet:o.wet==null?0.55:o.wet })); }
+  function crackle(M, t, dur, rate, g, seed, wet){ const r = rng(seed||7), n = Math.max(1, Math.round(dur*rate)); for(let i=0;i<n;i++) nz(M, { t:t+r()*dur, a:0.001, d:0.01+r()*0.025, g:g*(0.4+r()*0.6), ft:"highpass", f0:2200+r()*3500, q:0.6, pan:(r()-0.5)*0.8, off:r(), wet:wet||0.15 }); }
+  function sparkle(M, t, dur, rate, g, seed){ const r = rng(seed||5), n = Math.max(1, Math.round(dur*rate)), sc = [N.A5, N.Cs6, N.E6, N.A6, N.Fs6, N.D6]; for(let i=0;i<n;i++) bell(M, sc[Math.floor(r()*sc.length)], t+r()*dur, g*(0.5+r()*0.5), 0.5, { ratio:3.01, index:1.2, pan:(r()-0.5)*1.4, wet:0.75 }); }
+  // threat building blocks
+  function horn(M, notes, t, a, h, d, o){ notes.forEach((f, i)=>osc(M, { f, t, a, h, d, g:o.g/notes.length, type:"sawtooth", n:3, spread:14, lp:180, f2:o.bright||1400, fg:a, f3:500, q:1.2, drive:o.drive||3, wet:o.wet==null?0.12:o.wet, pan:o.pan })); }
+  function drum(M, t, o){ osc(M, { f:o.f||150, f1:o.f1||48, glide:0.12, t, a:0.002, d:o.d||0.35, g:o.g||0.4, drive:o.drive||1.5, wet:o.wet==null?0.1:o.wet, pan:o.pan }); nz(M, { t, a:0.001, d:0.06, g:(o.g||0.4)*0.35, ft:"lowpass", f0:1800, wet:0.05, pan:o.pan }); }
+  function clang(M, f, t, o){ bell(M, f, t, o.g||0.2, o.d||0.9, { ratio:1.414, index:4, pan:o.pan, wet:o.wet==null?0.15:o.wet, drive:o.drive||2.5 }); }
+  function riser(M, t, dur, o){ nz(M, { t, a:dur, d:0.03, g:o.g||0.18, f0:o.f0||300, f1:o.f1||4000, glide:dur, q:o.q||3, wet:o.wet==null?0.1:o.wet, drive:o.drive }); }
+  function impact(M, t, o){ osc(M, { f:o.f||120, f1:o.f1||35, glide:0.4, t, a:0.002, d:o.d||0.8, g:o.g||0.6, drive:o.drive||2, wet:o.wet==null?0.2:o.wet }); nz(M, { t, a:0.001, d:0.35, g:(o.g||0.6)*0.5, ft:"lowpass", f0:2600, f1:150, wet:o.wet==null?0.2:o.wet, drive:o.drive||2 }); }
+  function creak(M, t, d){ osc(M,{ f:85, f1:120, glide:d, t, a:0.03, h:d*0.6, d:d*0.3, g:0.12, type:"sawtooth", bp:700, q:5, wet:0.15, vib:9 }); }
+  // held cast: a bus with a live stop
+  function held(M, t, dur, build){ const c = M.c, g = c.createGain(), w = c.createGain(); g.gain.value = 1; w.gain.value = 1; g.connect(M.dry); w.connect(M.wet); build({ c, dry:g, wet:w }, t, dur);
+    const stop = fast=>{ const n = c.currentTime; [g, w].forEach(x=>{ x.gain.cancelScheduledValues(n); x.gain.setValueAtTime(x.gain.value, n); x.gain.linearRampToValueAtTime(0, n + (fast ? 0.05 : 0.18)); }); };
+    return { stop }; }
+
+  const R = {
+    // ================= SPELLS: held cast sounds =================
+    castMend:(M,t,p)=>held(M,t,p.dur||1,(B,t,d)=>{ choir(B,[N.A3,N.E4,N.A4],t,d,{ g:0.16, a:Math.min(0.3,d*0.35), swell:1.5, wet:0.55, rel:0.25 });
+      nz(B,{ t, a:d, d:0.1, g:0.05, f0:1500, f1:6000, glide:d, q:1.5, wet:0.6 }); sparkle(B,t+0.15,d-0.1,7,0.03,3); crackle(B,t,d,10,0.03,4); }),
+    castSurge:(M,t,p)=>held(M,t,p.dur||1.5,(B,t,d)=>{ choir(B,[N.D3,N.A3,N.D4,N.Fs4,N.A4],t,d,{ g:0.2, a:0.35, swell:1.9, wet:0.6, rise:1.06, rel:0.25 });
+      osc(B,{ f:N.D2, t, a:d*0.8, d:0.2, g:0.09, wet:0.2 }); nz(B,{ t, a:d, d:0.08, g:0.07, f0:800, f1:7000, glide:d, q:2, wet:0.5 }); sparkle(B,t+0.2,d-0.15,12,0.035,6); crackle(B,t,d,20,0.05,8); }),
+    castWind:(M,t,p)=>held(M,t,p.dur||2,(B,t,d)=>{ choir(B,[N.D3,N.A3,N.D4,N.A4],t,d,{ g:0.17, a:0.5, swell:1.6, vowel:"oo", wet:0.65, rel:0.3 });
+      nz(B,{ t, a:d*0.7, h:d*0.3, d:0.2, g:0.09, f0:400, f1:2200, glide:d, q:1.2, wet:0.5, pan:-0.3 }); nz(B,{ t:t+0.1, a:d*0.6, h:d*0.3, d:0.2, g:0.07, f0:600, f1:3000, glide:d, q:1.2, wet:0.5, pan:0.3 }); }),
+    // ================= SPELLS: landings =================
+    mend:(M,t)=>{ // a Greater Heal style landing: harp run up into bells, a short choir breath, air
+      harp(M,[N.A4,N.Cs5,N.E5,N.A5,N.Cs6],t,0.028,{ g:0.07 }); [N.A5,N.E6,N.Cs6].forEach((f,i)=>bell(M,f,t+0.13+i*0.02,0.09,1.6,{ pan:(i-1)*0.4, wet:0.6 }));
+      choir(M,[N.A4,N.E5],t+0.1,0.25,{ g:0.12, a:0.08, wet:0.7, rel:0.7 }); nz(M,{ t, a:0.12, d:0.5, g:0.06, ft:"highpass", f0:5000, wet:0.7 }); },
+    surge:(M,t)=>{ // bigger: a warm low bloom under it, a wider run, a fire whoosh
+      osc(M,{ f:N.D3, f1:N.D2, glide:0.5, t, a:0.01, d:0.7, g:0.22, wet:0.3 }); nz(M,{ t, a:0.05, d:0.6, g:0.13, ft:"lowpass", f0:400, f1:5000, glide:0.25, wet:0.4 });
+      harp(M,[N.D5,N.Fs5,N.A5,N.D6,N.Fs6,N.A6],t+0.02,0.025,{ g:0.07, width:1.6 }); [N.D6,N.A5,N.Fs6,N.D5].forEach((f,i)=>bell(M,f,t+0.15+i*0.025,0.08,2,{ pan:(i-1.5)*0.45, wet:0.65 }));
+      choir(M,[N.D4,N.A4,N.D5,N.Fs5],t+0.08,0.35,{ g:0.16, a:0.06, wet:0.75, rel:1 }); crackle(M,t,0.6,30,0.05,9,0.3); },
+    wind:(M,t)=>{ // a Prayer style release: a wide open chord that breathes out
+      choir(M,[N.D4,N.Fs4,N.A4,N.D5,N.Fs5],t,0.5,{ g:0.17, a:0.05, wet:0.75, rel:1.3, pan:0 }); harp(M,[N.A6,N.Fs6,N.D6,N.A5,N.Fs5,N.D5],t,0.03,{ g:0.05, width:1.8 });
+      nz(M,{ t, a:0.05, d:1.1, g:0.09, ft:"bandpass", f0:3000, f1:700, glide:1.1, q:0.7, wet:0.6 }); bell(M,N.D6,t+0.05,0.06,2,{ wet:0.7 }); },
+    hearth:(M,t)=>{ // Renew style: one soft bell, a breath of choir, a few embers
+      bell(M,N.E6,t,0.07,1.6,{ ratio:3.01, index:1.4, wet:0.7 }); bell(M,N.A5,t+0.04,0.05,1.4,{ ratio:3.01, index:1.2, wet:0.7 });
+      choir(M,[N.A4,N.E5],t,0.15,{ g:0.07, a:0.06, vowel:"oo", wet:0.75, rel:0.6 }); crackle(M,t,0.5,22,0.035,11,0.3); },
+    ward:(M,t)=>{ // Power Word: Shield style: a bubble that whooshes shut and rings like glass
+      osc(M,{ f:260, f1:1300, glide:0.14, t, a:0.01, d:0.16, g:0.1, type:"sine", wet:0.4 }); nz(M,{ t, a:0.1, d:0.15, g:0.08, f0:600, f1:5000, glide:0.14, q:2, wet:0.4 });
+      osc(M,{ f:110, f1:70, glide:0.2, t:t+0.13, a:0.004, d:0.3, g:0.22, wet:0.2 });
+      [N.E6,N.B5,N.Gs4*4].forEach((f,i)=>bell(M,f,t+0.14+i*0.012,0.07,1.8,{ ratio:2.0, index:1.6, pan:(i-1)*0.5, wet:0.6 })); sparkle(M,t+0.2,0.5,14,0.025,13); },
+    cleanse:(M,t)=>{ // Purify style: a falling run of light and a wash of air
+      harp(M,[N.A6,N.E6,N.Cs6,N.A5,N.E5],t,0.035,{ g:0.06 }); nz(M,{ t, a:0.03, d:0.5, g:0.07, ft:"highpass", f0:6000, f1:2500, glide:0.5, wet:0.6 }); bell(M,N.A5,t+0.17,0.07,1.4,{ wet:0.65 }); },
+    misdirect:(M,t)=>{ nz(M,{ t, a:0.06, d:0.14, g:0.12, f0:500, f1:3500, glide:0.2, q:2.5, pan:-0.6, wet:0.3 }); nz(M,{ t:t+0.08, a:0.05, d:0.14, g:0.1, f0:3500, f1:900, glide:0.18, q:2.5, pan:0.6, wet:0.3 });
+      bell(M,N.B5,t+0.1,0.06,0.8,{ pan:0.4, wet:0.5 }); },
+    purge:(M,t)=>{ // a holy flash that burns something away
+      nz(M,{ t, a:0.002, d:0.18, g:0.16, ft:"highpass", f0:3500, wet:0.3 }); bell(M,N.E6,t,0.1,0.9,{ ratio:1.5, index:5, wet:0.5 });
+      osc(M,{ f:2400, f1:300, glide:0.25, t, a:0.002, d:0.25, g:0.04, type:"sawtooth", lp:4000, wet:0.3 }); crackle(M,t,0.2,70,0.06,19,0.3); },
+    fizzle:(M,t)=>{ nz(M,{ t, a:0.005, d:0.35, g:0.1, ft:"lowpass", f0:2500, f1:150, wet:0.2 }); osc(M,{ f:N.A4, f1:N.A3*0.8, glide:0.3, t, a:0.005, d:0.3, g:0.05, type:"triangle", wet:0.2 }); },
+
+    // ================= THREATS: mechanic warnings =================
+    warnDodge:(M,t)=>{ // something is coming at you: a metal scrape rises, then a tritone horn stab
+      riser(M,t,0.32,{ f0:350, f1:3500, g:0.2, q:4, drive:2 }); nz(M,{ t, a:0.3, d:0.02, g:0.08, ft:"highpass", f0:3000, wet:0.05 });
+      horn(M,[N.D3,N.Gs3],t+0.32,0.01,0.08,0.25,{ g:0.32, drive:4, bright:2400 }); drum(M,t+0.32,{ f:200, f1:70, g:0.3, d:0.2 }); },
+    warnShelter:(M,t)=>{ // a raid-wide blast is building: a low war horn, two notes a half-step apart grinding
+      horn(M,[N.D2,N.Eb2,N.D3],t,0.35,0.35,0.6,{ g:0.4, drive:3.5, bright:1000, wet:0.25 }); osc(M,{ f:38, t, a:0.4, h:0.3, d:0.5, g:0.25, wet:0.1 });
+      nz(M,{ t, a:0.6, d:0.4, g:0.06, ft:"lowpass", f0:300, wet:0.2 }); },
+    warnSpread:(M,t)=>{ // scatter: three clashing iron strikes thrown left, centre, right, over a low hit
+      drum(M,t,{ f:140, f1:50, g:0.35, d:0.25, drive:2.5 }); [[N.As4/2,-0.85],[N.E4,0],[N.B4,0.85]].forEach(([f,p],i)=>{ clang(M,f,t+0.03+i*0.1,{ g:0.24, pan:p, d:0.55, drive:3.5 }); drum(M,t+0.03+i*0.1,{ f:110, f1:55, g:0.14, d:0.12, pan:p }); }); },
+    warnDispel:(M,t)=>{ // your job, now: a hard, dry, low alarm pulse, three times
+      [0,0.12,0.24].forEach(dt=>{ [N.B4/2, N.C5/2].forEach(f=>osc(M,{ f, t:t+dt, a:0.002, d:0.08, g:0.13, type:"square", lp:1200, drive:3, wet:0.04 })); drum(M,t+dt,{ f:180, f1:90, g:0.12, d:0.06 }); }); },
+    warnBrace:(M,t)=>{ // war drums rolling faster into a crushing hit
+      const hits = [0, 0.16, 0.29, 0.39, 0.47, 0.53, 0.58]; hits.forEach((dt,i)=>drum(M,t+dt,{ f:120+i*6, f1:45, g:0.16+i*0.035, d:0.22, pan:(i%2?0.25:-0.25) }));
+      impact(M,t+0.66,{ f:110, f1:30, g:0.6, d:0.9, drive:3 }); horn(M,[N.D2,N.Gs2],t+0.66,0.01,0.1,0.5,{ g:0.25, drive:4, bright:900 }); },
+    warnAttention:(M,t)=>{ // anything else: one dark struck gong
+      clang(M,110,t,{ g:0.22, d:1.6, wet:0.3, drive:1.8 }); drum(M,t,{ f:90, f1:40, g:0.2, d:0.4 }); },
+    pass:(M,t)=>{ bell(M,N.A5,t,0.08,0.9,{ ratio:3.01, index:1.4, wet:0.45 }); bell(M,N.E6,t+0.07,0.08,1.1,{ ratio:3.01, index:1.4, wet:0.45 }); },
+    fail:(M,t)=>{ impact(M,t,{ f:90, f1:40, g:0.4, d:0.4, drive:4, wet:0.08 }); horn(M,[N.D2,N.Eb2],t,0.005,0.05,0.3,{ g:0.25, drive:5, bright:700, wet:0.05 }); },
+    // ================= PARTY =================
+    downed:(M,t)=>{ choir(M,[N.D4,N.Eb3*2],t,0.5,{ g:0.12, a:0.04, vowel:"oo", wet:0.6, rel:0.6, rise:0.7 }); drum(M,t+0.05,{ f:70, f1:40, g:0.35, d:0.3 }); drum(M,t+0.33,{ f:65, f1:38, g:0.3, d:0.3 }); },
+    revived:(M,t)=>{ riser(M,t,0.35,{ f0:800, f1:6000, g:0.06, q:1.5, wet:0.6 }); choir(M,[N.A4,N.E5,N.A5],t+0.3,0.35,{ g:0.14, a:0.04, wet:0.75, rel:0.9 }); bell(M,N.A5,t+0.32,0.08,1.6,{ wet:0.6 }); },
+    lowMana:(M,t)=>{ [[N.E5,0],[N.B4,0.15]].forEach(([f,dt])=>bell(M,f,t+dt,0.08,0.5,{ ratio:1.0, index:0.8, wet:0.15 })); },
+    // ================= BOSS =================
+    phase:(M,t)=>{ clang(M,73,t,{ g:0.3, d:3, wet:0.45, drive:1.6 }); horn(M,[N.D2,N.Eb2],t+0.05,0.6,0.3,0.9,{ g:0.3, drive:3, bright:800, wet:0.35 }); impact(M,t,{ f:80, f1:30, g:0.4, d:1.2, wet:0.3 }); },
+    killBoom:(M,t)=>{ impact(M,t,{ f:130, f1:28, g:0.7, d:1.2, drive:3, wet:0.35 }); nz(M,{ t, a:0.002, d:0.7, g:0.25, ft:"lowpass", f0:5000, f1:200, wet:0.4 });
+      choir(M,[N.D4,N.A4,N.D5,N.Fs5],t+0.25,0.5,{ g:0.14, a:0.2, wet:0.8, rel:1.3 }); sparkle(M,t+0.3,0.9,16,0.03,31); crackle(M,t+0.1,0.9,30,0.05,33,0.3); },
+    defeated:(M,t)=>{ [[N.D4,0,0.18],[N.A4,0.16,0.18],[N.D5,0.32,0.9]].forEach(([f,dt,d])=>osc(M,{ f, t:t+dt, a:0.03, d, g:0.12, type:"sawtooth", n:3, spread:8, lp:300, f2:2600, fg:0.06, f3:1200, wet:0.4 }));
+      bell(M,N.Fs6,t+0.34,0.05,1.8,{ wet:0.7 }); },
+    // ================= REWARDS =================
+    xpFill:(M,t,p)=>{ const d = p.dur||1; nz(M,{ t, a:d, d:0.08, g:0.05, f0:900, f1:6000, glide:d, q:2, wet:0.5 }); sparkle(M,t,d,10,0.02,37); },
+    levelUp:(M,t)=>{ harp(M,[N.D5,N.Fs5,N.A5,N.D6,N.Fs6,N.A6],t,0.05,{ g:0.07, width:1.6 }); choir(M,[N.D4,N.A4,N.D5,N.Fs5,N.A5],t+0.28,0.6,{ g:0.18, a:0.12, wet:0.8, rel:1.4 });
+      [N.D6,N.A5,N.Fs6].forEach((f,i)=>bell(M,f,t+0.3+i*0.03,0.08,2.2,{ pan:(i-1)*0.5, wet:0.7 })); osc(M,{ f:N.D3, t:t+0.28, a:0.05, d:1.2, g:0.12, wet:0.4 }); },
+    loot0:(M,t)=>{ bell(M,N.A5,t,0.05,0.5,{ ratio:3.01, index:1, wet:0.3 }); },
+    loot1:(M,t)=>{ [N.E5,N.A5].forEach((f,i)=>bell(M,f,t+i*0.08,0.06,0.7,{ ratio:3.01, index:1.2, wet:0.4 })); },
+    loot2:(M,t)=>{ harp(M,[N.A5,N.Cs6,N.E6],t,0.06,{ g:0.06 }); bell(M,N.A5,t+0.12,0.06,1.2,{ wet:0.5 }); },
+    loot3:(M,t)=>{ harp(M,[N.D5,N.Fs5,N.A5,N.D6],t,0.06,{ g:0.06 }); [N.D6,N.A5].forEach((f,i)=>bell(M,f,t+0.2+i*0.03,0.07,1.6,{ pan:(i-0.5)*0.6, wet:0.6 })); choir(M,[N.D5,N.A5],t+0.18,0.3,{ g:0.08, a:0.08, wet:0.75, rel:0.8 }); },
+    loot4:(M,t)=>{ nz(M,{ t, a:0.2, d:0.5, g:0.1, ft:"lowpass", f0:400, f1:5000, glide:0.25, wet:0.4 }); harp(M,[N.D5,N.Fs5,N.A5,N.D6,N.Fs6,N.A6],t+0.15,0.05,{ g:0.07, width:1.6 });
+      choir(M,[N.D4,N.A4,N.D5,N.Fs5],t+0.4,0.6,{ g:0.16, a:0.1, wet:0.8, rel:1.3 }); [N.D6,N.Fs6,N.A5].forEach((f,i)=>bell(M,f,t+0.42+i*0.03,0.07,2,{ pan:(i-1)*0.5, wet:0.7 })); crackle(M,t,1.2,30,0.05,53,0.3); },
+    // ================= WORLD: things you touch (physical, mid-range, a little room sound) =================
+    lever:(M,t)=>{ [0,0.035,0.07].forEach((dt,i)=>nz(M,{ t:t+dt, a:0.001, d:0.02, g:0.08, ft:"bandpass", f0:3000+i*400, q:3, wet:0.1 }));
+      osc(M,{ f:180, f1:85, glide:0.12, t:t+0.1, a:0.002, d:0.2, g:0.3, wet:0.15 }); bell(M,560,t+0.1,0.1,0.35,{ ratio:2.41, index:3, wet:0.2, drive:1.5 }); },
+    button:(M,t)=>{ nz(M,{ t, a:0.001, d:0.03, g:0.12, ft:"lowpass", f0:2500, wet:0.1 }); osc(M,{ f:130, f1:60, glide:0.12, t:t+0.01, a:0.002, d:0.22, g:0.3, wet:0.2 });
+      nz(M,{ t:t+0.05, a:0.1, d:0.4, g:0.05, ft:"lowpass", f0:220, wet:0.2 }); },
+    doorOpen:(M,t)=>{ const g = M.c.createGain(); g.connect(M.dry); const l = M.c.createOscillator(), lg = M.c.createGain(); l.type = "square"; l.frequency.value = 23; lg.gain.value = 0.35; l.connect(lg); lg.connect(g.gain); l.start(t); l.stop(t+1.4);
+      nz({ c:M.c, dry:g, wet:M.wet },{ t, a:0.25, h:0.7, d:0.35, g:0.2, ft:"lowpass", f0:260, f1:420, glide:1, q:1.5, wet:0.15 }); osc(M,{ f:48, t, a:0.3, h:0.6, d:0.4, g:0.12, wet:0.1 });
+      osc(M,{ f:110, f1:55, glide:0.1, t:t+1.25, a:0.002, d:0.3, g:0.3, wet:0.25 }); nz(M,{ t:t+1.25, a:0.001, d:0.2, g:0.08, ft:"lowpass", f0:900, wet:0.25 }); },
+    doorSlam:(M,t)=>{ impact(M,t,{ f:100, f1:32, g:0.55, d:0.8, drive:2.5, wet:0.35 }); clang(M,140,t,{ g:0.16, d:1.2, wet:0.35, drive:2 }); nz(M,{ t:t+0.05, a:0.05, d:0.8, g:0.06, ft:"lowpass", f0:700, wet:0.3 }); },
+    fountain:(M,t)=>{ const r = rng(61); for(let i=0;i<16;i++){ const f = 300+r()*700; osc(M,{ f, f1:f*1.8, glide:0.04, t:t+r()*0.7, a:0.003, d:0.05, g:0.05, wet:0.35, pan:(r()-0.5)*0.8 }); }
+      nz(M,{ t, a:0.1, h:0.3, d:0.5, g:0.05, ft:"lowpass", f0:1600, wet:0.4 }); bell(M,N.A5,t+0.35,0.06,1.4,{ ratio:3.01, index:1.2, wet:0.6 }); bell(M,N.E6,t+0.42,0.04,1.2,{ ratio:3.01, index:1.2, wet:0.6 }); },
+    shrine:(M,t)=>{ riser(M,t,0.3,{ f0:800, f1:5000, g:0.05, q:1.5, wet:0.6 }); choir(M,[N.D4,N.A4,N.D5],t+0.25,0.4,{ g:0.14, a:0.06, wet:0.75, rel:1 });
+      [N.D6,N.A5].forEach((f,i)=>bell(M,f,t+0.27+i*0.04,0.07,1.8,{ pan:(i-0.5)*0.6, wet:0.65 })); },
+    ignite:(M,t)=>{ nz(M,{ t, a:0.12, d:0.4, g:0.16, ft:"lowpass", f0:200, f1:4500, glide:0.3, wet:0.25 }); osc(M,{ f:90, f1:140, glide:0.3, t, a:0.08, d:0.4, g:0.12, wet:0.2 }); crackle(M,t+0.1,0.8,40,0.06,67,0.2); },
+    crumble:(M,t)=>{ const r = rng(71); for(let i=0;i<7;i++){ const tt = t+r()*0.7; osc(M,{ f:90+r()*80, f1:45, glide:0.1, t:tt, a:0.002, d:0.15, g:0.12+r()*0.1, wet:0.25, pan:(r()-0.5)*0.8 }); nz(M,{ t:tt, a:0.001, d:0.08+r()*0.1, g:0.07, ft:"lowpass", f0:1200+r()*1500, wet:0.25 }); }
+      nz(M,{ t, a:0.2, d:0.8, g:0.05, ft:"lowpass", f0:500, wet:0.3 }); },
+    shatter:(M,t)=>{ nz(M,{ t, a:0.001, d:0.25, g:0.2, ft:"highpass", f0:3000, wet:0.4 }); const r = rng(73);
+      for(let i=0;i<12;i++) bell(M,2000+r()*4500,t+r()*0.35,0.03+r()*0.03,0.3+r()*0.4,{ ratio:2.76+r(), index:2, pan:(r()-0.5)*1.4, wet:0.5 }); },
+    chestLatch:(M,t)=>{ bell(M,1900,t,0.06,0.12,{ ratio:3.9, index:2, wet:0.1 }); creak(M,t+0.06,0.45); },
+    chestOpen:(M,t)=>{ creak(M,t,0.35); R.coins(M,t+0.25); sparkle(M,t+0.3,0.5,10,0.025,79); },
+    coins:(M,t)=>{ const r = rng(83); for(let i=0;i<10;i++) bell(M,2400+r()*2200,t+r()*0.5,0.04+r()*0.03,0.25,{ ratio:2.7, index:1.8, pan:(r()-0.5)*1, wet:0.3 }); },
+    puzzleMiss:(M,t)=>{ osc(M,{ f:160, f1:110, glide:0.08, t, a:0.002, d:0.12, g:0.18, wet:0.1 }); nz(M,{ t, a:0.001, d:0.05, g:0.08, ft:"bandpass", f0:900, q:2, wet:0.1 }); },
+    zap:(M,t)=>{ osc(M,{ f:110, t, a:0.002, h:0.12, d:0.1, g:0.12, type:"square", lp:3000, drive:3, wet:0.1 }); const r = rng(89);
+      for(let i=0;i<9;i++) nz(M,{ t:t+r()*0.22, a:0.001, d:0.02, g:0.12, ft:"highpass", f0:3500, wet:0.1 }); },
+    mimic:(M,t)=>{ const g = M.c.createGain(); g.connect(M.dry); const l = M.c.createOscillator(), lg = M.c.createGain(); l.frequency.value = 26; lg.gain.value = 0.6; l.connect(lg); lg.connect(g.gain); l.start(t); l.stop(t+0.9);
+      osc({ c:M.c, dry:g, wet:M.wet },{ f:72, f1:58, glide:0.6, t, a:0.08, h:0.25, d:0.3, g:0.3, type:"sawtooth", n:3, spread:20, lp:600, drive:4, wet:0.1 });
+      osc(M,{ f:200, f1:60, glide:0.06, t:t+0.62, a:0.001, d:0.12, g:0.35, drive:3, wet:0.1 }); nz(M,{ t:t+0.62, a:0.001, d:0.06, g:0.15, ft:"lowpass", f0:2500, wet:0.1 }); },
+    unlock:(M,t)=>{ bell(M,2200,t,0.07,0.15,{ ratio:3.9, index:2, wet:0.15 }); R.chain(M,t+0.08); },
+    chain:(M,t)=>{ const r = rng(97); for(let i=0;i<10;i++) bell(M,1300+r()*1500,t+i*0.045+r()*0.02,0.05,0.16,{ ratio:2.9, index:3, pan:(r()-0.5)*0.6, wet:0.15, drive:1.4 }); osc(M,{ f:150, f1:80, glide:0.1, t:t+0.48, a:0.002, d:0.18, g:0.2, wet:0.15 }); },
+    reveal:(M,t)=>{ riser(M,t,0.35,{ f0:1500, f1:7000, g:0.04, q:1.5, wet:0.6 }); sparkle(M,t+0.2,0.5,12,0.03,101); },
+    interact:(M,t)=>{ osc(M,{ f:220, f1:150, glide:0.06, t, a:0.002, d:0.1, g:0.15, wet:0.15 }); nz(M,{ t, a:0.001, d:0.03, g:0.06, ft:"bandpass", f0:1500, wet:0.1 }); },
+    // ================= MENUS =================
+    click:(M,t)=>{ osc(M,{ f:1800, t, a:0.001, d:0.025, g:0.05, type:"triangle", wet:0 }); nz(M,{ t, a:0.001, d:0.012, g:0.03, ft:"highpass", f0:4000, wet:0 }); },
+    tab:(M,t)=>{ osc(M,{ f:1100, t, a:0.001, d:0.035, g:0.05, type:"triangle", wet:0.05 }); },
+  };
+  // loudness per sound (re-measured after each change): threats loudest, then boss moments,
+  // landings and pass/fail, held casts under their own landing, rewards, menus quietest
+  const LEVEL = { castWind:0.7, wind:1.4, hearth:1.4, misdirect:1.6, purge:1.6, cleanse:1.3, fizzle:1.8, pass:1.3, lowMana:1.3, revived:1.4, defeated:1.6,
+    warnDodge:0.85, warnShelter:0.6, warnSpread:0.85, warnDispel:1.1, warnBrace:0.6, warnAttention:1.1, fail:0.75, downed:0.9, phase:0.6, killBoom:0.65,
+    loot2:1.1, loot3:1.2, loot4:1.1, xpFill:1.5, click:2, tab:2,
+    doorOpen:0.6, zap:0.6, mimic:0.6, button:1.2, fountain:1.6, shrine:1.7, ignite:1.7, shatter:1.6, chestLatch:2.5, chestOpen:2, coins:1.7, puzzleMiss:1.5, reveal:2.5, interact:1.8, crumble:1.1 };
+  function trim(c, out, name){ const g = c.createGain(); g.gain.value = LEVEL[name]||1; g.connect(out); return g; }
+  const SPELL = { mend:{ cast:"castMend", done:"mend" }, flicker:{ cast:"castSurge", done:"surge" }, wind:{ cast:"castWind", done:"wind" },
+    hearth:{ done:"hearth" }, ward:{ done:"ward" }, cleanse:{ done:"cleanse" }, misdirect:{ done:"misdirect" }, purge:{ done:"purge" } };
+  const WARN_GROUPS = { warnDodge:["MOVE","SIDESTEP","DODGE","GO AROUND","BACK OFF","BREAK AWAY","NAVIGATE","POSITION","SNARED","REELING","STAGGERED"],
+    warnShelter:["HIDE","GET IN","STEP IN","CLOSE IN","GET IN LIGHT","HIGH GROUND","GET BEHIND","SHELTER","CLOTH FALL"],
+    warnSpread:["SPREAD","FIND SPACE"],
+    warnDispel:["CLEANSE","PURGE","WAX WARD","MISDIRECT","FREE","CLAIM"],
+    warnBrace:["BRACE","MITIGATE","HEAL THROUGH","TOP OFF","HEAL FULL","BURST"] };
+  const WARN = {}; Object.entries(WARN_GROUPS).forEach(([snd, verbs])=>verbs.forEach(v=>{ WARN[v] = snd; }));
+  function warnFor(verb){ return WARN[String(verb||"").toUpperCase()] || "warnAttention"; }
+
+  // ---- the mix: sfx -> master -> limiter; a shared hall reverb fed by each voice's send
+  function buildMix(c, dest){ const comp = c.createDynamicsCompressor(); comp.threshold.value = -10; comp.knee.value = 6; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.2; comp.connect(dest);
+    const master = c.createGain(); master.connect(comp); const sfx = c.createGain(); sfx.connect(master);
+    const duck = c.createGain(); duck.connect(sfx); // everything that isn't a threat; dips while a warning plays
+    const verb = c.createConvolver(); verb.buffer = impulse(c); const vret = c.createGain(); vret.gain.value = 0.55; verb.connect(vret); vret.connect(duck);
+    const pre = c.createBiquadFilter(); pre.type = "highpass"; pre.frequency.value = 220; pre.connect(verb); // keep lows out of the hall
+    return { master, sfx, duck, verbIn:pre }; }
+  // threats and boss moments win: they skip the voice cap, and dip everything else by about 7 dB for a moment
+  const THREAT = new Set(["warnDodge","warnShelter","warnSpread","warnDispel","warnBrace","warnAttention","fail","downed","phase","killBoom","mimic","doorSlam"]);
+  const COOLDOWN = { pass:0.25, fail:0.25, click:0.04, tab:0.04, lowMana:3 }; const DEF_CD = 0.08;
+  const MAX_VOICES = 8, last = {}; let voices = [];
+  let ctx = null, mix = null;
+  const VOL = { master:0.6, sfx:1, mute:false };
+  function ensure(){ try{ if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null; ctx = new AC(); mix = buildMix(ctx, ctx.destination); apply(); }
+      if(ctx.state === "suspended" && !paused) ctx.resume(); return ctx; }catch(_){ return null; } }
+  let paused = false;
+  function setPaused(p){ paused = !!p; try{ if(ctx){ if(paused && ctx.state === "running") ctx.suspend(); else if(!paused && ctx.state === "suspended") ctx.resume(); } }catch(_){} }
+  function apply(){ if(!mix) return; mix.master.gain.value = VOL.mute ? 0 : VOL.master; mix.sfx.gain.value = VOL.sfx; }
+  function play(name, opts){ const r = R[name]; if(!r) return null; const c = ensure(); if(!c || VOL.mute || !(VOL.master>0)) return null;
+    const now = c.currentTime, threat = THREAT.has(name);
+    if(now - (last[name]||-9) < (COOLDOWN[name]==null ? DEF_CD : COOLDOWN[name])) return null; last[name] = now;
+    voices = voices.filter(v=>v > now);
+    if(!threat && voices.length >= MAX_VOICES) return null;
+    voices.push(now + ((opts && opts.dur) || 0) + 1.2);
+    if(threat){ const g = mix.duck.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.45, now+0.03); g.setValueAtTime(0.45, now+0.5); g.linearRampToValueAtTime(1, now+0.9); }
+    try{ return r({ c, dry:trim(c, threat ? mix.sfx : mix.duck, name), wet:trim(c, mix.verbIn, name) }, now + 0.01, opts||{}) || null; }catch(_){ return null; } }
+  function render(name, opts, sr, vol){ const r = R[name], len = (opts && opts.dur ? opts.dur : 0) + 4.5; const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const c = new OC(2, Math.ceil((sr||44100)*len), sr||44100), m = buildMix(c, c.destination); m.master.gain.value = vol==null ? 0.6 : vol;
+    r({ c, dry:trim(c, m.sfx, name), wet:trim(c, m.verbIn, name) }, 0.01, opts||{}); return c.startRendering(); }
+  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, warnFor, VOL, ensure, apply, play, render, setPaused, get ctx(){ return ctx; } };
+})();
+if(typeof window !== "undefined") window.HWSND = HWSND;
+
+</script>
 <script>
 (function(){
   "use strict";
@@ -11453,6 +11687,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
 
   function pushLog(cls, text){
+    if(cls==="event" && S.arena && S.arena.raid && !S.over) sndRaidLog(text); // soundHookV1
     S.log.push({cls, text});
     if(S.log.length>80) S.log.shift();
     renderLog();
@@ -12958,7 +13193,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     const castTime = effectiveCastTime(ability);
     if(castTime > 0){
       self.casting = { id: ability.id, target: S.target, remaining: castTime, total: castTime };
+      try{ const sp = HWSND.SPELL[ability.id]; if(sp && sp.cast) self._sndCast = HWSND.play(sp.cast, { dur:castTime }); }catch(_){} // soundHookV1
     } else {
+      sndSpell(ability.id); // soundHookV1
       spendMana(ability, S.target);
       S._reachMul = !!ability.range;
       S._sfxCast = ability.id; // spellFxV1
@@ -12977,7 +13214,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       const ability = ABILITIES.find(a=>a.id===self.casting.id);
       const target = self.casting.target;
       self.casting = null;
+      { const _sc = self._sndCast; self._sndCast = null; if(_sc) try{ _sc.stop(false); }catch(_){} } // soundHookV1: the held sound hands over to the landing
       if(ability && self.alive && self.mana >= effectiveCost(ability, target)){
+        sndSpell(ability.id); // soundHookV1
         spendMana(ability, target);
         S._reachMul = !!ability.range;
         S._sfxCast = ability.id; // spellFxV1
@@ -13078,6 +13317,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function balStrainEase(){ const ST = S.strain; if(!ST || !(ST.n>0)) return; ST.n--; ST.last = S.runTimer||0; ST.dir = -1; /* rampPipsV1 */
     spawnFloatingText(S.party.self.x, S.party.self.y-40, ST.n ? "STRAIN ×"+ST.n : "STRAIN EASES", "var(--moss)"); if(S._simStrainLog) S._simStrainLog.push("EASE|-|0"); }
   function mfResult(e, name, ok){
+    try{ HWSND.play(ok ? "pass" : "fail"); }catch(_){} // soundHookV1
     if(ok) balStrainEase(); // tune3V1
     if(ok) Object.keys(S.party).forEach(k=>{ const m = S.party[k]; if(m && m.alive && !m.downed) mfPulse(k, MF_OK); });
     (S._mfRes || (S._mfRes = {}))[mfEid(e)+"|"+name] = { ok, t:S.runTimer||0, name };
@@ -13960,7 +14200,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       sl.closed = true;
       sl.slabs.forEach((q,i)=>{ q.door = { id:"seal"+i, rect:q.rect, open:false, kind:"portcullis", seal:true }; S.doors.push(q.door); });
       S.rubbleVer = (S.rubbleVer||0) + 1; // re-plan pathing around the new gates
-      pushLog("event", "Iron gates slam down. There's no leaving this fight.");
+      pushLog("event", "Iron gates slam down. There's no leaving this fight."); sndLater("doorSlam", 0); // soundHookV1
       sl.slabs.forEach(q=>spawnActFx("quake", q.rect.x+q.rect.w/2, q.rect.y+q.rect.h/2, { size:0.5 }));
     }
   }
@@ -13970,7 +14210,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     if(sl.closed){
       S.doors = (S.doors||[]).filter(d=>!d.seal);
       S.rubbleVer = (S.rubbleVer||0) + 1;
-      pushLog("event", "The gates grind open.");
+      pushLog("event", "The gates grind open."); sndLater("doorOpen", 0); // soundHookV1
     }
   }
   function callPull(){
@@ -13997,7 +14237,8 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       if(!near) return;
       btn.pressed = true;
       const door = S.doors.find(d=>d.id===btn.opens);
-      if(door){ door.open = true; pushLog("event", "A switch clicks. The way ahead opens."); }
+      sndLater("button", 0); // soundHookV1
+      if(door){ door.open = true; pushLog("event", "A switch clicks. The way ahead opens."); sndLater("doorOpen", 220); }
     });
   }
 
@@ -14054,6 +14295,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     const pickId = (choices.length ? choices : FOUNTAIN_BUFF_IDS)[Math.floor(Math.random()*(choices.length ? choices.length : FOUNTAIN_BUFF_IDS.length))];
     const def = FOUNTAIN_BUFFS[pickId];
     S.fountainBuff = { id:pickId, t:FOUNTAIN_BUFF_DURATION, vigilUsed:false };
+    sndLater("fountain", 0); // soundHookV1
     pushLog("event", `The fountain grants ${def.name}. ${def.desc}`);
     updateGoldLabel();
     saveGame();
@@ -14088,13 +14330,13 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     },
     sealDoors(f,a){
       (a.ids||[]).forEach(id=>{ const dr=(S.doors||[]).find(d=>d.id===id); if(dr) dr.open=false; });
-      f.sealed = true;
+      f.sealed = true; sndLater("doorSlam", 0); // soundHookV1
       // nudge anyone standing inside a door slab toward the room's middle so nobody is entombed
       Object.values(S.party).forEach(m=>{ let g=0; while(isDoorBlocking(m.x,m.y) && g++<40){ const d=dist(m.x,m.y,f.x,f.y)||1; m.x += (f.x-m.x)/d*8; m.y += (f.y-m.y)/d*8; } });
       spawnActFx("quake", f.x, f.y, { size:0.9 });
     },
     openDoors(f,a){
-      (a.ids||[]).forEach(id=>{ const dr=(S.doors||[]).find(d=>d.id===id); if(dr) dr.open=true; });
+      (a.ids||[]).forEach(id=>{ const dr=(S.doors||[]).find(d=>d.id===id); if(dr) dr.open=true; }); sndLater("doorOpen", 150); // soundHookV1
       if(a.text) pushLog("event", a.text);
     },
     revealRoom(f,a){ const r=ROOMS.find(q=>q.id===a.roomId); if(r){ r.hidden=false; spawnActFx("quake", r.x+r.w/2, r.y+r.h/2, { size:0.6 }); } },
@@ -14110,10 +14352,10 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       spawnActFx("cleanse", f.x, f.y, { size:0.8 });
       pushLog("event", `${a.text||"The party receives a boon."} ${FOUNTAIN_BUFFS[id].name}: ${FOUNTAIN_BUFFS[id].desc}`);
     },
-    openDoor(f,a){ const dr=(S.doors||[]).find(d=>d.id===a.door); if(dr){ dr.open=true; pushLog("event","A door grinds open."); } },
+    openDoor(f,a){ const dr=(S.doors||[]).find(d=>d.id===a.door); if(dr){ dr.open=true; pushLog("event","A door grinds open."); sndLater("doorOpen", 150); } }, // soundHookV1
     revealChest(f,a){
       TREASURE_CHEST_DEFS.forEach((c,i)=>{ if(c.id===a.chestId && S.treasureChests[i] && S.treasureChests[i].hidden){
-        S.treasureChests[i].hidden=false; spawnActFx("cleanse", c.x, c.y, { size:0.7 });
+        S.treasureChests[i].hidden=false; spawnActFx("cleanse", c.x, c.y, { size:0.7 }); sndLater("reveal", 200); // soundHookV1
         pushLog("event","A hidden chest is revealed!"); } });
     },
     cleanseDistortion(f,a){
@@ -14127,14 +14369,14 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     },
     wakePack(f,a){
       S.packs.forEach(pk=>{ if(pk.dormant && pk.wakeFeature===(a.featureId||f.id) && (a.wave==null || (pk.wave||1)===a.wave)){
-        pk.dormant=false; if(a.text) pushLog("event", a.text);
+        pk.dormant=false; if(a.text) pushLog("event", a.text); sndLater("warnAttention", 0); // soundHookV1: an ambush wakes
         livingEnemiesOf(pk).forEach(e=>spawnActFx("eruption", e.x, e.y, { size:0.5 }));
         engageGroup(pk, true); } });
     },
   };
   function useFeature(f){
     f = f || nearestFeature(); if(!f || f.used || S.over) return false;
-    f.used = true;
+    f.used = true; sndFeature(f); // soundHookV1
     (f.actions||[]).forEach(a=>{ const fn=FEATURE_ACTIONS[a.do]; if(fn) fn(f,a); });
     if(f.group){
       const grp = S.features.filter(q=>q.group===f.group);
@@ -14589,7 +14831,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   function treasureSolve(){
     const t = activeTreasureChest();
     if(!t || t.solved) return;
-    t.solved = true;
+    t.solved = true; sndLater("chestOpen", 0); // soundHookV1
     t.reward = chestPayout(t);
     S.gold = (S.gold||0) + t.reward;
     pushLog("event", `The chest opens. ${t.reward} gold!`);
@@ -14599,7 +14841,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   // ---- mimic twist: waking it spawns a small group beside the chest; killing all of it pays the chest out ----
   function wakeMimic(idx){
     const t = S.treasureChests[idx], def = TREASURE_CHEST_DEFS[idx]; if(!t || t.mimicSpawned) return;
-    t.mimicSpawned = true;
+    t.mimicSpawned = true; sndLater("mimic", 0); // soundHookV1
     const hpMul = S.keystoneHpMul || 1;
     const boss = mkEnemy("mimicboss", "Hoard Mimic", def.x, def.y);
     boss.hp = boss.maxHp = Math.round(boss.hp*hpMul);
@@ -14613,7 +14855,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   }
   function mimicDefeated(g){
     const t = S.treasureChests[g.mimicIdx]; if(!t || t.solved) return;
-    t.solved = true; t.reward = chestPayout(t, g.mimicIdx);
+    t.solved = true; t.reward = chestPayout(t, g.mimicIdx); sndLater("coins", 300); // soundHookV1
     S.gold = (S.gold||0) + t.reward;
     const item = generateGearItem(S.level, false);
     let extra = "";
@@ -14683,7 +14925,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
       later: (fn, ms)=>{ const id = setTimeout(()=>{ if(document.getElementById("treasureOverlay").style.display!=="none") fn(); }, ms); timers.push(id); return id; },
       onClose: fn=>closers.push(fn),
       mistake: msg=>{
-        t.mistakes = (t.mistakes||0) + 1; refreshPay(); status.textContent = msg||"Mistake.";
+        t.mistakes = (t.mistakes||0) + 1; refreshPay(); status.textContent = msg||"Mistake."; sndLater(t.mod==="trapped" ? "zap" : "puzzleMiss", 0); // soundHookV1
         status.classList.add("bad"); setTimeout(()=>status.classList.remove("bad"), 500);
         host.classList.add("shake"); setTimeout(()=>host.classList.remove("shake"), 350);
         if(t.mod==="trapped"){ const me = S.party.self; if(me && me.alive){ me.hp = Math.max(1, me.hp - me.maxHp*CHEST_ZAP_PCT); spawnFloatingText(me.x, me.y-14, "Zap!", "var(--blood)"); czSpark(host); pushLog("event", "The trap zaps you."); } }
@@ -21145,7 +21387,7 @@ thrall(){return gs(14)+
     if(!near) return;
     const m = S.party[btn.forKey];
     if(m){
-      m.alive = true; m.imprisoned = false;
+      m.alive = true; m.imprisoned = false; sndLater("unlock", 0); // soundHookV1
       m.hp = Math.max(m.hp, Math.round(m.maxHp*0.3));
       pushLog("event", `${btn.forKey==="self"?"You break":m.label+" breaks"} free of the cage!`);
     }
@@ -23014,6 +23256,7 @@ thrall(){return gs(14)+
               st.timer -= dt;
               if(st.timer<=0){
                 const ddef = DEBUFFS[mech.debuff];
+                if((S.runTimer||0) - (st._sndAt||-9) > 3){ st._sndAt = S.runTimer||0; try{ HWSND.play(HWSND.warnFor(mechVerb(mech).verb)); }catch(_){} } // soundHookV1
                 const aliveKeys = Object.keys(S.party).filter(k=>S.party[k].alive);
                 if(!aliveKeys.length){ st.timer = mechEvery(e, mech); }
                 else if(ddef.tether){
@@ -24420,6 +24663,7 @@ thrall(){return gs(14)+
   }
   // A tagged boss mechanic is starting its telegraph.
   function bulwarkMoment(label){
+    if(label!=="Hammer Line") try{ HWSND.play("warnBrace"); }catch(_){} // soundHookV1: a hit the tank must be shielded for
     const f = bwFight(), now = S._bwClock||0; f.tags++;
     if(f.last!=null){ const g = now-f.last; if(g>1) f.gap = f.gap==null ? g : f.gap*0.6+g*0.4; }
     f.last = now;
@@ -25953,7 +26197,7 @@ thrall(){return gs(14)+
     const retreat = !!(opts && opts.retreat);
     S.over = true; S.won = won; S.paused = false;
     S.engagedGroups.clear();
-    const _xp = awardTeamXp(won);
+    const _xp = awardTeamXp(won); S._sndLoot = null; S._sndUp = _xp.after>_xp.before; // soundHookV1
     const overlay = document.getElementById("endOverlay");
     document.getElementById("endTitle").textContent = won ? "The Descent Is Cleared" : retreat ? "You Left the Descent" : "The Party Has Wiped";
     const clearLine = won && fullClearBonus() ? " You cleared every required pack: a bonus item drops." : "";
@@ -25982,7 +26226,7 @@ thrall(){return gs(14)+
     if(won){
       const clearBonus = fullClearBonus();
       const bossGold = bossGoldReward(); S.gold = (S.gold||0) + bossGold; updateGoldLabel();
-      const drops = rollRunLoot();
+      const drops = rollRunLoot(); S._sndLoot = drops; // soundHookV1
       lootEl.innerHTML = `<h3>Recovered from the chamber</h3><div class="lootNote" style="font-size:12px;opacity:.85;margin:2px 0 6px">+${bossGold} gold from the boss` + (clearBonus ? ` · full clear: +1 bonus drop` : ``) + ((S._miniKills||0) ? ` · ${S._miniKills} mini-boss${S._miniKills>1?"es":""}: +${S._miniGold} gold & ${(S._miniDrops||[]).length} gear (already in your bags)` : ``) + `</div>` + drops.map(gearItemChipHTML).join("");
       // Round 78: record progress toward the keystone band gate. Only a WIN
       // advances it (a wipe shouldn't unlock anything), and only if it's a
@@ -26003,11 +26247,12 @@ thrall(){return gs(14)+
     }
     const _kb = S._beatBoss; S._beatBoss = null; // killBeatV1: let the kill land before the card
     let _kbOk = false; if(won && !retreat && _kb && typeof document!=="undefined" && !S._simNoBeat){ try{ killBeatStart(_kb, overlay); _kbOk = true; }catch(_){ S._killBeat = null; } }
-    if(!_kbOk) overlay.style.display = "flex";
+    if(!_kbOk){ overlay.style.display = "flex"; sndResults(); }
   }
   const KB_DUR = 1.35;
   function killBeatStart(e, overlay){
     const kb = S._killBeat = { t:0, e, x:e.x, y:e.y, overlay, fx:[], r:(e.r||30) };
+    try{ HWSND.play("killBoom"); setTimeout(()=>{ if(S._killBeat===kb) HWSND.play("defeated"); }, 260); }catch(_){} // soundHookV1
     const gold = resolveColor("var(--accent-strong)"), ember = resolveColor("var(--ember)");
     for(let i=0;i<18;i++){ const a = Math.random()*Math.PI*2, sp = 140 + Math.random()*220;
       kb.fx.push({ a, sp, x:0, y:0, l:0.7 + Math.random()*0.6, s:2.8 + Math.random()*3.5, c: i%5===0 ? "#ffffff" : (i%2 ? gold : ember) }); }
@@ -26024,7 +26269,7 @@ thrall(){return gs(14)+
     try{ window.removeEventListener("pointerdown", kb.skip); window.removeEventListener("keydown", kb.skip); }catch(_){}
     if(kb.e){ kb.e._deathAnimT = 0; kb.e._flashT = 0; } S._shakeT = 0;
     const bb = document.getElementById("bossBanner"); if(bb){ bb.classList.remove("show"); bb._shown = false; bb._key = ""; }
-    const ov = kb.overlay; if(ov && !S.arena){ ov.classList.add("kbIn"); ov.style.display = "flex"; setTimeout(()=>ov.classList.remove("kbIn"), 700); }
+    const ov = kb.overlay; if(ov && !S.arena){ ov.classList.add("kbIn"); ov.style.display = "flex"; setTimeout(()=>ov.classList.remove("kbIn"), 700); sndResults(); }
   }
   function tickKillBeat(dt){
     const kb = S._killBeat; if(!kb) return; kb.t += dt; const t = kb.t, e = kb.e;
@@ -29486,6 +29731,38 @@ thrall(){return gs(14)+
       if(c.pip){ const k = Math.min(c.n, 6); return `<span class="bbPg strain${fl}" style="color:${col}">${Array.from({length:k},()=>`<i class="sd"></i>`).join("")}${c.n>6?`<b>${c.n}</b>`:""}</span>`; }
       return `<span class="bbPg${fl}" style="color:${col}">${Array.from({length:c.cap},(_,i)=>`<i class="rp${i<c.n?" on":""}"></i>`).join("")}</span>`; }).join("")}</div>`;
   }
+  // ---- soundHookV1
+  const SND_RAID = [ // raid log line -> sound
+    [/Wildfire hurls|Hammer Line|floodgate grinds|Ash begins to fall|lunges/, "warnDodge"],
+    [/Flashfire|Smother creeps/, "warnShelter"],
+    [/begins Banking/, "warnDispel"],
+    [/Tinder Pups hatch|hatches a Brood|An egg hatches|lays a Clutch Egg|starts forging|heads for the|takes the |lifts a masterwork|drinks their fire|Every well goes dark/, "warnAttention"],
+    [/Kindlemother rises|bursts from the fire|crashes into the hall|forges himself anew|crumbles to ash|clutch is broken|Desperation|Sovereign falls!|will not die|will not break/, "phase"],
+    [/quenches him|Banking is broken|blank cracks|cut a Tinder Pup|take the Sovereign's embers|ember well relights|An ember well catches|last well flares/, "pass"],
+    [/still burning|unattended well gutters|wants his ember back/, "fail"] ];
+  function sndRaidLog(text){ try{ const t = String(text||""); for(const [re, snd] of SND_RAID){ if(re.test(t)){ HWSND.play(snd); return; } } }catch(_){} }
+  function sndLater(name, ms){ try{ if(ms>0) setTimeout(()=>HWSND.play(name), ms); else HWSND.play(name); }catch(_){} }
+  const SND_FEATURE = { lever:"lever", shrine:"shrine", well:"fountain", torch:"ignite", brazier:"ignite", crack:"crumble", mirror:"shatter", raidIntro:"ignite", raidEmber:"ignite", raidChain:"chain" };
+  function sndFeature(f){ if(f.trigger==="enter") return; sndLater(SND_FEATURE[f.type] || "interact", 0); }
+  function sndSpell(id){ try{ const sp = HWSND.SPELL[id]; if(sp && sp.done) HWSND.play(sp.done); }catch(_){} }
+  const _sndNow = new Map();
+  function sndChips(boss, chips){ try{ const seen = new Set(), kind = ENEMY_KINDS[boss.kind];
+    chips.forEach(c=>{ if(!c || !c.now || c.mf || c.ramp || c.pip || c.id==="strain") return; const key = (boss.id||boss.name) + "|" + c.id; seen.add(key); if(_sndNow.has(key)) return; _sndNow.set(key, 1);
+      const m = (kindMechs(kind)||[]).find(x=>x.id===c.id); if(m && m.windup>0) return; /* the wind-up hook already warned */ HWSND.play(HWSND.warnFor(m ? mechVerb(m).verb : c.verb)); });
+    [..._sndNow.keys()].forEach(k=>{ if(!seen.has(k)) _sndNow.delete(k); }); }catch(_){} }
+  function sndResults(){ try{ HWSND.play("xpFill", { dur:1 }); const up = S._sndUp, drops = S._sndLoot || [];
+      if(up) setTimeout(()=>HWSND.play("levelUp"), 1100);
+      if(drops.length){ const best = Math.max(...drops.map(d=>RARITY_ORDER[d.rarity]||0)); setTimeout(()=>HWSND.play("loot"+Math.min(4, best)), up ? 2300 : 1300); } }catch(_){} }
+  function sndTick(){ if(typeof HWSND==="undefined") return; try{
+    HWSND.setPaused(!!(S.started && !S.over && S.paused));
+    const me = S.party && S.party.self; if(!me) return;
+    if(me._sndCast && !me.casting){ const h = me._sndCast; me._sndCast = null; h.stop(true); if(S.started && !S.over) HWSND.play("fizzle"); } // a cast cut off by a mechanic, a stun or a pin
+    if(!S.started || S.over) return;
+    const fresh = (S.runTimer||0) < 0.3;
+    Object.values(S.party).forEach(m=>{ if(!m) return; const up = !!m.alive; if(fresh || m._sndUp===undefined){ m._sndUp = up; return; } if(m._sndUp && !up) HWSND.play("downed"); else if(!m._sndUp && up) HWSND.play("revived"); m._sndUp = up; });
+    const mr = me.mana/Math.max(1, me.maxMana); if(fresh) me._sndLow = mr<0.2; else if(!me._sndLow && mr<0.2 && me.alive){ me._sndLow = true; HWSND.play("lowMana"); } else if(me._sndLow && mr>0.35) me._sndLow = false;
+    const b = activeBossEnemy(); if(b){ const ph = b._phase||0; if(b._sndPh===undefined || fresh) b._sndPh = ph; else if(ph > b._sndPh){ b._sndPh = ph; HWSND.play("phase"); } } else _sndNow.clear();
+  }catch(_){} }
   function updateBossBanner(){
     if(S._killBeat) return; // killBeatV1: the beat owns the banner
     const el = document.getElementById("bossBanner");
@@ -29512,6 +29789,7 @@ thrall(){return gs(14)+
     const mythName = _mk ? ((_mk.clutch && !_mk.clutch.risen) ? "THE LAST CLUTCH" : _mk.self ? "SELF-FORGED" : _mk.dark ? "THE LONG DARK" : null) : null;
     const _scB = S.arena && S.arena.raid && RAID_SCRIPTS[boss.kind];
     const chips = mythName ? [] : (_scB && _scB.chips && _mk) ? _scB.chips(S.arena.raid, boss) : bossNextUp(boss, 2);
+    sndChips(boss, chips); // soundHookV1
     const ph = boss._phase||0;
     const wd = boss._ward;
     const wardKey = wd ? "|W"+wd.progressText : (boss._wardSealed ? "|WB" : "");
@@ -29543,7 +29821,8 @@ thrall(){return gs(14)+
       kindMechs(kind).forEach(m=>{
         const st = e.mech[m.id];
         if(!st || !(m.windup>0)) return;
-        if(!st.casting || st.castT>=m.windup){ st._announceT = 0; return; }
+        if(!st.casting || st.castT>=m.windup){ st._announceT = 0; st._sndW = false; return; }
+        if(!st._sndW){ st._sndW = true; try{ HWSND.play(HWSND.warnFor(mechVerb(m).verb)); }catch(_){} } // soundHookV1
         st._announceT = (st._announceT||0) - dt;
         if(st._announceT>0) return;
         st._announceT = 0.8;
@@ -35739,6 +36018,7 @@ thrall(){return gs(14)+
   }
   function raidFinish(won, opts){
     const a = S.arena, r = a.raid;
+    try{ if(won){ HWSND.play("killBoom"); setTimeout(()=>HWSND.play("defeated"), 260); } }catch(_){} // soundHookV1
     S.over = true; S.won = !!won; S.paused = false; S.engagedGroups.clear();
     r.state = won ? "won" : "wiped";
     const st = RAID_STAGES[r.stage];
@@ -36339,8 +36619,13 @@ thrall(){return gs(14)+
 
   // ===== Display settings (render quality, UI size) + movable-widget layout editor =====
   const DISP_KEY = "hearthward_display_v1";
-  const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp" }; // numbersV1: nums = all | imp | off
-  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
+  const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp", snd:{ v:60, mute:false } }; // numbersV1: nums = all | imp | off; soundHookV1: snd
+  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), mute:!!o.snd.mute }; if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
+  // soundHookV1: browsers only start audio from a tap or key; menu buttons tick
+  document.addEventListener("pointerdown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
+  document.addEventListener("keydown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
+  document.addEventListener("click", e=>{ try{ const b = e.target && e.target.closest && e.target.closest("button"); if(!b || b.disabled || b.closest(".abilities,#castBar,#dSnd")) return;
+    HWSND.play(/tab|Tab|Pick|raidTier|wdBtn|dSeg|rgPick/.test(b.className + " " + (b.parentElement ? b.parentElement.className + " " + b.parentElement.id : "")) ? "tab" : "click"); }catch(_){} }, true);
   function dispSave(){ try{ localStorage.setItem(DISP_KEY, JSON.stringify(DISP)); }catch(e){} }
   function computeRS(){ const dpr = window.devicePixelRatio||1; return DISP.rq==="std" ? 1 : DISP.rq==="perf" ? 0.75 : Math.max(1, Math.min(2, dpr)); }
   RS = computeRS();
@@ -36457,6 +36742,7 @@ thrall(){return gs(14)+
   function dispSync(){
     document.querySelectorAll("#dRQ button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.rq));
     document.querySelectorAll("#dNum button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.nums)); // numbersV1
+    { const sv = document.getElementById("dSnd"); if(sv){ sv.value = DISP.snd.v; document.getElementById("dSndV").textContent = DISP.snd.mute ? "Muted" : DISP.snd.v+"%"; const mb = document.getElementById("dSndMute"); mb.textContent = DISP.snd.mute ? "Unmute" : "Mute"; mb.classList.toggle("on", DISP.snd.mute); } } // soundHookV1
     document.getElementById("dUI").value = Math.round(DISP.ui*100); document.getElementById("dUIv").textContent = Math.round(DISP.ui*100)+"%";
     document.getElementById("dRQnote").textContent = "Rendering at " + (Math.round(RS*100)/100) + "× (screen is " + (Math.round((window.devicePixelRatio||1)*100)/100) + "×)";
   }
@@ -36464,6 +36750,11 @@ thrall(){return gs(14)+
   document.addEventListener("pointerdown", e=>{ const p = document.getElementById("dispPanel"); if(p.classList.contains("open") && !p.contains(e.target) && e.target.id!=="dispBtn") p.classList.remove("open"); });
   document.querySelectorAll("#dRQ button").forEach(b=> b.addEventListener("click", ()=>{ DISP.rq = b.dataset.v; dispSave(); fitApp(); dispSync(); }));
   document.querySelectorAll("#dNum button").forEach(b=> b.addEventListener("click", ()=>{ DISP.nums = b.dataset.v; dispSave(); dispSync(); })); // numbersV1
+  function sndApply(){ try{ HWSND.VOL.master = DISP.snd.v/100; HWSND.VOL.mute = !!DISP.snd.mute; HWSND.apply(); }catch(_){} } // soundHookV1
+  sndApply();
+  document.getElementById("dSnd").addEventListener("input", e=>{ DISP.snd.v = +e.target.value; DISP.snd.mute = false; sndApply(); dispSync(); });
+  document.getElementById("dSnd").addEventListener("change", ()=>{ dispSave(); try{ HWSND.play("mend"); }catch(_){} });
+  document.getElementById("dSndMute").addEventListener("click", ()=>{ DISP.snd.mute = !DISP.snd.mute; sndApply(); dispSave(); dispSync(); });
   document.getElementById("dUI").addEventListener("input", e=>{ DISP.ui = (+e.target.value)/100; dispSave(); applyDisplay(); fitApp(); dispSync(); });
   document.getElementById("dEdit").addEventListener("click", hwEnter);
   document.getElementById("dResetLayout").addEventListener("click", hwReset);
@@ -36844,6 +37135,7 @@ thrall(){return gs(14)+
       const nearest = nearestTreasureChest();
       if(!nearest) return;
       S.activeChestIdx = nearest.idx;
+      sndLater("chestLatch", 0); // soundHookV1
       renderTreasurePuzzle();
       document.getElementById("treasureOverlay").style.display="flex";
     });
@@ -37254,6 +37546,7 @@ thrall(){return gs(14)+
       if(S.arena) arenaTick(dt);
     }
     if(S._killBeat) tickKillBeat(dt); // killBeatV1: runs after the run has ended
+    sndTick(); // soundHookV1
     drawScene();
     if(S.arena && S.arena.tut) tutLayoutUI(); // tutorialV1
     if(S.started){
@@ -37283,7 +37576,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build c96a3ef01c) */
+<script>/* phone app: offline cache (build 02d50cb421) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
