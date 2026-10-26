@@ -2716,6 +2716,146 @@ const HWSND = (()=>{
     if(!mus){ mus = musicNew(c, mix.mus, mix.verbIn, fam, c.currentTime, (Date.now() & 0xffff) + 7); mus.target = 0;
       if(!musTimer) musTimer = setInterval(()=>{ if(mus && ctx && ctx.state === "running") musicPump(mus, ctx.currentTime + 0.4); }, 100); }
     if(mus.target !== level) musicLevel(mus, level, c.currentTime); }
+  // ================= RAID MUSIC: composed, sectioned scores (the Unbanked Hearth) =================
+  // Daniel, Oct 26: Dark Souls 3 as the model ("fire fading / stealing fire"). One original Hearth theme, shared by the three
+  // bosses in different guises. Shared instruments are fine when the usage differs: the choir only holds distant chords
+  // (spells: short bright bursts), the brass only swells legato (warnings: dry stabs), the drums are pitched, soft and far
+  // (warnings: dry war drums that speed up). Buses: base (bass, strings, timpani), him (the boss: brass, choir, bell; dims as
+  // his embers are taken), light (the healer's staff: a soft piano-like voice that grows as the embers become yours).
+  const RI = {
+    brass:(M,f,t,d,g)=>osc(M,{ f, t, a:0.22, h:Math.max(0,d-0.3), d:0.35, g, type:"sawtooth", n:3, spread:10, lp:380, f2:1500, fg:0.5, f3:700, q:0.9, drive:1.3, wet:0.5 }),
+    cello:(M,f,t,d,g)=>osc(M,{ f, t, a:0.09, h:Math.max(0,d-0.25), d:0.3, g, type:"sawtooth", n:2, spread:7, lp:850, q:1, vib:4.5, wet:0.4 }),
+    waltz:(M,f,t,d,g)=>osc(M,{ f, t, a:0.012, d:0.28, g, type:"sawtooth", n:2, spread:9, lp:1100, wet:0.3 }),
+    bassLow:(M,f,t,d,g)=>osc(M,{ f, t, a:0.05, h:Math.max(0,d-0.4), d:0.4, g, type:"sawtooth", n:2, spread:5, lp:420, wet:0.2 }),
+    ost:(M,f,t,d,g)=>osc(M,{ f, t, a:0.004, d:0.1, g, type:"sawtooth", n:2, spread:8, lp:1000, q:1.3, wet:0.2 }),
+    timp:(M,f,t,d,g)=>{ osc(M,{ f, f1:f*0.92, glide:0.6, t, a:0.004, d:1.1, g, wet:0.45 }); nz(M,{ t, a:0.002, d:0.09, g:g*0.35, ft:"lowpass", f0:350, wet:0.4 }); },
+    bell:(M,f,t,d,g)=>bell(M, f, t, g, 2.6, { ratio:2.0, index:0.9, wet:0.85 }),
+    choir:(M,notes,t,d,g)=>choir(M, notes, t, d, { g, a:Math.min(1.2, d*0.4), vowel:"oo", wet:0.85, rel:1.4 }),
+    light:(M,f,t,d,g)=>{ bell(M, f, t, g, Math.min(2.4, d+0.8), { ratio:1.0, index:0.55, wet:0.6 }); osc(M,{ f:f*2, t, a:0.003, d:Math.min(1.2,d), g:g*0.18, type:"triangle", wet:0.6 }); },
+    drone:(M,f,t,d,g)=>osc(M,{ f, t, a:1.5, h:Math.max(0,d-3), d:1.5, g, type:"sawtooth", n:3, spread:8, lp:260, wet:0.5 }),
+    swell:(M,f,t,d,g)=>nz(M,{ t, a:d, d:0.08, g, ft:"lowpass", f0:200, f1:2500, glide:d, q:0.7, wet:0.6 }),    violin:(M,f,t,d,g)=>osc(M,{ f, t, a:0.15, h:Math.max(0,d-0.3), d:0.4, g, type:"triangle", n:2, spread:6, vib:5.5, lp:3200, wet:0.6 }),
+    ens:(M,f,t,d,g)=>osc(M,{ f, t, a:0.2, h:Math.max(0,d-0.35), d:0.45, g, type:"sawtooth", n:3, spread:14, lp:1600, vib:5, wet:0.55 }),
+    pluck:(M,f,t,d,g)=>osc(M,{ f, t, a:0.002, d:0.6, g, type:"triangle", lp:f*4, wet:0.5 }),
+    trem:(M,f,t,d,g)=>osc(M,{ f, t, a:0.004, d:0.06, g, type:"sawtooth", n:2, spread:10, lp:2600, wet:0.45 }),
+    marc:(M,f,t,d,g)=>osc(M,{ f, t, a:0.008, d:0.18, g, type:"sawtooth", n:2, spread:9, lp:1400, q:1, wet:0.25 }),
+    anvil:(M,f,t,d,g)=>bell(M, f, t, g, 0.5, { ratio:3.5, index:1.1, wet:0.35 }),
+    heart:(M,f,t,d,g)=>{ osc(M,{ f:58, f1:40, glide:0.12, t, a:0.004, d:0.22, g, wet:0.2 }); osc(M,{ f:52, f1:38, glide:0.12, t:t+0.2, a:0.004, d:0.2, g:g*0.7, wet:0.2 }); },
+  };
+  // The Hearth theme: [bar, beat, degree, beats] over 8 bars of 3/4. Original: a rising minor sixth that falls back step by step
+  // (the fire guttering); the first half ends open on the fifth, the second resolves through the leading tone.
+  const HEARTH_THEME = [ [0,0,0,3], [1,0,5,1],[1,1,4,1],[1,2,3,1], [2,0,2,2],[2,2,3,1], [3,0,4,3],
+    [4,0,0,3], [5,0,5,1],[5,1,4,1],[5,2,3,1], [6,0,3,1],[6,1,1,1],[6,2,-1,1], [7,0,0,3] ];
+  // the theme's harmony in any harmonic-minor key: i VI iv V | i VI V7 i (bass notes and a close voicing, from the tonic's MIDI)
+  function hearthBars(r, bassR){ const B = bassR==null ? r-12 : bassR, V = [[0,3,7],[0,3,8],[0,5,8],[-1,2,7],[0,3,7],[0,3,8],[-1,2,5],[0,3,7]], bs = [0,-4,-7,-5,0,-4,-5,0];
+    return V.map((v,i)=>({ bass:B + bs[i] + (B + bs[i] < 31 ? 12 : 0), ch:v.map(x=>r + x) })); }
+  // Each boss: sections (bpm, level g), bus(st) = { him, hf, li, lf } (the boss's voice, the healer's light) and play(st, t, X) per 16th.
+  // st.v holds the boss's live values: Sovereign ember (0-3 taken) and light (0..1, the Long Dark); Kindlemother hearts (0-4) and
+  // warm (0..1, the Last Clutch's eggs); Slagwright hot (1 white-hot .. 0 brittle).
+  const RAIDM = {
+    sovereign:{ root:53, scale:HMINOR, bars:hearthBars(53, 41), // F harmonic minor; a slow, dark waltz
+      sec:{ open:{ bpm:66 }, fall:{ bpm:50 }, last:{ bpm:80 }, desp:{ bpm:84 }, dark:{ bpm:52 } },
+      bus(st){ const S = st.sec, e = Math.max(0, Math.min(3, st.v.ember|0)), L = st.v.light==null ? 1 : st.v.light;
+        return { him:S==="dark" ? 0 : S==="fall" ? 0.7 : S==="desp" ? 0.5 : [1,0.8,0.65,0.5][e], hf:S==="desp" ? 1000 : [6000,3000,1700,1000][e],
+          li:(S==="desp" || S==="fall" || S==="dark") ? 1 : e/3*0.8, lf:S==="dark" ? 700 + 5000*L : 9000 }; },
+      play(st, t, X){ const { S, step, beat, bar, b8, B, loop, bt, th, base, him, lit } = X;
+        if(S==="open" || S==="last" || S==="desp"){
+          if(step===0){ RI.bassLow(base, mtof(B.bass), t, bt*3, 0.05); RI.choir(him, B.ch.map(mtof), t, bt*3, 0.03); }
+          const vary = loop % 3; // 0 the theme in full; 1 low in the cellos; 2 a rest: accompaniment and choir only (restraint)
+          if(S==="open"){ if(beat===1 || beat===2) B.ch.forEach(n=>RI.waltz(base, mtof(n - 12), t, 0, 0.012));
+            if(vary===0){ th((f,d)=>RI.brass(him, f, t, d, 0.03)); th((f,d)=>RI.light(lit, f, t, d, 0.03), 12); }
+            else if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.035), -12);
+            if(b8===0 && step===0) RI.bell(him, mtof(B.ch[0] + 24), t, 0, 0.02); }
+          else { RI.ost(base, mtof(B.ch[step % 3] - 12 + (step % 6 >= 3 ? 12 : 0)), t, 0, step % 4 === 0 ? 0.022 : 0.014);
+            if(step===0) RI.timp(base, mtof(B.bass + 12), t, 0, 0.09);
+            if(S==="last"){ if(vary !== 2){ th((f,d)=>RI.brass(him, f, t, d, 0.035)); th((f,d)=>RI.light(lit, f, t, d, 0.03), 12); } }
+            else { if(step===8) RI.timp(base, mtof(B.bass + 12), t, 0, 0.05); // Desperation: the staff carries the theme, in thirds
+              th((f,d)=>RI.light(lit, f, t, d, 0.04), 12); th((f,d)=>RI.light(lit, f, t, d, 0.024), 12, -2); if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.03), -12); } } }
+        else if(S==="fall"){ // a hush while his ember changes hands: drone, choir, the theme's first half on the light
+          if(step===0 && bar % 2 === 0){ RI.drone(base, mtof(29), t, bt*6, 0.045); RI.choir(him, B.ch.map(mtof), t, bt*6, 0.025); }
+          if(bar % 8 < 4) th((f,d)=>RI.light(lit, f, t, d*1.3, 0.035), 12, 0, 4); }
+        else if(S==="dark"){ const L = st.v.light==null ? 1 : st.v.light; // the Long Dark: notes drop out and the tone closes as the light shrinks
+          if(step===0 && bar % 2 === 0) RI.drone(base, mtof(29), t, bt*6, 0.03*(0.5 + 0.5*L));
+          if(step===0 && bar % 2 === 1) RI.timp(base, mtof(41), t, 0, 0.035);
+          th((f,d)=>{ if(st.r() < 0.35 + 0.65*L) RI.light(lit, f, t, d*1.3, 0.045*(0.4 + 0.6*L)); }, 12); } } },
+    kindle:{ root:57, scale:HMINOR, bars:hearthBars(57, 45), // A harmonic minor; a 6/8 rocking accompaniment under the 3/4 theme (a hemiola)
+      sec:{ brood:{ bpm:72 }, rise:{ bpm:80 }, flash:{ bpm:92, g:0.88 }, clutch:{ bpm:66 }, again:{ bpm:100, g:0.88 } },
+      bus(st){ const S = st.sec; return { him:S==="brood" ? 0.55 : S==="clutch" ? 0.4 : 1, hf:S==="brood" ? 2200 : S==="clutch" ? 1300 : 7000, li:(S==="brood" || S==="clutch") ? 1 : 0.55, lf:9000 }; },
+      play(st, t, X){ const { S, step, beat, bar, b8, B, loop, bt, th, base, him, lit } = X, h = Math.max(0, Math.min(4, st.v.hearts|0));
+        const rock = step===0 || step===6, arp = step % 2 === 0; // 6/8: two dotted-quarter pulses, eighth-note arpeggios
+        if(S==="brood"){ // she sleeps: a lullaby that warms with every Heart brought home
+          if(arp) RI.pluck(lit, mtof(B.ch[(step/2) % 3] + (step >= 6 ? 12 : 0)), t, 0, 0.02);
+          if(step===0 && bar % 2 === 0) RI.heart(base, 0, t, 0, 0.05);
+          if(step===0) RI.bassLow(base, mtof(B.bass), t, bt*3, h >= 1 ? 0.04 : 0.025);
+          if(h >= 2 && step===0) RI.choir(him, B.ch.map(mtof), t, bt*3, 0.022);
+          if(loop % 2 === 0) th((f,d)=>RI.violin(lit, f, t, d, 0.022 + 0.004*h), 12);
+          if(h >= 3) th((f,d)=>RI.cello(base, f, t, d, 0.022), -12);
+          if(h >= 4 && step % 2 === 1) RI.trem(him, mtof(B.ch[step % 3] + 12), t, 0, 0.008); }
+        else if(S==="rise" || S==="flash" || S==="again"){ // she wakes: the lament
+          if(step===0){ RI.bassLow(base, mtof(B.bass), t, bt*3, 0.05); RI.choir(him, B.ch.map(mtof), t, bt*3, 0.028); }
+          if(rock) RI.timp(base, mtof(B.bass + 12), t, 0, step===0 ? 0.07 : 0.04);
+          const vary = loop % 3;
+          if(S==="rise"){ if(arp) RI.waltz(base, mtof(B.ch[(step/2) % 3] - 12), t, 0, 0.011);
+            if(vary !== 2) th((f,d)=>RI.ens(him, f, t, d, 0.032)); if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.03), -12); }
+          else { RI.trem(base, mtof(B.ch[step % 3]), t, 0, step % 6 === 0 ? 0.02 : 0.012);
+            if(vary !== 2){ th((f,d)=>RI.ens(him, f, t, d, 0.03)); th((f,d)=>RI.brass(him, f, t, d, 0.026), -12); }
+            if(S==="again" && step===9) RI.timp(base, mtof(B.bass + 12), t, 0, 0.04); } }
+        else if(S==="clutch"){ const w = Math.max(0, Math.min(1, st.v.warm||0)); // the Last Clutch: the heartbeat quickens as the eggs warm
+          const every = w < 0.33 ? 24 : w < 0.66 ? 12 : 6;
+          if(st.step % every === 0) RI.heart(base, 0, t, 0, 0.045 + 0.02*w);
+          if(step===0 && bar % 2 === 0){ RI.drone(base, mtof(33), t, bt*6, 0.04); RI.choir(him, [B.ch[0], B.ch[0]+1, B.ch[2]].map(n=>mtof(n + 12)), t, bt*6, 0.016); }
+          if(arp && st.r() < 0.5) RI.pluck(lit, mtof(B.ch[(step/2) % 3] + 12), t, 0, 0.016); } } },
+    forge:{ root:48, scale:HMINOR, bars:hearthBars(48, 36), // C harmonic minor; hammered, marcato
+      sec:{ arsenal:{ bpm:92, g:0.88 }, commission:{ bpm:96 }, temper:{ bpm:104 }, forged:{ bpm:88 } }, trim:0.85,
+      bus(st){ const S = st.sec, hot = st.v.hot==null ? 1 : st.v.hot; return { him:1, hf:S==="forged" ? 2500 + 5000*(1-hot) : 7000, li:0.6, lf:9000 }; },
+      play(st, t, X){ const { S, step, beat, bar, b8, B, loop, bt, th, base, him, lit } = X, hot = st.v.hot==null ? 1 : st.v.hot;
+        const full = S==="temper" || (S==="forged" && hot < 0.5), vary = loop % 3;
+        if(S==="forged" && hot >= 0.5){ // white-hot: held tension, a heavy strike every bar, the theme in fragments
+          if(step===0){ RI.timp(base, mtof(B.bass + 12), t, 0, 0.08); RI.anvil(him, mtof(B.ch[0] + 24), t, 0, 0.022); RI.bassLow(base, mtof(B.bass), t, bt*3, 0.045); }
+          if(step===0 && bar % 2 === 0) RI.choir(him, [B.ch[0]+12, B.ch[0]+13, B.ch[2]+12].map(mtof), t, bt*6, 0.016);
+          if(step % 2 === 0) RI.trem(him, mtof(B.ch[2] + 12), t, 0, 0.008);
+          th((f,d)=>RI.brass(him, f, t, d, 0.03), -12, 0, b8 < 4 ? 2 : 6); return; }
+        if(step===0) RI.bassLow(base, mtof(B.bass), t, bt*3, 0.05);
+        if(beat >= 0) B.ch.forEach(n=>RI.marc(base, mtof(n - 12), t, 0, beat===0 ? 0.013 : 0.009)); // hammered chords on every beat
+        if(step===0) RI.timp(base, mtof(B.bass + 12), t, 0, 0.08); if(full && step===8) RI.timp(base, mtof(B.bass + 12), t, 0, 0.05);
+        if(beat===0) th((f,d)=>RI.anvil(him, f*4, t, 0, 0.018)); // the anvil rings the theme's downbeats
+        if(S==="commission" || full) RI.ost(base, mtof(B.ch[step % 3] - 12 + (step % 6 >= 3 ? 12 : 0)), t, 0, step % 4 === 0 ? 0.02 : 0.012);
+        if(vary !== 2 || full) th((f,d)=>RI.brass(him, f, t, d, 0.032));
+        if(full){ if(step===0) RI.choir(him, B.ch.map(mtof), t, bt*3, 0.025); th((f,d)=>RI.ens(him, f, t, d, 0.022), 12); }
+        else if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.028), -12); } } };
+  RAIDM.kindlemother = RAIDM.kindle; RAIDM.slagwright = RAIDM.forge; RAIDM.ashensovereign = RAIDM.sovereign;
+  function rRamp(st, p, v, when, dur){ const from = st.off ? (p._v==null ? p.value : p._v) : p.value; p.cancelScheduledValues(when); p.setValueAtTime(from, when); p.linearRampToValueAtTime(v, when + dur); p._v = v; }
+  function raidBus(st, when, dur){ const b = st.def.bus(st);
+    [st.bus.him.dry.gain, st.bus.him.wet.gain].forEach(p=>rRamp(st, p, b.him, when, dur)); st.bus.him.f.forEach(f=>rRamp(st, f.frequency, b.hf, when, dur));
+    [st.bus.light.dry.gain, st.bus.light.wet.gain].forEach(p=>rRamp(st, p, b.li, when, dur)); st.bus.light.f.forEach(f=>rRamp(st, f.frequency, b.lf, when, dur)); }
+  function raidLevel(st){ const s = st.def.sec[st.sec || st.want]; return (st.def.trim||1) * ((s && s.g) || 1); }
+  function raidMain(st, on, when, dur){ const v = on ? raidLevel(st) : 0; [st.mainD.gain, st.mainW.gain].forEach(p=>rRamp(st, p, v, when, dur || (on ? 1.5 : 3))); }
+  function raidNew(c, out, wet, id, t0, seed){ const def = RAIDM[id]; if(!def) return null;
+    const mainD = c.createGain(), mainW = c.createGain(); mainD.gain.value = 0; mainW.gain.value = 0; mainD.connect(out); mainW.connect(wet);
+    const bus = {}; ["base","him","light"].forEach(k=>{ const d = c.createGain(), w = c.createGain(), fd = c.createBiquadFilter(), fw = c.createBiquadFilter(); fd.type = fw.type = "lowpass"; fd.frequency.value = fw.frequency.value = 9000;
+      d.connect(fd); fd.connect(mainD); w.connect(fw); fw.connect(mainW); bus[k] = { c, dry:d, wet:w, f:[fd, fw] }; });
+    return { id, def, c, bus, mainD, mainW, sec:null, want:null, step:0, t:t0 + 0.1, spb:0.25, v:{}, r:rng(seed||99), log:[] }; }
+  const RAID_CUT = { fall:1, dark:1, clutch:1, forged:1 }; // these cut in at the next beat; the rest wait for the bar, with a timpani roll
+  function raidStep(st, t){
+    if(st.want !== st.sec){ const first = st.sec===null, cut = first || RAID_CUT[st.want];
+      if((cut && st.step % 4 === 0) || st.step % 12 === 0){ const into = st.want; st.sec = into; st.step = 0; st.rolled = false; st.spb = 60/st.def.sec[into].bpm/4; raidBus(st, t, cut ? 0.4 : 0.8);
+        if(!first) raidMain(st, true, t, 0.8); st.log.push([+t.toFixed(2), into]); if(!cut) RI.timp(st.bus.base, mtof(st.def.bars[0].bass + 12), t, 0, 0.1); }
+      else if(!cut && st.step % 12 === 8 && !st.rolled){ st.rolled = true; const bb = st.def.bars[Math.floor(st.step/12) % 8].bass + 12; RI.swell(st.bus.base, 0, t, st.spb*4, 0.03);
+        for(let i=0;i<6;i++) RI.timp(st.bus.base, mtof(bb), t + i*st.spb*4/6, 0, 0.02 + i*0.008); } }
+    const D = st.def, step = st.step % 12, beat = step % 4 === 0 ? step/4 : -1, bar = Math.floor(st.step/12), b8 = bar % 8, bt = st.spb*4;
+    const th = (fn, oct, dOff, bars)=>{ if(beat < 0) return; HEARTH_THEME.forEach(([br,bb,dg,len])=>{ if(br===b8 && bb===beat && (!bars || br < bars)) fn(mtof(deg(D.root, D.scale, dg + (dOff||0)) + (oct||0)), len*bt); }); };
+    D.play(st, t, { S:st.sec, step, beat, bar, b8, B:D.bars[b8], loop:Math.floor(bar/8), bt, th, base:st.bus.base, him:st.bus.him, lit:st.bus.light });
+    st.step++; }
+  function raidPump(st, until, tl){ while(st.t < until){ if(tl) while(tl.length && tl[0][0] <= st.t){ const [, sec, o] = tl.shift(); raidSetSt(st, sec, o||{}, st.t); } raidStep(st, st.t); st.t += st.spb; } }
+  function raidSetSt(st, sec, o, when){ st.want = sec; let ch = false;
+    Object.keys(o).forEach(k=>{ const v = o[k]; if(typeof v !== "number") return; if(st.v[k]==null || Math.abs(st.v[k] - v) > 0.01){ st.v[k] = v; ch = true; } });
+    if(ch && st.sec) raidBus(st, when, (st.sec==="dark" || st.sec==="forged") ? 0.3 : 1.2); }
+  let rmus = null, rmTimer = null;
+  function raidMusic(id, sec, o){ id = id || null; const c = (id && sec) ? ensure() : ctx; if(!c) return;
+    if(rmus && (rmus.id !== id || !sec)){ const old = rmus; raidMain(old, false, c.currentTime, (o && o.fade) || 3); /* fade: 0.5 s on a kill, as Dark Souls cuts to silence */ setTimeout(()=>{ try{ old.mainD.disconnect(); old.mainW.disconnect(); }catch(_){} }, 3500); rmus = null; }
+    if(!id || !sec) return;
+    if(!rmus){ rmus = raidNew(c, mix.mus, mix.verbIn, id, c.currentTime, (Date.now() & 0xffff) + 3); if(!rmus) return; rmus.want = sec; raidMain(rmus, true, c.currentTime);
+      if(!rmTimer) rmTimer = setInterval(()=>{ if(rmus && ctx && ctx.state === "running") raidPump(rmus, ctx.currentTime + 0.4); }, 100); }
+    raidSetSt(rmus, sec, o||{}, c.currentTime); }
   // ================= AMBIENCE: a quiet bed per dungeon family, with sparse random events =================
   // bed(M, t) builds the never-ending layers and returns the sources to stop; ev = [[minGap, maxGap, fn(M, t, r)]]
   function lfo(c, t, rate, depth, param, type){ const l = c.createOscillator(), g = c.createGain(); l.type = type||"sine"; l.frequency.value = rate; g.gain.value = depth; l.connect(g); g.connect(param); l.start(t); return l; }
@@ -2832,7 +2972,7 @@ const HWSND = (()=>{
     voices = voices.filter(v=>v > now);
     if(!threat && voices.length >= MAX_VOICES) return null;
     voices.push(now + ((opts && opts.dur) || 0) + 1.2);
-    if(threat || SPELL_DONE.has(name)){ const g = mix.mus.gain, lo = threat ? 0.35 : 0.7; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(lo, now+0.03); g.setValueAtTime(lo, now+0.55); g.linearRampToValueAtTime(1, now+1.1); } // music dips (with the duck under it: ~-16 dB under warnings)
+    if(threat || SPELL_DONE.has(name)){ const g = mix.mus.gain, lo = threat ? 0.35 : 0.5; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(lo, now+0.03); g.setValueAtTime(lo, now+0.55); g.linearRampToValueAtTime(1, now+1.1); } // music dips (with the duck under it: ~-16 dB under warnings)
     if(threat){ const g = mix.duck.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.45, now+0.03); g.setValueAtTime(0.45, now+0.5); g.linearRampToValueAtTime(1, now+0.9); }
     try{ const M = { c, dry:trim(c, threat ? mix.sfx : mix.duck, name), wet:trim(c, mix.verbIn, name) }, h = r(M, now + 0.01, opts||{}) || null;
       const fam = (opts && opts.fam!==undefined) ? opts.fam : famNow; if(fam && FAMC[fam] && WARN_HIT[name]!=null) famLayer(M, fam, now + 0.01 + WARN_HIT[name]); // family colour on warnings
@@ -2870,12 +3010,21 @@ const HWSND = (()=>{
     musicPump(st, dur); const motifs = st.motifLog;
     mix = saved.mix; Object.keys(last).forEach(k=>delete last[k]); Object.assign(last, saved.last); voices = saved.voices; cVoices = saved.cVoices; Object.keys(cLast).forEach(k=>delete cLast[k]); Object.assign(cLast, saved.cLast);
     return c.startRendering().then(buf=>({ buf, motifs })); }
+  function renderRaid(id, timeline, dur, events, sr){ const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const c = new OC(2, Math.ceil((sr||44100)*dur), sr||44100);
+    const saved = { mix, last:Object.assign({}, last), voices, cVoices, cLast:Object.assign({}, cLast) }; mix = buildMix(c, c.destination); mix.master.gain.value = 0.6; mix.musV.gain.value = 0.5*MUS_LEVEL; mix.cmb.gain.value = 1;
+    Object.keys(last).forEach(k=>delete last[k]); Object.keys(cLast).forEach(k=>delete cLast[k]); voices = []; cVoices = [];
+    const st = raidNew(c, mix.mus, mix.verbIn, id, 0, 4242); st.off = true; st.t = 0; st.want = (timeline[0]||[])[1] || null; raidMain(st, true, 0);
+    const tl = timeline.slice().sort((a,b)=>a[0]-b[0]); const stop = tl.findIndex(x=>!x[1]); let until = dur; if(stop >= 0){ until = tl[stop][0]; raidMain(st, false, until); tl.splice(stop); }
+    (events||[]).slice().sort((a,b)=>a[0]-b[0]).forEach(([t, n, o])=>{ try{ playAt(c, n, o||{}, t); }catch(_){} });
+    raidPump(st, until, tl); const log = st.log;
+    mix = saved.mix; Object.keys(last).forEach(k=>delete last[k]); Object.assign(last, saved.last); voices = saved.voices; cVoices = saved.cVoices; Object.keys(cLast).forEach(k=>delete cLast[k]); Object.assign(cLast, saved.cLast);
+    return c.startRendering().then(buf=>({ buf, log })); }
   function renderAmb(name, dur, sr){ const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const c = new OC(2, Math.ceil((sr||44100)*dur), sr||44100), m = buildMix(c, c.destination);
     m.master.gain.value = 0.6; m.amb.gain.value = AMB_LEVEL; const a = ambStart(c, m.amb, m.verbIn, name, 0, 99); ambPump(a, dur); return c.startRendering(); }
   function render(name, opts, sr, vol){ const r = R[name], len = (opts && opts.dur ? opts.dur : 0) + 4.5; const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const c = new OC(2, Math.ceil((sr||44100)*len), sr||44100), m = buildMix(c, c.destination); m.master.gain.value = vol==null ? 0.6 : vol;
     const M = { c, dry:trim(c, m.sfx, name), wet:trim(c, m.verbIn, name) }; r(M, 0.01, opts||{}); if(opts && opts.fam && FAMC[opts.fam] && WARN_HIT[name]!=null) famLayer(M, opts.fam, 0.01 + WARN_HIT[name]); return c.startRendering(); }
-  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, AMB, CFX_SND, COMBAT, warnFor, VOL, ensure, apply, play, render, renderAmb, renderScene, renderMusic, music, MUSIC, amb, setPaused, get ambName(){ return ambCur ? ambCur.name : null; }, get musicState(){ return mus ? { fam:mus.fam, level:mus.target } : null; }, get fam(){ return famNow; }, set fam(v){ famNow = v || null; }, get ctx(){ return ctx; } };
+  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, AMB, CFX_SND, COMBAT, warnFor, VOL, ensure, apply, play, render, renderAmb, renderScene, renderMusic, music, MUSIC, renderRaid, raidMusic, RAIDM, get raidState(){ return rmus ? Object.assign({ id:rmus.id, sec:rmus.sec, want:rmus.want }, rmus.v) : null; }, amb, setPaused, get ambName(){ return ambCur ? ambCur.name : null; }, get musicState(){ return mus ? { fam:mus.fam, level:mus.target } : null; }, get fam(){ return famNow; }, set fam(v){ famNow = v || null; }, get ctx(){ return ctx; } };
 })();
 if(typeof window !== "undefined") window.HWSND = HWSND;
 
@@ -30078,6 +30227,20 @@ thrall(){return gs(14)+
       if(S.started && !S.over && !S.arena && !S._killBeat && HWSND.MUSIC[fam] && SN.mus > 0 && SN.v > 0 && !SN.mute && S.engagedGroups && S.engagedGroups.size){
         lv = 1; if(S.boss && S.engagedGroups.has(S.boss)){ const be = activeBossEnemy(); lv = be && (be._phase||0) >= 1 ? 3 : 2; } }
       const ms = HWSND.musicState; if(lv){ if(!ms || ms.fam !== fam || ms.level !== lv) HWSND.music(fam, lv); } else if(ms) HWSND.music(null, 0); }
+    { let id = null, sec = null; const o = {}, a = S.arena, r = a && a.raid, SN = DISP.snd; /* raidMusicV1: the Unbanked Hearth's bosses */
+      if(r && r.k && !S.over && !r.introWait && SN.mus > 0 && SN.v > 0 && !SN.mute && S.boss && S.engagedGroups && S.engagedGroups.has(S.boss)){
+        const b = raidBoss(), k = r.k;
+        if(b && b.kind==="ashensovereign"){ id = "sovereign"; o.ember = k.embers|0; /* each ember taken dims him; the theme moves to the healer's light */
+          if(k.dark){ sec = "dark"; o.light = Math.max(0, Math.min(1, (k.dark.light - SV_LIGHT_MIN)/(SV_LIGHT_MAX - SV_LIGHT_MIN))); }
+          else if(k.win) sec = "fall"; else if(k.desp) sec = "desp"; else if(k.p2) sec = "last"; else sec = "open"; }
+        else if(b && b.kind==="kindlemother"){ id = "kindle"; o.hearts = k.delivered|0;
+          if(k.clutch && !k.clutch.risen){ sec = "clutch"; let w = 0; (k.clutch.eggs||[]).forEach(x=>{ if(x.alive && x._egg) w = Math.max(w, x._egg.t/KM_EGG_HATCH); }); if((k.clutch.hatch||[]).some(h=>h.alive)) w = 1; o.warm = Math.round(w*10)/10; }
+          else if(k.clutch && k.clutch.risen) sec = "again"; else if(k.fl) sec = "flash"; else if(k.awake) sec = "rise"; else sec = "brood"; }
+        else if(b && b.kind==="slagwright"){ id = "forge";
+          if(k.self){ sec = "forged"; o.hot = k.self.st==="brittle" ? 0 : 1; } else if(b.hp/b.maxHp < 0.3) sec = "temper"; else if(k.phase >= 1) sec = "commission"; else sec = "arsenal"; } }
+      const rs = HWSND.raidState;
+      if(id){ if(!rs || rs.id !== id || rs.want !== sec || Object.keys(o).some(x=>Math.abs((rs[x]==null ? -9 : rs[x]) - o[x]) > 0.02)) HWSND.raidMusic(id, sec, o); }
+      else if(rs) HWSND.raidMusic(null, null, { fade:(S.over && S.won) ? 0.5 : 3 }); }
     const me = S.party && S.party.self; if(!me) return;
     if(me._sndCast && !me.casting){ const h = me._sndCast; me._sndCast = null; h.stop(true); if(S.started && !S.over) HWSND.play("fizzle"); } // a cast cut off by a mechanic, a stun or a pin
     if(!S.started || S.over) return;
@@ -37905,7 +38068,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 27332af93a) */
+<script>/* phone app: offline cache (build b085ed818a) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
