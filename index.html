@@ -2536,6 +2536,19 @@ const HWSND = (()=>{
     tab:(M,t)=>{ osc(M,{ f:1100, t, a:0.001, d:0.035, g:0.05, type:"triangle", wet:0.05 }); },
   };
 
+
+  // ================= FAMILY COLOUR for warnings: a short layer on the warning's hit, so the type still reads first =================
+  const FAM_GAIN = { ember:10, tide:5, thicket:7, gloom:1.6, iron:1.7, arcane:4 };
+  function famLayer(M, fam, t){ const c = M.c, g = c.createGain(), w = c.createGain(); g.gain.value = w.gain.value = FAM_GAIN[fam]||1; g.connect(M.dry); w.connect(M.wet); FAMC[fam]({ c, dry:g, wet:w }, t); }
+  const WARN_HIT = { warnDodge:0.32, warnShelter:0.3, warnSpread:0.03, warnDispel:0, warnBrace:0.66, warnAttention:0 };
+  const FAMC = {
+    ember:(M,t)=>{ nz(M,{ t, a:0.03, d:0.35, g:0.09, ft:"lowpass", f0:300, f1:3000, glide:0.15, wet:0.2 }); crackle(M,t,0.3,40,0.05,131,0.15); },
+    tide:(M,t)=>{ nz(M,{ t, a:0.08, d:0.45, g:0.09, ft:"lowpass", f0:1400, f1:300, glide:0.5, q:1.2, wet:0.3 }); const r = rng(137); for(let i=0;i<6;i++){ const f = 250+r()*400; osc(M,{ f, f1:f*1.7, glide:0.04, t:t+0.05+r()*0.3, a:0.003, d:0.05, g:0.05, wet:0.3 }); } },
+    thicket:(M,t)=>{ osc(M,{ f:420, f1:260, glide:0.05, t, a:0.002, d:0.08, g:0.12, type:"triangle", lp:1500, wet:0.15 }); nz(M,{ t:t+0.02, a:0.04, d:0.3, g:0.06, ft:"highpass", f0:3500, wet:0.2, pan:0.3 }); },
+    gloom:(M,t)=>{ bell(M,98,t,0.09,1.8,{ ratio:2.76, index:2, wet:0.6 }); choir(M,[N.D3,N.Eb3],t,0.3,{ g:0.08, a:0.05, vowel:"oo", wet:0.6, rel:0.6 }); },
+    iron:(M,t)=>{ bell(M,640,t,0.08,0.9,{ ratio:2.41, index:3, wet:0.25, drive:1.6 }); nz(M,{ t:t+0.05, a:0.03, d:0.35, g:0.05, ft:"highpass", f0:4500, wet:0.2 }); },
+    arcane:(M,t)=>{ osc(M,{ f:1200, f1:2600, glide:0.2, t, a:0.02, d:0.3, g:0.035, wet:0.5 }); [1975.5,2637].forEach((f,i)=>bell(M,f,t+0.04+i*0.05,0.04,0.7,{ ratio:3.01, index:1.4, wet:0.6, pan:i?0.4:-0.4 })); },
+  };
   // ================= AMBIENCE: a quiet bed per dungeon family, with sparse random events =================
   // bed(M, t) builds the never-ending layers and returns the sources to stop; ev = [[minGap, maxGap, fn(M, t, r)]]
   function lfo(c, t, rate, depth, param, type){ const l = c.createOscillator(), g = c.createGain(); l.type = type||"sine"; l.frequency.value = rate; g.gain.value = depth; l.connect(g); g.connect(param); l.start(t); return l; }
@@ -2624,7 +2637,10 @@ const HWSND = (()=>{
     if(!threat && voices.length >= MAX_VOICES) return null;
     voices.push(now + ((opts && opts.dur) || 0) + 1.2);
     if(threat){ const g = mix.duck.gain; g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0.45, now+0.03); g.setValueAtTime(0.45, now+0.5); g.linearRampToValueAtTime(1, now+0.9); }
-    try{ return r({ c, dry:trim(c, threat ? mix.sfx : mix.duck, name), wet:trim(c, mix.verbIn, name) }, now + 0.01, opts||{}) || null; }catch(_){ return null; } }
+    try{ const M = { c, dry:trim(c, threat ? mix.sfx : mix.duck, name), wet:trim(c, mix.verbIn, name) }, h = r(M, now + 0.01, opts||{}) || null;
+      const fam = (opts && opts.fam!==undefined) ? opts.fam : famNow; if(fam && FAMC[fam] && WARN_HIT[name]!=null) famLayer(M, fam, now + 0.01 + WARN_HIT[name]); // family colour on warnings
+      return h; }catch(_){ return null; } }
+  let famNow = null;
 
   // ---- ambience playback: one bed at a time, crossfaded; events scheduled a second ahead
   const AMB_LEVEL = 0.5; let ambCur = null;
@@ -2644,8 +2660,8 @@ const HWSND = (()=>{
     m.master.gain.value = 0.6; m.amb.gain.value = AMB_LEVEL; const a = ambStart(c, m.amb, m.verbIn, name, 0, 99); ambPump(a, dur); return c.startRendering(); }
   function render(name, opts, sr, vol){ const r = R[name], len = (opts && opts.dur ? opts.dur : 0) + 4.5; const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const c = new OC(2, Math.ceil((sr||44100)*len), sr||44100), m = buildMix(c, c.destination); m.master.gain.value = vol==null ? 0.6 : vol;
-    r({ c, dry:trim(c, m.sfx, name), wet:trim(c, m.verbIn, name) }, 0.01, opts||{}); return c.startRendering(); }
-  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, AMB, warnFor, VOL, ensure, apply, play, render, renderAmb, amb, setPaused, get ambName(){ return ambCur ? ambCur.name : null; }, get ctx(){ return ctx; } };
+    const M = { c, dry:trim(c, m.sfx, name), wet:trim(c, m.verbIn, name) }; r(M, 0.01, opts||{}); if(opts && opts.fam && FAMC[opts.fam] && WARN_HIT[name]!=null) famLayer(M, opts.fam, 0.01 + WARN_HIT[name]); return c.startRendering(); }
+  return { R, N, SPELL, WARN_GROUPS, LEVEL, THREAT, AMB, warnFor, VOL, ensure, apply, play, render, renderAmb, amb, setPaused, get ambName(){ return ambCur ? ambCur.name : null; }, get fam(){ return famNow; }, set fam(v){ famNow = v || null; }, get ctx(){ return ctx; } };
 })();
 if(typeof window !== "undefined") window.HWSND = HWSND;
 
@@ -29820,7 +29836,7 @@ thrall(){return gs(14)+
       if(drops.length){ const best = Math.max(...drops.map(d=>RARITY_ORDER[d.rarity]||0)); setTimeout(()=>HWSND.play("loot"+Math.min(4, best)), up ? 2300 : 1300); } }catch(_){} }
   function sndTick(){ if(typeof HWSND==="undefined") return; try{
     HWSND.setPaused(!!(S.started && !S.over && S.paused));
-    { const want = (S.started && !S.over && !(S.arena && (S.arena.tut || !S.arena.raid))) ? currentFamily() : null; if(HWSND.ambName !== want) HWSND.amb(want); } // the dungeon's ambience; silent in the hub, results, tutorial and testing arena
+    { const want = (S.started && !S.over && !(S.arena && (S.arena.tut || !S.arena.raid))) ? currentFamily() : null; if(HWSND.ambName !== want) HWSND.amb(want); HWSND.fam = (S.started && !S.over) ? currentFamily() : null; } // family colour on warnings // the dungeon's ambience; silent in the hub, results, tutorial and testing arena
     const me = S.party && S.party.self; if(!me) return;
     if(me._sndCast && !me.casting){ const h = me._sndCast; me._sndCast = null; h.stop(true); if(S.started && !S.over) HWSND.play("fizzle"); } // a cast cut off by a mechanic, a stun or a pin
     if(!S.started || S.over) return;
@@ -37644,7 +37660,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 5a255daaf8) */
+<script>/* phone app: offline cache (build 8955cd57e1) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
