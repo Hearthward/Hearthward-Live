@@ -2622,6 +2622,27 @@ const HWSND = (()=>{
     // ================= MENUS =================
     click:(M,t)=>{ osc(M,{ f:1800, t, a:0.001, d:0.025, g:0.05, type:"triangle", wet:0 }); nz(M,{ t, a:0.001, d:0.012, g:0.03, ft:"highpass", f0:4000, wet:0 }); },
     tab:(M,t)=>{ osc(M,{ f:1100, t, a:0.001, d:0.035, g:0.05, type:"triangle", wet:0.05 }); },
+    // ================= THE UNSIGNED SEAL (raid 2): glass, ink, wax and candle; B harmonic minor like the arcane family =================
+    crystalBreak:(M,t)=>{ impact(M,t,{ f:140, f1:50, g:0.35, d:0.5, wet:0.3 }); R.shatter(M,t+0.01); bell(M,739.99,t+0.05,0.07,1.6,{ ratio:3.01, index:1.2, wet:0.7 }); },
+    stagger:(M,t)=>{ bell(M,123.47,t,0.28,3,{ ratio:1.5, index:2.5, wet:0.5, drive:1.4 }); bell(M,246.94,t+0.01,0.12,2.2,{ ratio:2.01, index:1.6, wet:0.55 }); // a struck glass gong: the boss is open
+      [987.77,1174.66,1479.98].forEach((f,i)=>bell(M,f,t+0.08+i*0.06,0.05,1.2,{ ratio:3.01, index:1.2, wet:0.6, pan:(i-1)*0.5 })); },
+    fuseBurn:(M,t)=>{ nz(M,{ t, a:0.05, h:0.5, d:0.3, g:0.2, ft:"bandpass", f0:3500, f1:6000, glide:0.8, q:2, wet:0.15 }); crackle(M,t,0.9,45,0.07,131,0.15); // a hiss running up the fuse, then the catch
+      riser(M,t+0.4,0.4,{ f0:300, f1:2500, g:0.12, q:1.5, wet:0.25 }); nz(M,{ t:t+0.8, a:0.01, d:0.6, g:0.18, ft:"lowpass", f0:1800, f1:300, glide:0.5, wet:0.3 }); },
+    lanternOut:(M,t)=>{ nz(M,{ t, a:0.02, d:0.35, g:0.32, ft:"lowpass", f0:3000, f1:300, glide:0.3, wet:0.3 }); osc(M,{ f:420, f1:160, glide:0.5, t:t+0.05, a:0.01, d:0.6, g:0.18, type:"triangle", wet:0.5 });
+      bell(M,493.88,t+0.1,0.09,1.5,{ ratio:3.01, index:1, wet:0.8 }); },
+    harpoon:(M,t)=>{ nz(M,{ t, a:0.06, d:0.05, g:0.12, ft:"bandpass", f0:900, f1:3000, glide:0.06, q:2, wet:0.1 }); impact(M,t+0.08,{ f:160, f1:60, g:0.28, d:0.35, drive:2.5, wet:0.15 }); R.chain(M,t+0.12); },
+    darkFall:(M,t)=>{ osc(M,{ f:220, f1:55, glide:1.6, t, a:0.2, h:0.6, d:1.2, g:0.16, type:"sawtooth", n:3, spread:18, lp:700, wet:0.5 }); // the dark closes: everything sinks, then a heartbeat
+      nz(M,{ t, a:0.4, h:0.4, d:1.2, g:0.1, ft:"lowpass", f0:2500, f1:150, glide:1.6, wet:0.6 }); drum(M,t+0.9,{ f:70, f1:38, g:0.35, d:0.4 }); drum(M,t+1.15,{ f:65, f1:36, g:0.25, d:0.4 }); },
+    sealBind:(M,t)=>{ impact(M,t,{ f:110, f1:45, g:0.4, d:0.6, wet:0.25 }); nz(M,{ t, a:0.002, d:0.12, g:0.1, ft:"lowpass", f0:900, wet:0.2 }); // the page is signed: a wax stamp, a resolving chord
+      choir(M,[246.94,369.99,493.88,587.33],t+0.15,0.9,{ g:0.16, a:0.15, wet:0.75, rel:1.4 }); [987.77,1479.98,1975.5].forEach((f,i)=>bell(M,f,t+0.2+i*0.07,0.06,2,{ wet:0.7, pan:(i-1)*0.5 })); },
+    // ================= THE ENCHANTING TABLE and THE EMBER ANVIL =================
+    tableEnchant:(M,t)=>{ riser(M,t,0.45,{ f0:600, f1:5200, g:0.06, q:2, wet:0.5 }); sparkle(M,t+0.1,0.4,14,0.025,137); osc(M,{ f:123.47, t:t+0.45, a:0.01, d:1.2, g:0.12, wet:0.4 });
+      [493.88,587.33,739.99,987.77].forEach((f,i)=>bell(M,f,t+0.45+i*0.05,0.07,1.6,{ ratio:3.01, index:1.3, wet:0.6, pan:(i-1.5)*0.3 })); },
+    tableInscribe:(M,t)=>{ [0,0.09,0.16,0.27].forEach((dt,i)=>nz(M,{ t:t+dt, a:0.005, d:0.06, g:0.025, ft:"bandpass", f0:2800+i*300, q:4, wet:0.1 })); R.sealBind(M,t+0.35); }, // a pen scratch, then the seal
+    tableTrade:(M,t)=>{ [1975.5,2349.3].forEach((f,i)=>bell(M,f,t+i*0.07,0.1,0.5,{ ratio:2.76, index:1.6, wet:0.35, pan:(i-0.5)*0.6 })); osc(M,{ f:300, f1:180, glide:0.08, t, a:0.002, d:0.12, g:0.08, wet:0.2 }); },
+    tableEmbers:(M,t)=>{ R.ignite(M,t); bell(M,739.99,t+0.15,0.05,0.8,{ ratio:3.01, index:1.2, wet:0.4 }); },
+    anvilForge:(M,t)=>{ clang(M,523.25,t,{ g:0.22, d:1.2, wet:0.3 }); clang(M,523.25,t+0.28,{ g:0.18, d:1.1, wet:0.3 }); // two hammer strikes, then the quench
+      nz(M,{ t:t+0.6, a:0.03, d:0.7, g:0.12, ft:"highpass", f0:2500, f1:6000, glide:0.5, wet:0.25 }); crackle(M,t+0.6,0.6,30,0.05,139,0.2); },
   };
 
 
@@ -2799,6 +2820,11 @@ const HWSND = (()=>{
     trem:(M,f,t,d,g)=>osc(M,{ f, t, a:0.004, d:0.06, g, type:"sawtooth", n:2, spread:10, lp:2600, wet:0.45 }),
     marc:(M,f,t,d,g)=>osc(M,{ f, t, a:0.008, d:0.18, g, type:"sawtooth", n:2, spread:9, lp:1400, q:1, wet:0.25 }),
     anvil:(M,f,t,d,g)=>bell(M, f, t, g, 0.5, { ratio:3.5, index:1.1, wet:0.35 }),
+    glass:(M,f,t,d,g)=>{ bell(M, f, t, g, Math.min(2.6, d+1), { ratio:3.01, index:0.6, wet:0.75 }); osc(M,{ f, t, a:0.004, d:Math.min(0.8,d), g:g*0.25, type:"sine", wet:0.7 }); }, // sealMusicV1
+    pulse:(M,f,t,d,g)=>osc(M,{ f, t, a:0.003, d:0.09, g, type:"square", lp:1500, q:2, wet:0.35 }),
+    gpad:(M,f,t,d,g)=>osc(M,{ f, t, a:0.8, h:Math.max(0,d-1.2), d:1.2, g, type:"triangle", n:3, spread:12, lp:2400, vib:3, wet:0.7 }),
+    scratch:(M,f,t,d,g)=>nz(M,{ t, a:0.004, d:0.05, g, ft:"bandpass", f0:3200 + (f||0), q:3, wet:0.15 }),
+    tick:(M,f,t,d,g)=>{ nz(M,{ t, a:0.001, d:0.025, g, ft:"highpass", f0:5000, wet:0.25 }); osc(M,{ f:f||2600, t, a:0.001, d:0.03, g:g*0.5, type:"triangle", wet:0.3 }); },
     heart:(M,f,t,d,g)=>{ osc(M,{ f:58, f1:40, glide:0.12, t, a:0.004, d:0.22, g, wet:0.2 }); osc(M,{ f:52, f1:38, glide:0.12, t:t+0.2, a:0.004, d:0.2, g:g*0.7, wet:0.2 }); },
   };
   // The Hearth theme: [bar, beat, degree, beats] over 8 bars of 3/4. Original: a rising minor sixth that falls back step by step
@@ -2807,6 +2833,12 @@ const HWSND = (()=>{
     [4,0,0,3], [5,0,5,1],[5,1,4,1],[5,2,3,1], [6,0,3,1],[6,1,1,1],[6,2,-1,1], [7,0,0,3] ];
   // the theme's harmony in any harmonic-minor key: i VI iv V | i VI V7 i (bass notes and a close voicing, from the tonic's MIDI)
   function hearthBars(r, bassR){ const B = bassR==null ? r-12 : bassR, V = [[0,3,7],[0,3,8],[0,5,8],[-1,2,7],[0,3,7],[0,3,8],[-1,2,5],[0,3,7]], bs = [0,-4,-7,-5,0,-4,-5,0];
+    return V.map((v,i)=>({ bass:B + bs[i] + (B + bs[i] < 31 ? 12 : 0), ch:v.map(x=>r + x) })); }
+  // sealMusicV1: the Seal theme, 8 bars of 4/4 ([bar, beat, degree, beats]). A working that is never finished: a rising spell-arpeggio
+  // to the octave that unwinds; both halves end hanging on the leading tone over V, and only signing the page resolves it (hand: resolve).
+  const SEAL_THEME = [ [0,0,0,1],[0,1,2,1],[0,2,4,2], [1,0,7,3],[1,3,6,1], [2,0,5,2],[2,2,4,1],[2,3,3,1], [3,0,4,4],
+    [4,0,0,1],[4,1,2,1],[4,2,4,1],[4,3,7,1], [5,0,8,2],[5,2,7,1],[5,3,6,1], [6,0,5,1],[6,1,4,1],[6,2,3,1],[6,3,1,1], [7,0,6,4] ];
+  function sealBars(r, bassR){ const B = bassR==null ? r-12 : bassR, V = [[0,3,7],[0,3,8],[0,5,8],[-1,2,7],[0,3,7],[0,3,8],[0,5,8],[-1,2,7]], bs = [0,-4,-7,-5,0,-4,-7,-5];
     return V.map((v,i)=>({ bass:B + bs[i] + (B + bs[i] < 31 ? 12 : 0), ch:v.map(x=>r + x) })); }
   // Each boss: sections (bpm, level g), bus(st) = { him, hf, li, lf } (the boss's voice, the healer's light) and play(st, t, X) per 16th.
   // st.v holds the boss's live values: Sovereign ember (0-3 taken) and light (0..1, the Long Dark); Kindlemother hearts (0-4) and
@@ -2882,6 +2914,79 @@ const HWSND = (()=>{
         if(vary !== 2 || full) th((f,d)=>RI.brass(him, f, t, d, 0.032));
         if(full){ if(step===0) RI.choir(him, B.ch.map(mtof), t, bt*3, 0.025); th((f,d)=>RI.ens(him, f, t, d, 0.022), 12); }
         else if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.028), -12); } } };
+  // ---- sealMusicV1: the Unsigned Seal. Glass, pulse and loom instead of brass-and-fire; the boss voice (him) still swells legato,
+  // the healer's voice (light) is glass. All 4/4 (bar:16).
+  Object.assign(RAIDM, {
+    warden:{ root:59, scale:HMINOR, bars:sealBars(59, 47), theme:SEAL_THEME, bar:16, // B minor: a vessel humming with charge
+      sec:{ contain:{ bpm:100 }, crack:{ bpm:108 }, pb:{ bpm:96, g:0.9 }, mg:{ bpm:112, g:0.9 }, over:{ bpm:116, g:0.9 } }, trim:0.9,
+      bus(st){ const S = st.sec, ch = Math.max(0, Math.min(1, st.v.charge||0)); return { him:S==="pb" ? 0.6 : 1, hf:1600 + 6000*ch, li:S==="contain" ? 0.9 : 0.6, lf:9000 }; },
+      play(st, t, X){ const { S, step, beat, bar, b8, B, loop, bt, th, base, him, lit } = X, ch = Math.max(0, Math.min(1, st.v.charge||0)), vary = loop % 3;
+        if(step===0) RI.bassLow(base, mtof(B.bass), t, bt*4, 0.05);
+        const arp = mtof(B.ch[step % 3] + (step % 8 >= 4 ? 12 : 0)); // the charge: a glassy arpeggio that fills in and brightens as the needle swings out
+        if(S==="pb"){ // Pressure Build: sealed, the strain rising; a ticking that quickens through each bar
+          if(step===0 && bar % 2 === 0){ RI.drone(base, mtof(B.bass), t, bt*8, 0.04); RI.choir(him, [B.ch[0], B.ch[0]+1, B.ch[2]].map(n=>mtof(n + 12)), t, bt*8, 0.018); }
+          if(step % (b8 % 2 ? 2 : 4) === 0) RI.tick(base, 2200 + 200*(b8 % 4), t, 0, 0.03); if(step===12) RI.swell(base, 0, t, bt, 0.03);
+          th((f,d)=>RI.brass(him, f, t, d, 0.028), -12, 0, 2); return; }
+        if(S==="contain"){ if(step % 2 === 0 || ch > 0.5) RI.pulse(base, arp, t, 0, 0.008 + 0.01*ch);
+          if(step===0) RI.gpad(base, mtof(B.ch[0]), t, bt*4, 0.012);
+          if(vary !== 2) th((f,d)=>RI.glass(lit, f, t, d, 0.03), 12); else th((f,d)=>RI.cello(base, f, t, d, 0.03), -12); return; }
+        RI.pulse(base, arp, t, 0, step % 4 === 0 ? 0.016 + 0.008*ch : 0.01 + 0.008*ch); // crack, mg, over: the full hum
+        if(beat===0 || beat===2) RI.timp(base, mtof(B.bass + 12), t, 0, beat===0 ? 0.08 : 0.05);
+        if(S==="mg"){ if(b8 >= 6 && step % 2 === 0) RI.timp(base, mtof(B.bass + 12), t, 0, 0.03); // the crystals closing: the drums close in too
+          th((f,d)=>RI.brass(him, f, t, d, 0.032)); th((f,d)=>RI.ens(him, f, t, d, 0.022), 12); return; }
+        if(S==="crack"){ if(vary !== 2) th((f,d)=>RI.brass(him, f, t, d, 0.032)); if(vary===0) th((f,d)=>RI.glass(lit, f, t, d, 0.026), 12); else if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.028), -12); return; }
+        if(step===0) RI.choir(him, B.ch.map(mtof), t, bt*4, 0.026); // over: everything
+        th((f,d)=>RI.brass(him, f, t, d, 0.032)); th((f,d)=>RI.glass(lit, f, t, d, 0.028), 12); if(step % 4 === 2) RI.ost(base, mtof(B.ch[(step/2|0) % 3] - 12), t, 0, 0.014); } },
+    seer:{ root:54, scale:HMINOR, bars:sealBars(54, 42), theme:SEAL_THEME, bar:16, // F# minor: a loom; the harp crosses the bar in threes like a shuttle
+      sec:{ weave:{ bpm:84 }, cut:{ bpm:92 }, spindle:{ bpm:66 }, tear:{ bpm:100, g:0.9 }, fates:{ bpm:76 } },
+      bus(st){ const S = st.sec, kn = Math.max(0, Math.min(5, st.v.knots|0)); return { him:S==="spindle" ? 0.5 : 1, hf:[7000,5000,3600,2600,1900,1400][kn], li:S==="spindle" || S==="fates" ? 1 : 0.7, lf:9000 }; },
+      play(st, t, X){ const { S, step, beat, bar, b8, B, loop, bt, th, base, him, lit } = X, kn = Math.max(0, Math.min(5, st.v.knots|0)), vary = loop % 3, gs = st.step;
+        if(step===0) RI.bassLow(base, mtof(B.bass), t, bt*4, S==="spindle" ? 0.03 : 0.045);
+        if(kn > 0 && step===0 && bar % 2 === 0) RI.drone(base, mtof(B.ch[0] + 1 - 12), t, bt*8, 0.006*kn); // each knot pulls a sour thread under the music
+        if(S==="spindle"){ // Spindle Weave: a hush; the harp traces the theme note by note as you trace the pegs; the shuttle ticks
+          if(step===0 && bar % 2 === 0) RI.choir(him, B.ch.map(n=>mtof(n + 12)), t, bt*8, 0.02);
+          if(beat >= 0) RI.tick(base, 1800, t, 0, 0.018); th((f,d)=>RI.pluck(lit, f, t, d, 0.04), 12); th((f,d)=>RI.glass(lit, f, t, d, 0.016), 24); return; }
+        if(gs % 3 === 0) RI.pluck(base, mtof(B.ch[(gs/3|0) % 3] + 12), t, 0, S==="weave" ? 0.022 : 0.018); // the shuttle: threes across fours
+        if(S==="weave"){ if(step===0) RI.gpad(base, mtof(B.ch[2]), t, bt*4, 0.012); if(b8 % 4 === 0 && step===0) RI.glass(him, mtof(B.ch[0] + 24), t, 0, 0.02);
+          if(vary !== 2) th((f,d)=>RI.violin(lit, f, t, d, 0.026), 12); else th((f,d)=>RI.cello(base, f, t, d, 0.028), -12); return; }
+        if(S==="fates"){ // Mythic: the three sisters sing the theme in canon, a bar apart: violin, glass, cello
+          if(step===0) RI.choir(him, B.ch.map(mtof), t, bt*4, 0.022); if(beat===0) RI.timp(base, mtof(B.bass + 12), t, 0, 0.05);
+          th((f,d)=>RI.violin(lit, f, t, d, 0.026), 12);
+          const TH = SEAL_THEME, R = st.def.root, sc = st.def.scale; [[1,"glass",24,0.02],[2,"cello",-12,0.026]].forEach(([lag, ins, oc, g])=>{ if(beat < 0) return; const b0 = (b8 - lag + 8) % 8;
+            TH.forEach(([br,bb,dg,len])=>{ if(br===b0 && bb===beat) RI[ins](ins==="cello" ? base : lit, mtof(deg(R, sc, dg) + oc), t, len*bt, g); }); }); return; }
+        if(beat===0) RI.timp(base, mtof(B.bass + 12), t, 0, S==="tear" ? 0.08 : 0.06); // cut, tear
+        if(S==="tear"){ RI.trem(base, mtof(B.ch[step % 3]), t, 0, step % 4 === 0 ? 0.018 : 0.011); if(beat===2) RI.timp(base, mtof(B.bass + 12), t, 0, 0.05);
+          th((f,d)=>RI.brass(him, f, t, d, 0.03), -12); th((f,d)=>RI.ens(him, f, t, d, 0.022)); return; }
+        if(step===0 && b8 % 2 === 0) RI.choir(him, B.ch.map(mtof), t, bt*8, 0.02);
+        if(vary !== 2) th((f,d)=>RI.ens(him, f, t, d, 0.028)); if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.026), -12); else th((f,d)=>RI.violin(lit, f, t, d, 0.018), 12); } },
+    hand:{ root:50, scale:HMINOR, bars:sealBars(50, 38), theme:SEAL_THEME, bar:16, // D minor: pen scratches for percussion; Mythic: the candle against the dark
+      sec:{ draft:{ bpm:88 }, margins:{ bpm:92 }, redact:{ bpm:98, g:0.92 }, pen:{ bpm:76 }, dark:{ bpm:54 }, final:{ bpm:60 }, resolve:{ bpm:60 } },
+      bus(st){ const S = st.sec, b = st.v.burn ? 1 : 0; return { him:S==="dark" ? 0 : S==="pen" ? 0.45 + 0.55*b : 1, hf:S==="pen" ? 1600 + 5000*b : 7000, li:S==="draft" ? 0.7 : 1, lf:9000 }; },
+      play(st, t, X){ const { S, step, beat, bar, b8, B, loop, bt, th, base, him, lit } = X, vary = loop % 3;
+        if(S==="resolve"){ // you sign the page: the theme's last note at last (V -> i), then it rings out
+          if(bar===0 && step===0){ RI.choir(him, B.ch.map(mtof), t, bt*2, 0.03); RI.glass(lit, mtof(deg(st.def.root, st.def.scale, 6) + 12), t, bt*2, 0.04); RI.bassLow(base, mtof(st.def.bars[7].bass), t, bt*2, 0.05); }
+          if(bar===0 && step===8){ const I = st.def.bars[0]; RI.choir(him, I.ch.concat([I.ch[0] + 12]).map(mtof), t, bt*8, 0.034); RI.bassLow(base, mtof(I.bass), t, bt*8, 0.06); RI.timp(base, mtof(I.bass + 12), t, 0, 0.1);
+            RI.glass(lit, mtof(st.def.root + 12), t, bt*6, 0.05); [0,3,7,12].forEach((x,i)=>RI.glass(lit, mtof(st.def.root + 24 + x), t + i*bt*0.5, bt*4, 0.022)); RI.gpad(base, mtof(I.ch[0]), t, bt*8, 0.02); } return; }
+        if(S==="final"){ // the Pen falls: the answer phrase, slow, on choir and low strings, held on the unresolved leading tone
+          if(step===0 && bar % 2 === 0){ RI.drone(base, mtof(B.bass), t, bt*8, 0.035); RI.choir(him, B.ch.map(mtof), t, bt*8, 0.024); }
+          if(b8 >= 4) th((f,d)=>RI.cello(base, f, t, d, 0.03), -12); if(b8 >= 4) th((f,d)=>RI.glass(lit, f, t, d, 0.026), 12);
+          if(b8 === 7 && step % 2 === 0) RI.trem(him, mtof(deg(st.def.root, st.def.scale, 6) + 12), t, 0, 0.006 + 0.0015*(step/2)); return; }
+        if(S==="dark"){ // Lights Out: a drone and a heartbeat; the candle's voice holds on to fragments of the theme
+          if(step===0 && bar % 2 === 0) RI.drone(base, mtof(B.bass), t, bt*8, 0.03); if(step===0) RI.heart(base, 0, t, 0, 0.05);
+          th((f,d)=>{ if(st.r() < 0.5) RI.glass(lit, f, t, d*1.2, 0.03); }, 12); return; }
+        if(S==="pen"){ const b = st.v.burn ? 1 : 0; // the Pen: the candle carries the theme; set the Pen burning and the orchestra joins
+          if(step===0) RI.bassLow(base, mtof(B.bass), t, bt*4, 0.045); if(step===0 && bar % 2 === 0) RI.drone(base, mtof(B.bass - 12), t, bt*8, 0.025);
+          if(beat===0) RI.timp(base, mtof(B.bass + 12), t, 0, 0.05 + 0.03*b); th((f,d)=>RI.light(lit, f, t, d, 0.035), 12);
+          if(step % 2 === 1) RI.trem(him, mtof(B.ch[step % 3] + 12), t, 0, 0.007);
+          if(b){ th((f,d)=>RI.brass(him, f, t, d, 0.03)); RI.ost(base, mtof(B.ch[step % 3] - 12 + (step % 8 >= 4 ? 12 : 0)), t, 0, step % 4 === 0 ? 0.018 : 0.011); } return; }
+        // draft, margins, redact: the Hand writes; scratches mark the rhythm
+        if([0,3,6,10,12].indexOf(step) >= 0) RI.scratch(base, step*40, t, 0, step===0 ? 0.05 : 0.03); if(S==="redact" && step % 2 === 1) RI.scratch(base, 900, t, 0, 0.018);
+        if(step===0) RI.bassLow(base, mtof(B.bass), t, bt*4, 0.05); if(step % 2 === 0) RI.pluck(base, mtof(B.ch[(step/2) % 3] - 12), t, 0, 0.018);
+        if(S==="draft"){ if(vary !== 2) th((f,d)=>RI.cello(base, f, t, d, 0.032), -12); if(vary===0) th((f,d)=>RI.glass(lit, f, t, d, 0.022), 12); return; }
+        if(beat >= 0) B.ch.forEach(n=>RI.marc(base, mtof(n - 12), t, 0, beat===0 ? 0.012 : 0.008)); if(beat===0 || (S==="redact" && beat===2)) RI.timp(base, mtof(B.bass + 12), t, 0, 0.07);
+        if(S==="margins"){ if(vary !== 2) th((f,d)=>RI.brass(him, f, t, d, 0.03)); if(vary===1) th((f,d)=>RI.cello(base, f, t, d, 0.026), -12); return; }
+        if(step===0) RI.choir(him, B.ch.map(mtof), t, bt*4, 0.024); th((f,d)=>RI.brass(him, f, t, d, 0.032)); th((f,d)=>RI.ens(him, f, t, d, 0.022), 12); } } });
+  RAIDM.weftseer = RAIDM.seer; RAIDM.unsignedhand = RAIDM.hand;
   RAIDM.kindlemother = RAIDM.kindle; RAIDM.slagwright = RAIDM.forge; RAIDM.ashensovereign = RAIDM.sovereign;
   function rRamp(st, p, v, when, dur){ const from = st.off ? (p._v==null ? p.value : p._v) : p.value; p.cancelScheduledValues(when); p.setValueAtTime(from, when); p.linearRampToValueAtTime(v, when + dur); p._v = v; }
   function raidBus(st, when, dur){ const b = st.def.bus(st);
@@ -2894,21 +2999,21 @@ const HWSND = (()=>{
     const bus = {}; ["base","him","light"].forEach(k=>{ const d = c.createGain(), w = c.createGain(), fd = c.createBiquadFilter(), fw = c.createBiquadFilter(); fd.type = fw.type = "lowpass"; fd.frequency.value = fw.frequency.value = 9000;
       d.connect(fd); fd.connect(mainD); w.connect(fw); fw.connect(mainW); bus[k] = { c, dry:d, wet:w, f:[fd, fw] }; });
     return { id, def, c, bus, mainD, mainW, sec:null, want:null, step:0, t:t0 + 0.1, spb:0.25, v:{}, r:rng(seed||99), log:[] }; }
-  const RAID_CUT = { fall:1, dark:1, clutch:1, forged:1 }; // these cut in at the next beat; the rest wait for the bar, with a timpani roll
+  const RAID_CUT = { fall:1, dark:1, clutch:1, forged:1, pb:1, mg:1, spindle:1, fates:1, final:1, resolve:1 }; // these cut in at the next beat; the rest wait for the bar, with a timpani roll
   function raidStep(st, t){
     if(st.want !== st.sec){ const first = st.sec===null, cut = first || RAID_CUT[st.want];
-      if((cut && st.step % 4 === 0) || st.step % 12 === 0){ const into = st.want; st.sec = into; st.step = 0; st.rolled = false; st.spb = 60/st.def.sec[into].bpm/4; raidBus(st, t, cut ? 0.4 : 0.8);
+      const SB = st.def.bar || 12; if((cut && st.step % 4 === 0) || st.step % SB === 0){ const into = st.want; st.sec = into; st.step = 0; st.rolled = false; st.spb = 60/st.def.sec[into].bpm/4; raidBus(st, t, cut ? 0.4 : 0.8);
         if(!first) raidMain(st, true, t, 0.8); st.log.push([+t.toFixed(2), into]); if(!cut) RI.timp(st.bus.base, mtof(st.def.bars[0].bass + 12), t, 0, 0.1); }
-      else if(!cut && st.step % 12 === 8 && !st.rolled){ st.rolled = true; const bb = st.def.bars[Math.floor(st.step/12) % 8].bass + 12; RI.swell(st.bus.base, 0, t, st.spb*4, 0.03);
+      else if(!cut && st.step % SB === SB - 4 && !st.rolled){ st.rolled = true; const bb = st.def.bars[Math.floor(st.step/SB) % 8].bass + 12; RI.swell(st.bus.base, 0, t, st.spb*4, 0.03);
         for(let i=0;i<6;i++) RI.timp(st.bus.base, mtof(bb), t + i*st.spb*4/6, 0, 0.02 + i*0.008); } }
-    const D = st.def, step = st.step % 12, beat = step % 4 === 0 ? step/4 : -1, bar = Math.floor(st.step/12), b8 = bar % 8, bt = st.spb*4;
-    const th = (fn, oct, dOff, bars)=>{ if(beat < 0) return; HEARTH_THEME.forEach(([br,bb,dg,len])=>{ if(br===b8 && bb===beat && (!bars || br < bars)) fn(mtof(deg(D.root, D.scale, dg + (dOff||0)) + (oct||0)), len*bt); }); };
+    const D = st.def, SB = D.bar || 12, step = st.step % SB, beat = step % 4 === 0 ? step/4 : -1, bar = Math.floor(st.step/SB), b8 = bar % 8, bt = st.spb*4;
+    const th = (fn, oct, dOff, bars)=>{ if(beat < 0) return; (D.theme || HEARTH_THEME).forEach(([br,bb,dg,len])=>{ if(br===b8 && bb===beat && (!bars || br < bars)) fn(mtof(deg(D.root, D.scale, dg + (dOff||0)) + (oct||0)), len*bt); }); };
     D.play(st, t, { S:st.sec, step, beat, bar, b8, B:D.bars[b8], loop:Math.floor(bar/8), bt, th, base:st.bus.base, him:st.bus.him, lit:st.bus.light });
     st.step++; }
   function raidPump(st, until, tl){ while(st.t < until){ if(tl) while(tl.length && tl[0][0] <= st.t){ const [, sec, o] = tl.shift(); raidSetSt(st, sec, o||{}, st.t); } raidStep(st, st.t); st.t += st.spb; } }
   function raidSetSt(st, sec, o, when){ st.want = sec; let ch = false;
     Object.keys(o).forEach(k=>{ const v = o[k]; if(typeof v !== "number") return; if(st.v[k]==null || Math.abs(st.v[k] - v) > 0.01){ st.v[k] = v; ch = true; } });
-    if(ch && st.sec) raidBus(st, when, (st.sec==="dark" || st.sec==="forged") ? 0.3 : 1.2); }
+    if(ch && st.sec) raidBus(st, when, (st.sec==="dark" || st.sec==="forged" || st.sec==="pen") ? 0.3 : 1.2); }
   let rmus = null, rmTimer = null;
   function raidMusic(id, sec, o){ id = id || null; const c = (id && sec) ? ensure() : ctx; if(!c) return;
     if(rmus && (rmus.id !== id || !sec)){ const old = rmus; raidMain(old, false, c.currentTime, (o && o.fade) || 3); /* fade: 0.5 s on a kill, as Dark Souls cuts to silence */ setTimeout(()=>{ try{ old.mainD.disconnect(); old.mainW.disconnect(); }catch(_){} }, 3500); rmus = null; }
@@ -3005,7 +3110,7 @@ const HWSND = (()=>{
     const pre = c.createBiquadFilter(); pre.type = "highpass"; pre.frequency.value = 220; pre.connect(verb); // keep lows out of the hall
     return { master, sfx, duck, amb, cmb, cmbDip, mus, musV, verbIn:pre }; }
   // threats and boss moments win: they skip the voice cap, and dip everything else by about 7 dB for a moment
-  const THREAT = new Set(["warnDodge","warnShelter","warnSpread","warnDispel","warnBrace","warnAttention","fail","downed","phase","killBoom","mimic","doorSlam"]);
+  const THREAT = new Set(["darkFall","harpoon","warnDodge","warnShelter","warnSpread","warnDispel","warnBrace","warnAttention","fail","downed","phase","killBoom","mimic","doorSlam"]);
   const COOLDOWN = { pass:0.25, fail:0.25, click:0.04, tab:0.04, lowMana:3, hurt:0.25, cDeath:0.4 }; const DEF_CD = 0.08;
   const MAX_VOICES = 8, last = {}; let voices = [], cVoices = []; const cLast = {};
   const SPELL_DONE = new Set(['mend','surge','wind','hearth','ward','cleanse','misdirect','purge']);
@@ -30717,6 +30822,23 @@ thrall(){return gs(14)+
   }
   // ---- soundHookV1
   const SND_RAID = [ // raid log line -> sound
+    // sealSoundV1: the Unsigned Seal (first, so its lines never fall through to raid 1's patterns)
+    [/crystal shatters|Both crystals shattered/, "crystalBreak"],
+    [/staggers!|caught in her own thread|signature breaks/, "stagger"],
+    [/Fire runs up the fuse|chain burns through/, "fuseBurn"],
+    [/Rain puts out your lantern/, "lanternOut"],
+    [/Chain Ballista harpoons/, "harpoon"],
+    [/dark closes/, "darkFall"],
+    [/You sign the page/, "sealBind"],
+    [/Your lantern catches/, "ignite"],
+    [/overcharges|ties into the loom|crystals touch|Warp Thread on .* snaps|Warp Thread rips|loom tears/, "fail"],
+    [/Warp Thread slackens|reels from the cut/, "pass"],
+    [/Static Field|Severed Threads|warp snaps down the floor/, "warnDodge"],
+    [/^Siphon:|Rot creeps/, "warnDispel"],
+    [/blade of Ruin/, "warnBrace"],
+    [/Arc Lash|arrow flips|Warp Thread to|The Eye fixes|throws its pen|signs again|crystals are cracked/, "warnAttention"],
+    [/Pressure Build:|Magnetize:|crystals are gone|breaks containment|Warden unseals|Spindle Weave|begins to foretell|already seen this fight|drops its pen|Pen falls, charred|stabs the Hand|writes its own signature/, "phase"],
+    [/lay a hand on the containment seal|pluck a thread of the loom|You touch the page/, "shrine"],
     [/Wildfire hurls|Hammer Line|floodgate grinds|Ash begins to fall|lunges/, "warnDodge"],
     [/Flashfire|Smother creeps/, "warnShelter"],
     [/begins Banking/, "warnDispel"],
@@ -30724,6 +30846,15 @@ thrall(){return gs(14)+
     [/Kindlemother rises|bursts from the fire|crashes into the hall|forges himself anew|crumbles to ash|clutch is broken|Desperation|Sovereign falls!|will not die|will not break/, "phase"],
     [/quenches him|Banking is broken|blank cracks|cut a Tinder Pup|take the Sovereign's embers|ember well relights|An ember well catches|last well flares/, "pass"],
     [/still burning|unattended well gutters|wants his ember back/, "fail"] ];
+  // sealMusicV1: which Seal score and section a fight state calls for ([id, sec] or null); fills o with the live values
+  function sealMusicPick(kind, k, o){
+    if(kind==="warden"){ o.charge = Math.round(Math.min(1, Math.abs(k.n||0))*10)/10;
+      return ["warden", (k.inter && k.inter.kind==="pb") ? "pb" : (k.inter && k.inter.kind==="mg") ? "mg" : (k.phase||1) >= 3 ? "over" : (k.phase||1) >= 2 ? "crack" : "contain"]; }
+    if(kind==="weftseer"){ o.knots = Math.min(5, k.knots|0); return ["seer", k.fates ? "fates" : k.weave ? "spindle" : k.inter ? "tear" : (k.phase||1) >= 2 ? "cut" : "weave"]; }
+    if(kind==="unsignedhand"){ if(k.final) return ["hand", "final"]; if(k.pen2){ o.burn = (k.pen2.burn||0) > 0 ? 1 : 0; return ["hand", k.pen2.dark ? "dark" : "pen"]; }
+      return ["hand", (k.phase||1) >= 3 ? "redact" : (k.phase||1) >= 2 ? "margins" : "draft"]; }
+    return null; }
+  try{ if(typeof window!=="undefined") window.__sealMus = sealMusicPick; }catch(_){}
   function sndRaidLog(text){ try{ const t = String(text||""); for(const [re, snd] of SND_RAID){ if(re.test(t)){ HWSND.play(snd); return; } } }catch(_){} }
   function sndLater(name, ms){ try{ if(ms>0) setTimeout(()=>HWSND.play(name), ms); else HWSND.play(name); }catch(_){} }
   const SND_FEATURE = { lever:"lever", shrine:"shrine", well:"fountain", torch:"ignite", brazier:"ignite", crack:"crumble", mirror:"shatter", raidIntro:"ignite", raidEmber:"ignite", raidChain:"chain" };
@@ -30763,10 +30894,13 @@ thrall(){return gs(14)+
           if(k.clutch && !k.clutch.risen){ sec = "clutch"; let w = 0; (k.clutch.eggs||[]).forEach(x=>{ if(x.alive && x._egg) w = Math.max(w, x._egg.t/KM_EGG_HATCH); }); if((k.clutch.hatch||[]).some(h=>h.alive)) w = 1; o.warm = Math.round(w*10)/10; }
           else if(k.clutch && k.clutch.risen) sec = "again"; else if(k.fl) sec = "flash"; else if(k.awake) sec = "rise"; else sec = "brood"; }
         else if(b && b.kind==="slagwright"){ id = "forge";
-          if(k.self){ sec = "forged"; o.hot = k.self.st==="brittle" ? 0 : 1; } else if(b.hp/b.maxHp < 0.3) sec = "temper"; else if(k.phase >= 1) sec = "commission"; else sec = "arsenal"; } }
+          if(k.self){ sec = "forged"; o.hot = k.self.st==="brittle" ? 0 : 1; } else if(b.hp/b.maxHp < 0.3) sec = "temper"; else if(k.phase >= 1) sec = "commission"; else sec = "arsenal"; }
+        else if(b){ const pk = sealMusicPick(b.kind, k, o); if(pk){ id = pk[0]; sec = pk[1]; } } }
+      if(!id && r && r.k && r.k.final && S.over && S.won && SN.mus > 0 && SN.v > 0 && !SN.mute){ const bk = ((S.boss && S.boss.enemies && S.boss.enemies[0]) || {}).kind; /* the page is signed: the theme resolves */
+        if(bk==="unsignedhand"){ const now = S.tPrev||0; if(!r._resolveT) r._resolveT = now; if(now - r._resolveT < 7000){ id = "hand"; sec = "resolve"; } } }
       const rs = HWSND.raidState;
       if(id){ if(!rs || rs.id !== id || rs.want !== sec || Object.keys(o).some(x=>Math.abs((rs[x]==null ? -9 : rs[x]) - o[x]) > 0.02)) HWSND.raidMusic(id, sec, o); }
-      else if(rs) HWSND.raidMusic(null, null, { fade:(S.over && S.won) ? 0.5 : 3 }); }
+      else if(rs) HWSND.raidMusic(null, null, { fade:(S.over && S.won) ? (r && r._resolveT ? 3 : 0.5) : 3 }); }
     const me = S.party && S.party.self; if(!me) return;
     if(me._sndCast && !me.casting){ const h = me._sndCast; me._sndCast = null; h.stop(true); if(S.started && !S.over) HWSND.play("fizzle"); } // a cast cut off by a mechanic, a stun or a pin
     if(!S.started || S.over) return;
@@ -31984,19 +32118,19 @@ thrall(){return gs(14)+
     h += `<div class="trkExtras"><span class="trkSub" title="Any 3 of one trade for 1 of another; any one melts down for ${TRINKET_EMBERS} Embers">Spares</span>` + SEAL_COMP.map(k=>`<span class="trkX"><b title="${k.name}">${k.ic} ${T.comp[k.id]}</b>${SEAL_COMP.filter(o=>o.id!==k.id).map(o=>`<button type="button" class="anvBtn sm" data-tf="${k.id}" data-tt="${o.id}"${T.comp[k.id]>=3?"":" disabled"} title="Trade 3 ${k.name} for 1 ${o.name}">3→${o.ic}</button>`).join("")}<button type="button" class="anvBtn sm" data-em="${k.id}"${T.comp[k.id]>=1?"":" disabled"} title="Melt 1 ${k.name} for ${TRINKET_EMBERS} Embers">\u{1F525}${TRINKET_EMBERS}</button></span>`).join("") + `</div>`;
     document.getElementById("trkBody").innerHTML = h;
     const on = (id, fn)=>{ const el = document.getElementById(id); if(el) el.addEventListener("click", fn); };
-    on("trkEnchant", ()=>{ if(trinketEnchant(role)){ _trkFlash = true; renderTrinkets(); } });
+    on("trkEnchant", ()=>{ if(trinketEnchant(role)){ try{ HWSND.play("tableEnchant"); }catch(_){} _trkFlash = true; renderTrinkets(); } });
     on("trkChange", ()=>{ _trkPick = null; _trkChanging = true; renderTrinkets(); });
     document.querySelectorAll("#trkBody .trkOpt").forEach(b=>b.addEventListener("click", ()=>{ _trkPick = b.dataset.a; renderTrinkets(); const cf = document.querySelector("#trkBody .trkConfirm"); if(cf && cf.scrollIntoView) cf.scrollIntoView({ block:"nearest" }); }));
-    on("trkYes", ()=>{ if(trinketInscribe(role, _trkPick)){ _trkPick = null; _trkChanging = false; renderTrinkets(); } });
+    on("trkYes", ()=>{ if(trinketInscribe(role, _trkPick)){ try{ HWSND.play("tableInscribe"); }catch(_){} _trkPick = null; _trkChanging = false; renderTrinkets(); } });
     on("trkNo", ()=>{ _trkPick = null; _trkChanging = false; renderTrinkets(); });
-    document.querySelectorAll("#trkBody [data-tf]").forEach(b=>b.addEventListener("click", ()=>{ if(sealTrade(b.dataset.tf, b.dataset.tt)) renderTrinkets(); }));
-    document.querySelectorAll("#trkBody [data-em]").forEach(b=>b.addEventListener("click", ()=>{ if(sealToEmbers(b.dataset.em)) renderTrinkets(); }));
+    document.querySelectorAll("#trkBody [data-tf]").forEach(b=>b.addEventListener("click", ()=>{ if(sealTrade(b.dataset.tf, b.dataset.tt)){ try{ HWSND.play("tableTrade"); }catch(_){} renderTrinkets(); } }));
+    document.querySelectorAll("#trkBody [data-em]").forEach(b=>b.addEventListener("click", ()=>{ if(sealToEmbers(b.dataset.em)){ try{ HWSND.play("tableEmbers"); }catch(_){} renderTrinkets(); } }));
     on("trkTestGrant", ()=>{ SEAL_COMP.forEach(k=>T.comp[k.id] += 20); [0,1,2].forEach(t=>T.clears[t] = [3,4,5]); saveGame(); renderTrinkets(); });
   }
   function forgeSlot(role, slot){
     const K = kiln(), rk = forgeRank(role, slot); if(rk>=FORGE_MAX || rk>=forgeRankCap()) return false;
     const cost = FORGE_COST[rk]; if(K.embers < cost) return false;
-    K.embers -= cost; (K.forge[role] = K.forge[role]||{})[slot] = rk+1; _anvFlash = role+":"+slot;
+    K.embers -= cost; (K.forge[role] = K.forge[role]||{})[slot] = rk+1; _anvFlash = role+":"+slot; try{ HWSND.play("anvilForge"); }catch(_){} /* sealSoundV1 */
     saveGame(); renderAnvil(); if(typeof renderLoadout==="function") renderLoadout();
     return true;
   }
@@ -39983,7 +40117,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 43f617e381) */
+<script>/* phone app: offline cache (build 627fc5d4c6) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
