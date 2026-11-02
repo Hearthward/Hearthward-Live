@@ -12489,7 +12489,8 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
   function kiln(){ const K = S.kiln = S.kiln || {}; K.embers = K.embers||0; K.clears = K.clears||{}; K.forge = K.forge||{}; return K; }
   function raidTierCleared(t){ const c = kiln().clears[t]; return !!c && [0,1,2].every(i=>c.includes(i)); }
   function forgeRankCap(){ let n = 0; while(n<FORGE_MAX && raidTierCleared(n)) n++; return n; } // Normal -> I, Heroic -> II, Mythic -> III
-  function raidTierOpen(t){ return t<=0 || !!S._testMode || raidTierCleared(t-1); } // Heroic after a Normal clear, Mythic after Heroic (test party: all open)
+  function raidTierOpen(t, rid){ if(t<=0 || S._testMode) return true; if(!rid){ try{ rid = (S.arena && S.arena.raid) ? raidOfStage(S.arena.raid.stage).id : _raidSel; }catch(_){ rid = "ember"; } }
+    return rid==="seal" ? sealTierCleared(t-1) : raidTierCleared(t-1); } /* sealOpenV1: each raid's own clears open its next difficulty */ // Heroic after a Normal clear, Mythic after Heroic (test party: all open)
   function forgeRank(role, slot){ const f = S.kiln && S.kiln.forge && S.kiln.forge[role]; return (f && f[slot]) || 0; }
   function statUnforged(role, kind){ const st = computeRoleStats(role); return st[kind] - ((st._forged && st._forged[kind])||0); }
   function forgeMul(role, slot){ let m = 0; for(let i=0;i<forgeRank(role,slot);i++) m += FORGE_STEP[i]; return m; }
@@ -31877,17 +31878,16 @@ thrall(){return gs(14)+
         "The first spark to wake in the kiln. She bore the cinder pups and does not forgive the ones who put out her children's fires.",
         "The foundry's master smith, who forged the Hearthfired arms and never stopped. Heat and hammer are all that is left of him.",
         "The last lord of the Ashguard, still keeping vigil over the final ember. He will not let it go out, and he will not let it be taken." ] },
-    ...(TEST_TOOLS ? [{ id:"seal", name:"The Unsigned Seal", sub:"A working left unfinished.", stages:[3,4,5], testOnly:true, noRewards:true,
+    { id:"seal", name:"The Unsigned Seal", sub:"A working left unfinished.", stages:[3,4,5], noRewards:true, /* sealOpenV1: open to players; noRewards routes kilnAward to the Seal branch (components, no Embers) */
       lore:"An enchanting workshop whose great working was started and never finished. It kept running with no one to complete it.",
       bossLore:[
         "A containment warden holding far more charge than it was built for. It is cracking at every seam.",
         "A veiled seer who weaves the shape of the working on a loom of light. She has already seen how this ends.",
-        "A faceless scribe who has never finished the signature. (Stand-in fight.)" ] }]
-    : [{ id:"tide", name:"The Drowned Reliquary", sub:"Something stirs beneath the tide.", dummy:true, bosses:["???","???","???"],
-      lore:"Nothing is known of this place yet." }]),
+        "A faceless scribe who has never finished the signature. Every stroke it draws is meant to end you." ] },
   ];
   // sealRaidV1: which raid a stage belongs to, and the stage after it in that raid (null after its last boss)
   function raidOfStage(si){ return RAIDS.find(x=>x.stages && x.stages.includes(si)) || RAIDS[0]; }
+  try{ if(typeof window!=="undefined") window.__sealOpen = { raidTierOpen:(t, rid)=>raidTierOpen(t, rid), raids:()=>RAIDS, setSel:(id)=>{ _raidSel = id; } }; }catch(_){}
   function raidNextStage(si){ const R = raidOfStage(si), i = R.stages.indexOf(si); return (i>=0 && i<R.stages.length-1) ? R.stages[i+1] : null; }
   let _raidSel = "ember", _raidTier = 0;
   // Before raids open, the raid panel holds one line that darkens as you climb (a new line every 40 keystone levels).
@@ -31912,7 +31912,7 @@ thrall(){return gs(14)+
     const names = r.dummy ? r.bosses : r.stages.map(si=>RAID_STAGES[si].name.replace(/^The /,""));
     const q = t=>String(t||"").replace(/"/g,"&quot;");
     document.getElementById("raidList").innerHTML = `<div class="raidCard on${r.dummy?" sealed":""}"><div class="rcHead"><span class="rcName" title="${q(r.lore)}">${r.name}</span>${r.sub?`<span class="rcSub">${r.sub}</span>`:""}</div><div class="rcBosses">${names.map((n,i)=>`<span${r.bossLore&&r.bossLore[i]?` class="rcBoss" title="${q(r.bossLore[i])}"`:""}><b>${["I","II","III"][i]}</b>${n}</span>`).join("")}</div></div>`;
-    document.getElementById("raidNote").textContent = r.dummy ? "Not yet available." : r.testOnly ? "Test build: Normal only, no rewards. Bosses 1 and 2 are complete; boss 3 is a stand-in." : "Raids are tuned to fully upgraded parties. The most challenging descent awaits\u2026";
+    document.getElementById("raidNote").textContent = r.dummy ? "Not yet available." : "Raids are tuned to fully upgraded parties. The most challenging descent awaits\u2026";
     const go = document.getElementById("raidEnterBtn"); go.disabled = !!r.dummy; go.textContent = r.dummy ? "Sealed" : "Enter";
     // difficulty + Embers + the anvil
     const K = kiln(); if(!raidTierOpen(_raidTier) || r.normalOnly) _raidTier = 0;
@@ -39983,7 +39983,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build c2dad867a8) */
+<script>/* phone app: offline cache (build 43f617e381) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
