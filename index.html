@@ -1403,6 +1403,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   .hubBadge{ min-width:16px; height:16px; line-height:16px; border-radius:8px; background:var(--accent); color:#1b1410; font-size:.7rem; font-weight:700; text-align:center; }
   .hubBadge.coin{ background:none; font-size:.9rem; line-height:16px; min-width:0; }
   .endLine{ display:block; text-align:left; margin:2px 0; }
+  #endOverlay.rp1 #lootList, #endOverlay.rp1 #againBtn, #endOverlay.rp2 #endBody, #endNext{ display:none; } /* resultsPagesV1 */
+  #endOverlay.rp1 #endNext{ display:inline-block; } #endOverlay.rp1 .card{ cursor:pointer; } #endOverlay.rp2 #againBtn.rpHold{ pointer-events:none; }
+  #endOverlay.rp2 #lootList{ animation: rpIn .3s ease-out; } @keyframes rpIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
   /* killBeatV1 */
   #endOverlay.kbIn .card{ animation: kbRise .45s cubic-bezier(.2,.8,.3,1); }
   @keyframes kbRise{ 0%{ opacity:0; transform:translateY(14px) scale(.97); } 100%{ opacity:1; transform:none; } }
@@ -2271,6 +2274,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     <h2 id="endTitle">Victory</h2>
     <p id="endBody"></p>
     <div class="bestiary" id="lootList"></div>
+    <button class="go" id="endNext" type="button">See your drops ▸</button>
     <button class="go" id="againBtn">Descend Again</button>
   </div>
 </div>
@@ -2475,8 +2479,29 @@ const HWSND = (()=>{
       const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 5.2 + v*0.31 + i*0.17; lg.gain.value = f*0.006; l.connect(lg); lg.connect(os.frequency); l.start(t); l.stop(end+0.05);
       const vg = c.createGain(); vg.gain.value = 0.25/notes.length; os.connect(vg); vg.connect(form); os.start(t); os.stop(end+0.05); } }); }
   function harp(M, notes, t, step, o){ notes.forEach((f, i)=>osc(M, { f, t:t+i*step, a:0.002, d:o.d||0.7, g:o.g||0.06, type:"triangle", lp:f*4, pan:((i/(Math.max(1,notes.length-1)))-0.5)*(o.width||1.2), wet:o.wet==null?0.55:o.wet })); }
-  function crackle(M, t, dur, rate, g, seed, wet){ const r = rng(seed||7), n = Math.max(1, Math.round(dur*rate)); for(let i=0;i<n;i++) nz(M, { t:t+r()*dur, a:0.001, d:0.01+r()*0.025, g:g*(0.4+r()*0.6), ft:"highpass", f0:2200+r()*3500, q:0.6, pan:(r()-0.5)*0.8, off:r(), wet:wet||0.15 }); }
-  function sparkle(M, t, dur, rate, g, seed){ const r = rng(seed||5), n = Math.max(1, Math.round(dur*rate)), sc = [N.A5, N.Cs6, N.E6, N.A6, N.Fs6, N.D6]; for(let i=0;i<n;i++) bell(M, sc[Math.floor(r()*sc.length)], t+r()*dur, g*(0.5+r()*0.5), 0.5, { ratio:3.01, index:1.2, pan:(r()-0.5)*1.4, wet:0.75 }); }
+  // grainBankV1 (Nov 18): crackle and sparkle replay pre-made grains instead of building a filter/oscillator chain per grain.
+  // Each grain was ~7 audio nodes (source, filter, gain, its own route + panner + send); now 2 (buffer source + gain) into a few shared
+  // pan buses per call. Same random draws in the same order, so timing, pitch and pan patterns are unchanged; f0, length and pan are
+  // quantised (4 x 3 crackle grains, 5 pan positions). Baked once per sample rate; tiny buffers (~0.6 MB total).
+  const GB_F = [0, 1, 2, 3].map(k=>2200 + 3500*(k+0.5)/4), GB_D = [0, 1, 2].map(k=>0.01 + 0.025*(k+0.5)/3), GB_P = [-0.56, -0.28, 0, 0.28, 0.56];
+  function gbEnv(i, sr, a, d){ const t = i/sr; if(t < a) return E*Math.pow(1/E, t/a); const x = (t-a)/d; return x >= 1 ? 0 : Math.pow(E, x); }
+  function gbGrain(c, fi, di){ const k = C(c), key = "gc"+fi+"_"+di; if(k[key]) return k[key]; const sr = c.sampleRate, a = 0.001, d = GB_D[di], n = Math.ceil((a+d+0.004)*sr);
+    const b = c.createBuffer(1, n, sr), y = b.getChannelData(0), r = rng(101 + fi*7 + di*31), w = 2*Math.PI*GB_F[fi]/sr, cw = Math.cos(w), al = Math.sin(w)/(2*Math.pow(10, 0.6/20));
+    const a0 = 1+al, b0 = (1+cw)/2/a0, b1 = -(1+cw)/a0, b2 = b0, a1 = -2*cw/a0, a2 = (1-al)/a0; let x1 = 0, x2 = 0, y1 = 0, y2 = 0; /* the BiquadFilter highpass, Q in dB as Web Audio has it */
+    for(let i=0;i<n;i++){ const x = r()*2-1, v = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2; x2 = x1; x1 = x; y2 = y1; y1 = v; y[i] = v*gbEnv(i, sr, a, d); }
+    return k[key] = b; }
+  function gbBell(c, f){ const k = C(c), key = "gb"+f; if(k[key]) return k[key]; const sr = c.sampleRate, d = 0.5, n = Math.ceil((d+0.05)*sr), b = c.createBuffer(1, n, sr), y = b.getChannelData(0);
+    let pc = 0, pm = 0; const fm = f*3.01, i0 = f*1.2, i1 = f*0.05, tr = d*0.6; /* the FM bell: carrier f, modulator 3.01 f, index 1.2 f falling to 0.05 f */
+    for(let i=0;i<n;i++){ const t = i/sr, mg = t < tr ? i0*Math.pow(i1/i0, t/tr) : i1; pm += 2*Math.PI*fm/sr; pc += 2*Math.PI*(f + mg*Math.sin(pm))/sr; y[i] = Math.sin(pc)*gbEnv(i, sr, 0.002, d); }
+    return k[key] = b; }
+  function gbBuses(M, wet){ const c = M.c, head = route(M, { wet }), bus = {}; return p=>{ const q = GB_P.reduce((m, v)=>Math.abs(v-p) < Math.abs(m-p) ? v : m, 0);
+    if(!bus[q]){ if(q && c.createStereoPanner){ const sp = c.createStereoPanner(); sp.pan.value = q; sp.connect(head); bus[q] = sp; } else bus[q] = head; } return bus[q]; }; }
+  function gbPlay(M, buf, t, g, dst){ const c = M.c, src = c.createBufferSource(), amp = c.createGain(); src.buffer = buf; amp.gain.value = g; src.connect(amp); amp.connect(dst); src.start(t); }
+  function crackle(M, t, dur, rate, g, seed, wet){ const r = rng(seed||7), n = Math.max(1, Math.round(dur*rate)), bus = gbBuses(M, wet||0.15), c = M.c;
+    for(let i=0;i<n;i++){ const tt = t+r()*dur, d = 0.01+r()*0.025, gg = g*(0.4+r()*0.6), f0 = 2200+r()*3500, pan = (r()-0.5)*0.8; r(); /* off: unused now, kept so the draws stay in step */
+      gbPlay(M, gbGrain(c, Math.min(3, Math.floor((f0-2200)/875)), Math.min(2, Math.floor((d-0.01)/(0.025/3)))), tt, gg, bus(pan)); } }
+  function sparkle(M, t, dur, rate, g, seed){ const r = rng(seed||5), n = Math.max(1, Math.round(dur*rate)), sc = [N.A5, N.Cs6, N.E6, N.A6, N.Fs6, N.D6], bus = gbBuses(M, 0.75), c = M.c;
+    for(let i=0;i<n;i++){ const f = sc[Math.floor(r()*sc.length)], tt = t+r()*dur, gg = g*(0.5+r()*0.5), pan = (r()-0.5)*1.4; gbPlay(M, gbBell(c, f), tt, gg, bus(pan)); } }
   // threat building blocks
   function horn(M, notes, t, a, h, d, o){ notes.forEach((f, i)=>osc(M, { f, t, a, h, d, g:o.g/notes.length, type:"sawtooth", n:3, spread:14, lp:180, f2:o.bright||1400, fg:a, f3:500, q:1.2, drive:o.drive||3, wet:o.wet==null?0.12:o.wet, pan:o.pan })); }
   function drum(M, t, o){ osc(M, { f:o.f||150, f1:o.f1||48, glide:0.12, t, a:0.002, d:o.d||0.35, g:o.g||0.4, drive:o.drive||1.5, wet:o.wet==null?0.1:o.wet, pan:o.pan }); nz(M, { t, a:0.001, d:0.06, g:(o.g||0.4)*0.35, ft:"lowpass", f0:1800, wet:0.05, pan:o.pan }); }
@@ -3116,13 +3141,21 @@ const HWSND = (()=>{
   const SPELL_DONE = new Set(['mend','surge','wind','hearth','ward','cleanse','misdirect','purge']);
   let ctx = null, mix = null;
   const VOL = { master:0.6, sfx:1, amb:1, cmb:1, mus:0.5, mute:false };
-  function ensure(){ try{ if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null; ctx = new AC(); mix = buildMix(ctx, ctx.destination); apply(); }
-      if(ctx.state === "suspended" && !paused) ctx.resume(); return ctx; }catch(_){ return null; } }
+  function ensure(){ try{ if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return null; ctx = new AC(); mix = buildMix(ctx, ctx.destination); apply(); hookWake(); }
+      wake(); return ctx; }catch(_){ return null; } }
   let paused = false;
-  function setPaused(p){ paused = !!p; try{ if(ctx){ if(paused && ctx.state === "running") ctx.suspend(); else if(!paused && ctx.state === "suspended") ctx.resume(); } }catch(_){} }
+  // audioWakeV1 (Nov 18): iOS can stop the context on its own ("interrupted": a call, a notification, the audio thread overloaded).
+  // Any state other than running is woken when the game isn't paused, at most twice a second, and on the next tap or key (iOS only
+  // allows the restart inside a user gesture). play() drops sounds while the context isn't running instead of queuing them, so a
+  // stall can't release a pile of sounds at once when it comes back.
+  let wakeT = 0, wakeHooked = false;
+  function wake(force){ try{ if(!ctx || paused || ctx.state === "running" || ctx.state === "closed") return; const now = Date.now(); if(!force && now - wakeT < 500) return; wakeT = now; const pr = ctx.resume(); if(pr && pr.catch) pr.catch(()=>{}); }catch(_){} }
+  function hookWake(){ if(wakeHooked || typeof document === "undefined") return; wakeHooked = true; const f = ()=>wake(true);
+    ["pointerdown", "touchend", "keydown"].forEach(ev=>document.addEventListener(ev, f, { capture:true, passive:true })); }
+  function setPaused(p){ paused = !!p; try{ if(ctx){ if(paused && ctx.state === "running") ctx.suspend(); else if(!paused) wake(); } }catch(_){} }
   function apply(){ if(!mix) return; mix.master.gain.value = VOL.mute ? 0 : VOL.master; mix.sfx.gain.value = VOL.sfx; mix.amb.gain.value = VOL.amb * AMB_LEVEL; mix.cmb.gain.value = VOL.cmb; mix.musV.gain.value = VOL.mus * MUS_LEVEL; }
   const MUS_LEVEL = 1;
-  function play(name, opts){ if(!R[name]) return null; const c = ensure(); if(!c || VOL.mute || !(VOL.master>0)) return null; return playAt(c, name, opts, c.currentTime); }
+  function play(name, opts){ if(!R[name]) return null; const c = ensure(); if(!c || VOL.mute || !(VOL.master>0)) return null; if(c.state !== "running") return null; /* audioWakeV1 */ return playAt(c, name, opts, c.currentTime); }
   function playAt(c, name, opts, now){ const r = R[name];
     const threat = THREAT.has(name), combat = COMBAT.has(name);
     if(now - (last[name]||-9) < (COOLDOWN[name]==null ? DEF_CD : COOLDOWN[name])) return null; last[name] = now;
@@ -12604,6 +12637,9 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
   const TRINKET_COST = [1, 2, 3, 5], TRINKET_STEP = 0.01, TRINKET_EMBERS = 12, TRINKET_TIERS = ["I","II","III","IV"];
   function sealK(){ const K = kiln(), T = K.seal = K.seal || {}; T.comp = T.comp || { core:0, sheet:0, sigil:0 }; T.clears = T.clears || {}; T.tr = T.tr || {}; T.focus = T.focus || "self"; return T; }
   function trinketOf(role){ const T = sealK(); return T.tr[role] = T.tr[role] || { tier:0, insc:null }; }
+  function raidTabCurrency(r, K){ /* sealTabV1: the Seal tab shows its components, other raids their Embers */
+    if(r && r.id==="seal"){ const c = (sealK().comp)||{}; return `<span class="raidEmb" title="Components: one per Seal boss kill (2 on Heroic, 3 on Mythic), used at the Enchanting Table">${SEAL_COMP.map(k=>`<span title="${k.name}">${k.ic} ${c[k.id]|0}</span>`).join(" ")}</span>`; }
+    return `<span class="raidEmb" title="Embers: dropped by raid bosses, spent at the Ember Anvil">\u{1F525} ${K.embers}</span>`; }
   function sealTierCleared(t){ const c = sealK().clears[t]; return !!c && [3,4,5].every(i=>c.includes(i)); }
   function trinketTierCap(){ return sealTierCleared(2) ? 4 : sealTierCleared(1) ? 2 : sealTierCleared(0) ? 1 : 0; }
   function trinketMul(role){ const tr = S.kiln && S.kiln.seal && S.kiln.seal.tr && S.kiln.seal.tr[role]; return tr ? TRINKET_STEP*Math.min(3, tr.tier||0) : 0; }
@@ -27287,7 +27323,7 @@ thrall(){return gs(14)+
     S.over = true; S.won = won; S.paused = false;
     S.engagedGroups.clear();
     const _xp = awardTeamXp(won); S._sndLoot = null; S._sndUp = _xp.after>_xp.before; // soundHookV1
-    const overlay = document.getElementById("endOverlay");
+    const overlay = document.getElementById("endOverlay"); overlay.classList.remove("rp1", "rp2"); /* resultsPagesV1 */
     document.getElementById("endTitle").textContent = won ? "The Descent Is Cleared" : retreat ? "You Left the Descent" : "The Party Has Wiped";
     const clearLine = won && fullClearBonus() ? " You cleared every required pack: a bonus item drops." : "";
     const timedLine = won
@@ -27316,6 +27352,7 @@ thrall(){return gs(14)+
       const clearBonus = fullClearBonus();
       const bossGold = bossGoldReward(); S.gold = (S.gold||0) + bossGold; updateGoldLabel();
       const drops = rollRunLoot(); S._sndLoot = drops; // soundHookV1
+      if(drops.length) overlay.classList.add("rp1"); /* resultsPagesV1: XP first, then the drops */
       lootEl.innerHTML = `<h3>Recovered from the chamber</h3><div class="lootNote" style="font-size:12px;opacity:.85;margin:2px 0 6px">+${bossGold} gold from the boss` + (clearBonus ? ` · full clear: +1 bonus drop` : ``) + ((S._miniKills||0) ? ` · ${S._miniKills} mini-boss${S._miniKills>1?"es":""}: +${S._miniGold} gold & ${(S._miniDrops||[]).length} gear (already in your bags)` : ``) + `</div>` + drops.map(gearItemChipHTML).join("");
       // Round 78: record progress toward the keystone band gate. Only a WIN
       // advances it (a wipe shouldn't unlock anything), and only if it's a
@@ -30874,8 +30911,16 @@ thrall(){return gs(14)+
     chips.forEach(c=>{ if(!c || !c.now || c.mf || c.ramp || c.pip || c.id==="strain") return; const key = (boss.id||boss.name) + "|" + c.id; seen.add(key); if(_sndNow.has(key)) return; _sndNow.set(key, 1);
       const m = (kindMechs(kind)||[]).find(x=>x.id===c.id); if(m && m.windup>0) return; /* the wind-up hook already warned */ HWSND.play(HWSND.warnFor(m ? mechVerb(m).verb : c.verb)); });
     [..._sndNow.keys()].forEach(k=>{ if(!seen.has(k)) _sndNow.delete(k); }); }catch(_){} }
-  function sndResults(){ try{ HWSND.play("xpFill", { dur:1 }); const up = S._sndUp, drops = S._sndLoot || [];
+  // resultsPagesV1: the loot chime waits for page 2 when the results have two pages
+  let _resUpAt = 0, _resShownAt = 0;
+  function sndLootChime(delay){ try{ const drops = S._sndLoot || []; if(!drops.length) return; const best = Math.max(...drops.map(d=>RARITY_ORDER[d.rarity]||0)); setTimeout(()=>HWSND.play("loot"+Math.min(4, best)), delay); }catch(_){} }
+  function resPage2(){ const ov = document.getElementById("endOverlay"); if(!ov || !ov.classList.contains("rp1")) return;
+    ov.classList.remove("rp1"); ov.classList.add("rp2"); const ab = document.getElementById("againBtn"); if(ab){ ab.classList.add("rpHold"); setTimeout(()=>ab.classList.remove("rpHold"), 350); }
+    const now = performance.now(); sndLootChime(Math.max(150, _resUpAt ? _resUpAt + 1200 - now : 0)); sndTap(); }
+  function sndTap(){ try{ HWSND.play("click"); }catch(_){} }
+  function sndResults(){ try{ HWSND.play("xpFill", { dur:1 }); const up = S._sndUp, drops = S._sndLoot || []; _resUpAt = up ? performance.now() + 1100 : 0; _resShownAt = performance.now();
       if(up) setTimeout(()=>HWSND.play("levelUp"), 1100);
+      const two = document.getElementById("endOverlay").classList.contains("rp1"); if(two) return;
       if(drops.length){ const best = Math.max(...drops.map(d=>RARITY_ORDER[d.rarity]||0)); setTimeout(()=>HWSND.play("loot"+Math.min(4, best)), up ? 2300 : 1300); } }catch(_){} }
   function sndTick(){ if(typeof HWSND==="undefined") return; try{
     HWSND.setPaused(!!(S.started && !S.over && S.paused));
@@ -32052,7 +32097,7 @@ thrall(){return gs(14)+
     const K = kiln(); if(!raidTierOpen(_raidTier) || r.normalOnly) _raidTier = 0;
     const tw = document.getElementById("raidTiers");
     if(tw){ tw.hidden = !!r.dummy;
-      tw.innerHTML = RAID_TIER_NAMES.map((n,i)=>`<button type="button" class="raidTier${i===_raidTier?" on":""}${raidTierCleared(i)?" done":""}" data-t="${i}"${(r.normalOnly && i>0) ? ` disabled title="Not built yet"` : raidTierOpen(i)?"":` disabled title="Clear ${RAID_TIER_NAMES[i-1]} first"`}>${n}</button>`).join("") + `<span class="raidEmb" title="Embers: dropped by raid bosses, spent at the Ember Anvil">\u{1F525} ${K.embers}</span>`;
+      tw.innerHTML = RAID_TIER_NAMES.map((n,i)=>`<button type="button" class="raidTier${i===_raidTier?" on":""}${(r.id==="seal" ? sealTierCleared(i) : raidTierCleared(i))?" done":""}" data-t="${i}"${(r.normalOnly && i>0) ? ` disabled title="Not built yet"` : raidTierOpen(i)?"":` disabled title="Clear ${RAID_TIER_NAMES[i-1]} first"`}>${n}</button>`).join("") + raidTabCurrency(r, K);
       tw.querySelectorAll(".raidTier").forEach(b=>b.addEventListener("click", ()=>{ _raidTier = +b.dataset.t; refreshRaidBtn(); })); }
     const ab = document.getElementById("raidAnvilBtn"); if(ab) ab.hidden = !(K.anvil || S._testMode);
     { const tb = document.getElementById("raidTrinketBtn"); if(tb){ const T = K.seal; tb.hidden = !(S._testMode || (T && T.comp && (T.comp.core + T.comp.sheet + T.comp.sigil > 0 || Object.keys(T.tr||{}).length))); } } /* sealTrinketV1 */
@@ -39411,6 +39456,9 @@ thrall(){return gs(14)+
       renderMods(); updatePartyFrames();
       fitApp(); requestAnimationFrame(fitApp);
     });
+    { const ov = document.getElementById("endOverlay"); /* resultsPagesV1: a tap anywhere on page 1 turns the page */
+      ov.addEventListener("click", ()=>{ if(ov.classList.contains("rp1") && performance.now() - _resShownAt > 300) resPage2(); }); /* the tap that skipped the kill beat must not also turn the page */
+      document.addEventListener("keydown", e=>{ if(ov.style.display!=="none" && ov.classList.contains("rp1") && (e.key==="Enter" || e.key===" ") && performance.now() - _resShownAt > 300){ e.preventDefault(); e.stopPropagation(); resPage2(); } }, true); }
     document.getElementById("againBtn").addEventListener("click", ()=>{
       document.getElementById("startOverlay").style.display="flex";
       document.getElementById("endOverlay").style.display="none";
@@ -40029,7 +40077,23 @@ thrall(){return gs(14)+
     ctx.font="bold 15px 'Cinzel',serif"; ctx.textAlign="center"; ctx.fillStyle="rgba(215,190,255,.95)"; ctx.fillText("DISTORTED: controls reversed · touch a mirror",W/2,30); ctx.restore();
   }
 
+  // frameCapV1: which frames the loop may skip. Returns true to skip this one.
+  const FC = { last:0, busyT:-1e9, draws:0, skips:0, mode:"" };
+  function fcSkip(t){
+    const idle = !S.started || S.paused || (S.over && !S._killBeat);
+    let iv = 0, mode = "full";
+    if(idle){ iv = 250; mode = "idle"; }
+    else if(document.documentElement.classList.contains("phoneL")){
+      const busy = (S.engagedGroups && S.engagedGroups.size>0) || S.arena || S._killBeat || (S.party && S.party.self && S.party.self.casting) || S._camCine;
+      if(busy) FC.busyT = t;
+      if(!busy && t - FC.busyT > 1500){ iv = 1000/30; mode = "explore"; }
+    }
+    FC.mode = mode;
+    if(iv && t - FC.last < iv - 4){ FC.skips++; return true; }
+    FC.last = t; FC.draws++; return false; }
+  try{ if(typeof window!=="undefined") window.__fc = FC; }catch(_){}
   function loop(t){
+    if(fcSkip(t)){ sndTick(); requestAnimationFrame(loop); return; }
     const dt = Math.min(0.05, (t-(S.tPrev||t))/1000);
     S.tPrev = t;
     if(S.started && !S.over && !S.paused){
@@ -40117,7 +40181,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 627fc5d4c6) */
+<script>/* phone app: offline cache (build 017e25a227) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
