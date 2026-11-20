@@ -2124,7 +2124,7 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
   <div id="dispPanel" class="frame">
     <h3>Display</h3>
     <div class="dRow"><span>Render quality</span>
-      <div class="dSeg" id="dRQ"><button type="button" data-v="auto">Auto (sharp)</button><button type="button" data-v="std">Standard</button><button type="button" data-v="perf">Performance</button></div>
+      <div class="dSeg" id="dRQ"><button type="button" data-v="sharp">Sharp</button><button type="button" data-v="auto">Auto</button><button type="button" data-v="std">Standard</button><button type="button" data-v="perf">Performance</button></div>
       <span class="dNote" id="dRQnote"></span></div>
     <div class="dRow"><span>Numbers</span>
       <div class="dSeg" id="dNum"><button type="button" data-v="all">All</button><button type="button" data-v="imp">Important</button><button type="button" data-v="off">Off</button></div>
@@ -9590,7 +9590,13 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
   // before this round and still is.
   const KEYSTONE_BASE_TIMER = 300;
   const KEYSTONE_TIMER_STEP = 50;
-  function keystoneTimer(level){ return level<=0 ? KEYSTONE_BASE_TIMER : KEYSTONE_BASE_TIMER + (level-1)*KEYSTONE_TIMER_STEP; }
+  function keystoneTimerOld(level){ return level<=0 ? KEYSTONE_BASE_TIMER : KEYSTONE_BASE_TIMER + (level-1)*KEYSTONE_TIMER_STEP; }
+  // dunSizeV1: same seconds per pack as before at every keystone. Average packs per hall count, measured over seeds (harness/dsize.js).
+  const DUN_PACKS_BY_HALLS = { 3:9, 4:11, 5:13.2, 6:20.3, 7:19.3, 8:21, 9:23.3, 10:29.3, 11:32.2, 12:32.6, 13:33, 14:34, 15:34.7 };
+  function dunOldExtraHalls(level){ const lvl = Math.max(0, Math.min(100, level||0)); if(lvl<=0) return 0; return Math.round(2 + 10*Math.pow((lvl-1)/99, 0.6)); }
+  function keystoneTimer(level){ if(level<=0) return KEYSTONE_BASE_TIMER;
+    const oldP = DUN_PACKS_BY_HALLS[3 + dunOldExtraHalls(level)], newP = DUN_PACKS_BY_HALLS[3 + proceduralExtraHallsForLevel(level)];
+    return Math.round(keystoneTimerOld(level) * (newP && oldP ? newP/oldP : 1) / 10) * 10; }
 
   const DUNGEON_BASE_HP = 1.5, DUNGEON_BASE_DMG = 6, DUNGEON_BASE_RAMP = 20, DUNGEON_BASE_DMG_RAMP = 60; // balanceV1: damage reaches full at +60 // keystone +1 and up: dungeon baseline (the per-level steps below scale from here), phased in from +1 (no change) to full at +20
   function dunBaseMulR(full, level, ramp){ const f = Math.max(0, Math.min(1, (level-1)/(ramp-1))); return 1 + (full-1)*f; } // balanceV1
@@ -9678,10 +9684,10 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
   // Hearthfired gear doesn't drop until 80+. New curve: keystone 1 still opens with 5 rooms,
   // then grows slowly to 15 rooms at keystone 100 (1:5, 10:7, 20:9, 25:9, 45:11, 80:14, 100+:15).
   // Tune with the three knobs below; guard-pack difficulty no longer depends on room count.
-  const PROCEDURAL_MAX_EXTRA_HALLS = 12; // caps total halls at 3+12 = 15
-  const PROCEDURAL_HALLS_CAP_LEVEL = 100; // extraHalls reaches (and stays at) its max here
+  const PROCEDURAL_MAX_EXTRA_HALLS = 6; // dunSizeV1: caps total halls at 3+6 = 9 (~23 packs); was 12 (15 halls, ~35 packs)
+  const PROCEDURAL_HALLS_CAP_LEVEL = 150; // dunSizeV1: was 100
   const PROCEDURAL_HALLS_START_EXTRA = 2; // keystone 1 = 3+2 = 5 rooms
-  const PROCEDURAL_HALLS_EXPONENT = 0.6; // <1 = fast early, slower later
+  const PROCEDURAL_HALLS_EXPONENT = 1.1; // dunSizeV1: near-linear (was 0.6, which front-loaded growth: key 54 sat at 93% of the cap)
   function proceduralExtraHallsForLevel(level){
     const lvl = Math.max(0, Math.min(PROCEDURAL_HALLS_CAP_LEVEL, level||0));
     if(lvl<=0) return 0;
@@ -11991,6 +11997,7 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
       }, 0);
     }
     S.completionRequired = Math.round(packWeights.reduce((a,b)=>a+b,0) - Math.max(forkReduction, ...Object.values(groupWeights)));
+    { const req = packWeights.filter(w=>w>0); S._miniWeight = req.length ? 1.0 * req.reduce((a,b)=>a+b,0) / req.length : 0; } /* dunSizeV1 */
     S.completionEarned = 0;
 
     // Gear is equipped between descents (Gear Loadout screen) — every
@@ -14754,6 +14761,8 @@ if(typeof window !== "undefined") window.HWSND = HWSND;
       }
     }
     if(!(enemy._group && enemy._group.optional)) S.completionEarned += enemyWeight(enemy);
+    else if(enemy._group.spur){ /* dunSizeV1: spur rooms count toward Forces %, the mini-boss as one average required pack */
+      S.completionEarned += (enemy._group.mini && enemy.kind === enemy._group.mini) ? (S._miniWeight||0) : enemyWeight(enemy); }
     // Round 64: "no way to know when or where it's going to explode and no
     // way to get allied NPCs to move out of it" — Bursting used to deal
     // its damage the same instant the enemy died, with zero reaction
@@ -27800,7 +27809,7 @@ thrall(){return gs(14)+
     }
 
     // live ground-pool damage zones (already ignited, persist a few seconds)
-    S.groundPools.forEach(pool=>drawGroundPool(pool));
+    S.groundPools.forEach(pool=>{ if(worldOnScreen(pool.x, pool.y, (pool.radius||0) + 40)) drawGroundPool(pool); }); /* sprCullV1 */
     mpDraw(); // mechPredV1: after every boss telegraph and ground pool, so the shading sits on top
     drawRaidFx();
     drawTethers();
@@ -27842,7 +27851,7 @@ thrall(){return gs(14)+
     sprites.push({ wx:S.party.dpsCaster.x, wy:S.party.dpsCaster.y, draw:()=>drawUnitSprite(S.party.dpsCaster, resolveColor("var(--arcane)"), S.party.dpsCaster.short||"M") });
     sprites.push({ wx:S.party.self.x, wy:S.party.self.y, draw:()=>drawUnitSprite(S.party.self, resolveColor("var(--accent)"), "H") });
     sprites.sort((a,b)=>(a.wy-b.wy) || (a.wx-b.wx)); // top-down: whoever stands further down the screen draws in front
-    sprites.forEach(s=>s.draw());
+    sprites.forEach(s=>{ if(s.wy < -50000 || worldOnScreen(s.wx, s.wy, 220, 160)) s.draw(); }); /* sprCullV1: off-screen entries skipped */
     try{ sfxDrawTop(); }catch(_){} // compFxV1
     try{ drawKillBeat(); }catch(_){} // killBeatV1
     drawBeacons(); // oct10UiV1: above props and units, so objects never hide the beacon
@@ -28561,8 +28570,12 @@ thrall(){return gs(14)+
 
   // Unified floor: rims for every room, then corridor floors, then room floors (rooms last so a corridor's end tucks under the
   // room it joins instead of sitting on top of it as a pasted rectangle).
+  function roomOnScreen(r){ const m = 70, p0 = VIEW.project(r.x-m, r.y-m), p1 = VIEW.project(r.x+r.w+m, r.y+r.h+m); /* floorCullV1 */
+    return !(Math.max(p0.x,p1.x) < 0 || Math.min(p0.x,p1.x) > LW() || Math.max(p0.y,p1.y) < 0 || Math.min(p0.y,p1.y) > LH()); }
+  function worldOnScreen(x, y, m, up){ const p = VIEW.project(x, y), sm = m*VIEW.scale, su = (up||0)*VIEW.scale; /* sprCullV1 */
+    return !(p.x < -sm || p.x > LW() + sm || p.y < -sm || p.y > LH() + sm + su); }
   function drawFloors(){
-    const vis = ROOMS.filter(r=>!r.hidden);
+    const vis = ROOMS.filter(r=>!r.hidden && roomOnScreen(r));
     const ordered = vis.filter(r=>r.kind==="corridor").concat(vis.filter(r=>r.kind!=="corridor"));
     ordered.forEach(drawRoomRim);
     ordered.forEach(drawFloor);
@@ -39196,14 +39209,16 @@ thrall(){return gs(14)+
   // ===== Display settings (render quality, UI size) + movable-widget layout editor =====
   const DISP_KEY = "hearthward_display_v1";
   const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp", skinFx:2, snd:{ v:60, amb:100, cmb:100, mus:50, mute:false } }; // numbersV1: nums = all | imp | off; soundHookV1: snd
-  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if([0,1,2].includes(o.skinFx)) DISP.skinFx=o.skinFx; /* sealSkinsV1 */ if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), amb:typeof o.snd.amb==="number" ? Math.max(0, Math.min(100, o.snd.amb)) : 100, cmb:typeof o.snd.cmb==="number" ? Math.max(0, Math.min(100, o.snd.cmb)) : 100, mus:typeof o.snd.mus==="number" ? Math.max(0, Math.min(100, o.snd.mus)) : 50, mute:!!o.snd.mute }; /* musicHookV1: mus */ if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
+  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["sharp","auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if([0,1,2].includes(o.skinFx)) DISP.skinFx=o.skinFx; /* sealSkinsV1 */ if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), amb:typeof o.snd.amb==="number" ? Math.max(0, Math.min(100, o.snd.amb)) : 100, cmb:typeof o.snd.cmb==="number" ? Math.max(0, Math.min(100, o.snd.cmb)) : 100, mus:typeof o.snd.mus==="number" ? Math.max(0, Math.min(100, o.snd.mus)) : 50, mute:!!o.snd.mute }; /* musicHookV1: mus */ if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
   // soundHookV1: browsers only start audio from a tap or key; menu buttons tick
   document.addEventListener("pointerdown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
   document.addEventListener("keydown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
   document.addEventListener("click", e=>{ try{ const b = e.target && e.target.closest && e.target.closest("button"); if(!b || b.disabled || b.closest(".abilities,#castBar,#dSnd")) return;
     HWSND.play(/tab|Tab|Pick|raidTier|wdBtn|dSeg|rgPick/.test(b.className + " " + (b.parentElement ? b.parentElement.className + " " + b.parentElement.id : "")) ? "tab" : "click"); }catch(_){} }, true);
   function dispSave(){ try{ localStorage.setItem(DISP_KEY, JSON.stringify(DISP)); }catch(e){} }
-  function computeRS(){ const dpr = window.devicePixelRatio||1; return DISP.rq==="std" ? 1 : DISP.rq==="perf" ? 0.75 : Math.max(1, Math.min(2, dpr)); }
+  function rsTouch(){ try{ return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches) || document.documentElement.classList.contains("phoneL"); }catch(_){ return false; } }
+  function computeRS(){ const dpr = window.devicePixelRatio||1; /* perfV2: Auto = 1.5x on touch screens; Sharp = the old 2x */
+    if(DISP.rq==="std") return 1; if(DISP.rq==="perf") return 0.75; const top = Math.max(1, Math.min(2, dpr)); if(DISP.rq==="sharp") return top; return rsTouch() ? Math.min(1.5, top) : top; }
   RS = computeRS();
   const HW_WIDGETS = [
     {id:"party", sel:"#partyFrames", label:"Party"},
@@ -40155,7 +40170,7 @@ thrall(){return gs(14)+
     drawScene();
     if(S.arena && S.arena.tut) tutLayoutUI(); // tutorialV1
     if(S.started){
-      updatePartyFrames();
+      if(!(t - (S._pfAt||-1e9) < 62)){ S._pfAt = t; updatePartyFrames(); } /* perfV2: party frames at ~15 Hz */
       updateAbilitiesHUD();
       updateCastBar();
     }
@@ -40181,7 +40196,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build 017e25a227) */
+<script>/* phone app: offline cache (build e46ce8a1ef) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
