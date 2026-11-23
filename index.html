@@ -2126,6 +2126,9 @@ canvas{ width:100%; height:100%; display:block; touch-action: none; }
     <div class="dRow"><span>Render quality</span>
       <div class="dSeg" id="dRQ"><button type="button" data-v="sharp">Sharp</button><button type="button" data-v="auto">Auto</button><button type="button" data-v="std">Standard</button><button type="button" data-v="perf">Performance</button></div>
       <span class="dNote" id="dRQnote"></span></div>
+    <div class="dRow"><span>Battery saver</span>
+      <div class="dSeg" id="dBat"><button type="button" data-v="0">Off</button><button type="button" data-v="1">On</button></div>
+      <span class="dNote">30 frames a second in fights too: less heat and battery on phones, slightly less smooth motion.</span></div>
     <div class="dRow"><span>Numbers</span>
       <div class="dSeg" id="dNum"><button type="button" data-v="all">All</button><button type="button" data-v="imp">Important</button><button type="button" data-v="off">Off</button></div>
       <span class="dNote">Important: big hits on the party and the healing that lands. All: every hit, including on enemies.</span></div>
@@ -2816,7 +2819,7 @@ const HWSND = (()=>{
       if(on) st.lv[i] = 1; else setTimeout(()=>{ if(st.target < i) st.lv[i] = 0; }, 3200); } st.target = level; }
   function musicPump(st, until){ while(st.t < until){ musicStep(st, null, st.t); st.t += st.spb; } }
   let mus = null, musTimer = null;
-  function music(fam, level){ fam = fam || null; level = level|0; const c = (fam && level) ? ensure() : ctx; if(!c) return;
+  function music(fam, level){ fam = fam || null; level = level|0; if(!(VOL.mus>0)) level = 0; /* audioQuietV1: music volume 0 = no music made */ const c = (fam && level) ? ensure() : ctx; if(!c) return;
     if(mus && (mus.fam !== fam || !level)){ const old = mus; musicLevel(old, 0, c.currentTime); setTimeout(()=>{ old.lg.forEach(x=>{ if(x){ try{ x.g.disconnect(); x.w.disconnect(); }catch(_){} } }); }, 3500); mus = null; }
     if(!fam || !level) return;
     if(!mus){ mus = musicNew(c, mix.mus, mix.verbIn, fam, c.currentTime, (Date.now() & 0xffff) + 7); mus.target = 0;
@@ -3040,7 +3043,7 @@ const HWSND = (()=>{
     Object.keys(o).forEach(k=>{ const v = o[k]; if(typeof v !== "number") return; if(st.v[k]==null || Math.abs(st.v[k] - v) > 0.01){ st.v[k] = v; ch = true; } });
     if(ch && st.sec) raidBus(st, when, (st.sec==="dark" || st.sec==="forged" || st.sec==="pen") ? 0.3 : 1.2); }
   let rmus = null, rmTimer = null;
-  function raidMusic(id, sec, o){ id = id || null; const c = (id && sec) ? ensure() : ctx; if(!c) return;
+  function raidMusic(id, sec, o){ id = id || null; if(!(VOL.mus>0)) id = null; /* audioQuietV1 */ const c = (id && sec) ? ensure() : ctx; if(!c) return;
     if(rmus && (rmus.id !== id || !sec)){ const old = rmus; raidMain(old, false, c.currentTime, (o && o.fade) || 3); /* fade: 0.5 s on a kill, as Dark Souls cuts to silence */ setTimeout(()=>{ try{ old.mainD.disconnect(); old.mainW.disconnect(); }catch(_){} }, 3500); rmus = null; }
     if(!id || !sec) return;
     if(!rmus){ rmus = raidNew(c, mix.mus, mix.verbIn, id, c.currentTime, (Date.now() & 0xffff) + 3); if(!rmus) return; rmus.want = sec; raidMain(rmus, true, c.currentTime);
@@ -3149,11 +3152,14 @@ const HWSND = (()=>{
   // allows the restart inside a user gesture). play() drops sounds while the context isn't running instead of queuing them, so a
   // stall can't release a pile of sounds at once when it comes back.
   let wakeT = 0, wakeHooked = false;
-  function wake(force){ try{ if(!ctx || paused || ctx.state === "running" || ctx.state === "closed") return; const now = Date.now(); if(!force && now - wakeT < 500) return; wakeT = now; const pr = ctx.resume(); if(pr && pr.catch) pr.catch(()=>{}); }catch(_){} }
+  function wake(force){ try{ if(!ctx || paused || quiet() || ctx.state === "running" || ctx.state === "closed") return; const now = Date.now(); if(!force && now - wakeT < 500) return; wakeT = now; const pr = ctx.resume(); if(pr && pr.catch) pr.catch(()=>{}); }catch(_){} }
   function hookWake(){ if(wakeHooked || typeof document === "undefined") return; wakeHooked = true; const f = ()=>wake(true);
     ["pointerdown", "touchend", "keydown"].forEach(ev=>document.addEventListener(ev, f, { capture:true, passive:true })); }
   function setPaused(p){ paused = !!p; try{ if(ctx){ if(paused && ctx.state === "running") ctx.suspend(); else if(!paused) wake(); } }catch(_){} }
-  function apply(){ if(!mix) return; mix.master.gain.value = VOL.mute ? 0 : VOL.master; mix.sfx.gain.value = VOL.sfx; mix.amb.gain.value = VOL.amb * AMB_LEVEL; mix.cmb.gain.value = VOL.cmb; mix.musV.gain.value = VOL.mus * MUS_LEVEL; }
+  // audioQuietV1 (Nov 21): muted (or master 0) = the whole audio context is suspended, so nothing is made or processed (the reverb,
+  // compressor and music schedulers ran on into a zero gain before). Unmuting wakes it (the settings tap is a user gesture).
+  function quiet(){ return !!VOL.mute || !(VOL.master>0); }
+  function apply(){ if(!mix) return; try{ if(ctx){ if(quiet()){ if(ctx.state !== "closed") ctx.suspend(); } else wake(true); } if(!(VOL.amb>0) && ambCur) amb(null); }catch(_){} /* suspend even mid-resume; stop ambience already playing when its volume hits 0 (the game only re-asks when it changes) */ mix.master.gain.value = VOL.mute ? 0 : VOL.master; mix.sfx.gain.value = VOL.sfx; mix.amb.gain.value = VOL.amb * AMB_LEVEL; mix.cmb.gain.value = VOL.cmb; mix.musV.gain.value = VOL.mus * MUS_LEVEL; }
   const MUS_LEVEL = 1;
   function play(name, opts){ if(!R[name]) return null; const c = ensure(); if(!c || VOL.mute || !(VOL.master>0)) return null; if(c.state !== "running") return null; /* audioWakeV1 */ return playAt(c, name, opts, c.currentTime); }
   function playAt(c, name, opts, now){ const r = R[name];
@@ -3187,7 +3193,7 @@ const HWSND = (()=>{
   function ambStopNode(a, c, fade){ const n = c.currentTime; [a.bus, a.wbus].forEach(g=>{ g.gain.cancelScheduledValues(n); g.gain.setValueAtTime(g.gain.value, n); g.gain.linearRampToValueAtTime(0, n+fade); });
     setTimeout(()=>{ a.srcs.forEach(x=>{ try{ x.stop(); }catch(_){} }); try{ a.bus.disconnect(); a.wbus.disconnect(); }catch(_){} }, fade*1000+200); }
   let ambTimer = null;
-  function amb(name){ name = name || null; if((ambCur && ambCur.name) === name) return; const c = name ? ensure() : ctx; if(!c) return;
+  function amb(name){ name = name || null; if(!(VOL.amb>0)) name = null; /* audioQuietV1: ambience volume 0 = none made */ if((ambCur && ambCur.name) === name) return; const c = name ? ensure() : ctx; if(!c) return;
     if(ambCur){ ambStopNode(ambCur, c, 2.0); ambCur = null; }
     if(name){ ambCur = ambStart(c, mix.amb, mix.verbIn, name, c.currentTime + 0.05, (Date.now() & 0xffff) + 1);
       if(!ambTimer) ambTimer = setInterval(()=>{ if(ambCur && ctx && ctx.state === "running") ambPump(ambCur, ctx.currentTime + 1); }, 250); } }
@@ -39208,8 +39214,9 @@ thrall(){return gs(14)+
 
   // ===== Display settings (render quality, UI size) + movable-widget layout editor =====
   const DISP_KEY = "hearthward_display_v1";
-  const DISP = { rq:"auto", ui:1, layout:{}, nums:"imp", skinFx:2, snd:{ v:60, amb:100, cmb:100, mus:50, mute:false } }; // numbersV1: nums = all | imp | off; soundHookV1: snd
-  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["sharp","auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if([0,1,2].includes(o.skinFx)) DISP.skinFx=o.skinFx; /* sealSkinsV1 */ if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), amb:typeof o.snd.amb==="number" ? Math.max(0, Math.min(100, o.snd.amb)) : 100, cmb:typeof o.snd.cmb==="number" ? Math.max(0, Math.min(100, o.snd.cmb)) : 100, mus:typeof o.snd.mus==="number" ? Math.max(0, Math.min(100, o.snd.mus)) : 50, mute:!!o.snd.mute }; /* musicHookV1: mus */ if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
+  const DISP_TOUCH = (()=>{ try{ return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches); }catch(_){ return false; } })(); /* phoneDefaultsV1 */
+  const DISP = { rq:"auto", bat:DISP_TOUCH, ui:1, layout:{}, nums:"imp", skinFx:2, snd:{ v:60, amb:100, cmb:100, mus:50, mute:DISP_TOUCH } }; // numbersV1: nums = all | imp | off; soundHookV1: snd
+  try{ const raw = localStorage.getItem(DISP_KEY); if(raw){ const o = JSON.parse(raw); if(o){ if(["sharp","auto","std","perf"].includes(o.rq)) DISP.rq=o.rq; if(o.bat===true||o.bat===false) DISP.bat=o.bat; /* batterySaverV1 */ if(+o.ui>=0.7 && +o.ui<=1.6) DISP.ui=+o.ui; if(["all","imp","off"].includes(o.nums)) DISP.nums=o.nums; if([0,1,2].includes(o.skinFx)) DISP.skinFx=o.skinFx; /* sealSkinsV1 */ if(o.snd && typeof o.snd.v==="number") DISP.snd = { v:Math.max(0, Math.min(100, o.snd.v)), amb:typeof o.snd.amb==="number" ? Math.max(0, Math.min(100, o.snd.amb)) : 100, cmb:typeof o.snd.cmb==="number" ? Math.max(0, Math.min(100, o.snd.cmb)) : 100, mus:typeof o.snd.mus==="number" ? Math.max(0, Math.min(100, o.snd.mus)) : 50, mute:!!o.snd.mute }; /* musicHookV1: mus */ if(o.layout && typeof o.layout==="object") DISP.layout=o.layout; } } }catch(e){}
   // soundHookV1: browsers only start audio from a tap or key; menu buttons tick
   document.addEventListener("pointerdown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
   document.addEventListener("keydown", ()=>{ try{ HWSND.ensure(); }catch(_){} }, true);
@@ -39332,6 +39339,7 @@ thrall(){return gs(14)+
   // --- panel ---
   function dispSync(){
     document.querySelectorAll("#dRQ button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.rq));
+    document.querySelectorAll("#dBat button").forEach(b=> b.classList.toggle("on", (b.dataset.v==="1")===!!DISP.bat)); /* batterySaverV1 */
     document.querySelectorAll("#dNum button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.nums)); // numbersV1
     document.querySelectorAll("#dSkinFx button").forEach(b=> b.classList.toggle("on", +b.dataset.v===DISP.skinFx)); /* sealSkinsV1 */
     { const sv = document.getElementById("dSnd"); if(sv){ sv.value = DISP.snd.v; document.getElementById("dSndV").textContent = DISP.snd.mute ? "Muted" : DISP.snd.v+"%"; const mb = document.getElementById("dSndMute"); mb.textContent = DISP.snd.mute ? "Unmute" : "Mute"; mb.classList.toggle("on", DISP.snd.mute); const av = document.getElementById("dAmb"); av.value = DISP.snd.amb; document.getElementById("dAmbV").textContent = DISP.snd.amb+"%"; const cv = document.getElementById("dCmb"); cv.value = DISP.snd.cmb; document.getElementById("dCmbV").textContent = DISP.snd.cmb+"%"; const mv = document.getElementById("dMus"); mv.value = DISP.snd.mus; document.getElementById("dMusV").textContent = DISP.snd.mus ? DISP.snd.mus+"%" : "Off"; } } // soundHookV1 + musicHookV1
@@ -39341,6 +39349,7 @@ thrall(){return gs(14)+
   document.getElementById("dispBtn").addEventListener("click", e=>{ e.stopPropagation(); const p = document.getElementById("dispPanel"); p.classList.toggle("open"); dispSync(); });
   document.addEventListener("pointerdown", e=>{ const p = document.getElementById("dispPanel"); if(p.classList.contains("open") && !p.contains(e.target) && e.target.id!=="dispBtn") p.classList.remove("open"); });
   document.querySelectorAll("#dRQ button").forEach(b=> b.addEventListener("click", ()=>{ DISP.rq = b.dataset.v; dispSave(); fitApp(); dispSync(); }));
+  document.querySelectorAll("#dBat button").forEach(b=> b.addEventListener("click", ()=>{ DISP.bat = b.dataset.v==="1"; dispSave(); dispSync(); })); /* batterySaverV1 */
   document.querySelectorAll("#dNum button").forEach(b=> b.addEventListener("click", ()=>{ DISP.nums = b.dataset.v; dispSave(); dispSync(); })); // numbersV1
   document.querySelectorAll("#dSkinFx button").forEach(b=> b.addEventListener("click", ()=>{ DISP.skinFx = +b.dataset.v; dispSave(); dispSync(); })); /* sealSkinsV1 */
   function sndApply(){ try{ HWSND.VOL.master = DISP.snd.v/100; HWSND.VOL.amb = DISP.snd.amb/100; HWSND.VOL.cmb = DISP.snd.cmb/100; HWSND.VOL.mus = DISP.snd.mus/100; HWSND.VOL.mute = !!DISP.snd.mute; HWSND.apply(); }catch(_){} } // soundHookV1
@@ -40098,6 +40107,7 @@ thrall(){return gs(14)+
     const idle = !S.started || S.paused || (S.over && !S._killBeat);
     let iv = 0, mode = "full";
     if(idle){ iv = 250; mode = "idle"; }
+    else if(typeof DISP!=="undefined" && DISP.bat){ iv = 1000/30; mode = "saver"; } /* batterySaverV1: 30 fps everywhere */
     else if(document.documentElement.classList.contains("phoneL")){
       const busy = (S.engagedGroups && S.engagedGroups.size>0) || S.arena || S._killBeat || (S.party && S.party.self && S.party.self.casting) || S._camCine;
       if(busy) FC.busyT = t;
@@ -40196,7 +40206,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build e46ce8a1ef) */
+<script>/* phone app: offline cache (build f81f640672) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
