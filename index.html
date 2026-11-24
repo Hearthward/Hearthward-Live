@@ -480,6 +480,13 @@
   #dispPanel .dSndRow{ display:flex; gap:8px; align-items:center; } #dispPanel .dSndRow input{ flex:1; min-width:0; } #dispPanel #dSndMute.on{ background:var(--accent-strong); color:var(--bg); } /* soundHookV1 */
   #dispPanel .dBtns{ display:flex; gap:6px; flex-wrap:wrap; }
   @media (max-width: 899px), (max-height: 559px){ #dispPanel .dDesk{ display:none; } }
+  /* dispPhoneV1 */
+  html.phoneL #dispPanel{ top:8px; right:8px; width:min(330px, 48vw); padding:9px 11px 12px; gap:7px; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; -webkit-overflow-scrolling:touch; }
+  html.phoneL #dispPanel h3{ font-size:.72rem; position:sticky; top:-9px; background:inherit; margin:-9px -11px 0; padding:9px 11px 4px; z-index:1; }
+  html.phoneL #dispPanel .dRow{ gap:3px; } html.phoneL #dispPanel .dRow > span:first-child{ font-size:.7rem; }
+  html.phoneL #dispPanel .dSeg button{ min-height:30px; padding:2px 0; font-size:.62rem; letter-spacing:0; }
+  html.phoneL #dispPanel .dNote{ font-size:.58rem; line-height:1.3; }
+  html.phoneL #dispPanel input[type=range]{ height:30px; } html.phoneL #dispPanel button.dBtn, html.phoneL #dispPanel #dSndMute{ min-height:30px; }
   #raidTitle{ position:fixed; left:0; right:0; top:20%; text-align:center; pointer-events:none; z-index:70; opacity:0; font-family:Cinzel,serif; color:#ffe6b8; }
 #raidTitle .rtT{ font-size:clamp(26px,5.2vw,64px); letter-spacing:.22em; padding-left:.22em; white-space:nowrap; font-weight:700; text-transform:uppercase; text-shadow:0 0 30px rgba(255,120,30,.85),0 0 8px rgba(255,200,120,.6),0 3px 0 #000; }
 #raidTitle .rtS{ margin-top:10px; font-size:clamp(12px,1.6vw,20px); letter-spacing:.38em; padding-left:.38em; text-transform:uppercase; color:#e0b890; text-shadow:0 2px 0 #000; }
@@ -39337,9 +39344,14 @@ thrall(){return gs(14)+
   }
   function hwReset(){ DISP.layout = {}; dispSave(); applyDisplay(); fitApp(); if(hwEditing) { document.getElementById("hwEdit").innerHTML=""; hwUpdateFrames(); } }
   // --- panel ---
+  function dispFit(){ /* dispPhoneV1: on phones the panel fits the screen below its top edge and scrolls inside */
+    const p = document.getElementById("dispPanel"); if(!p) return; if(!document.documentElement.classList.contains("phoneL") || !p.classList.contains("open")){ p.style.maxHeight = ""; return; }
+    const r = p.getBoundingClientRect(), sc = (r.width / (p.offsetWidth||r.width)) || 1; p.style.maxHeight = Math.max(160, Math.floor((window.innerHeight - r.top - 8) / sc)) + "px"; }
+  window.addEventListener("resize", ()=>{ try{ dispFit(); }catch(_){} });
   function dispSync(){
     document.querySelectorAll("#dRQ button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.rq));
     document.querySelectorAll("#dBat button").forEach(b=> b.classList.toggle("on", (b.dataset.v==="1")===!!DISP.bat)); /* batterySaverV1 */
+    dispFit(); /* dispPhoneV1 */
     document.querySelectorAll("#dNum button").forEach(b=> b.classList.toggle("on", b.dataset.v===DISP.nums)); // numbersV1
     document.querySelectorAll("#dSkinFx button").forEach(b=> b.classList.toggle("on", +b.dataset.v===DISP.skinFx)); /* sealSkinsV1 */
     { const sv = document.getElementById("dSnd"); if(sv){ sv.value = DISP.snd.v; document.getElementById("dSndV").textContent = DISP.snd.mute ? "Muted" : DISP.snd.v+"%"; const mb = document.getElementById("dSndMute"); mb.textContent = DISP.snd.mute ? "Unmute" : "Mute"; mb.classList.toggle("on", DISP.snd.mute); const av = document.getElementById("dAmb"); av.value = DISP.snd.amb; document.getElementById("dAmbV").textContent = DISP.snd.amb+"%"; const cv = document.getElementById("dCmb"); cv.value = DISP.snd.cmb; document.getElementById("dCmbV").textContent = DISP.snd.cmb+"%"; const mv = document.getElementById("dMus"); mv.value = DISP.snd.mus; document.getElementById("dMusV").textContent = DISP.snd.mus ? DISP.snd.mus+"%" : "Off"; } } // soundHookV1 + musicHookV1
@@ -40206,7 +40218,7 @@ thrall(){return gs(14)+
 </script>
 
 
-<script>/* phone app: offline cache (build f81f640672) */
+<script>/* phone app: offline cache (build d0beac641b) */
 if("serviceWorker" in navigator) window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
 </script>
 </body>
